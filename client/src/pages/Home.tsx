@@ -1,6 +1,8 @@
 import { Map, UtensilsCrossed, ClipboardList, Plus } from "lucide-react";
 import { ToolCard, type Tool } from "@/components/ToolCard";
 import logoUrl from "@assets/blckbx-logo.png";
+import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 
 const tools: Tool[] = [
   {
@@ -54,16 +56,36 @@ const tools: Tool[] = [
 ];
 
 export default function Home() {
+  const { logout } = useAuth();
+  const [, setLocation] = useLocation();
+
+  const handleLogout = () => {
+    logout();
+    setLocation("/login", { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-[#E8E4DE]">
-      <header className="p-8 text-center">
-        <img
-          src={logoUrl}
-          alt="BlckBx"
-          className="h-16 w-auto mx-auto mb-2"
-        />
-        <h1 className="text-2xl font-semibold text-[#1a1a1a] mt-4">Tools</h1>
-        <p className="text-gray-600 mt-2">Select a tool to get started</p>
+      <header className="p-8">
+        <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
+          <div className="text-center flex-1">
+            <img
+              src={logoUrl}
+              alt="BlckBx"
+              className="h-16 w-auto mx-auto mb-2"
+            />
+            <h1 className="text-2xl font-semibold text-[#1a1a1a] mt-4">Tools</h1>
+            <p className="text-gray-600 mt-2">Select a tool to get started</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-full bg-[#E7C51C] text-[#232220] text-sm font-medium px-4 py-2 hover:bg-[#d8b614] transition-colors"
+            data-testid="button-home-signout"
+          >
+            Sign Out
+          </button>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 pb-12">

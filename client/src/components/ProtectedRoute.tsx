@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Redirect } from "wouter";
+import { useLocation } from "wouter";
 import logoUrl from "@assets/blckbx-logo.png";
 
 interface ProtectedRouteProps {
@@ -8,6 +9,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
+  const [location] = useLocation();
 
   if (isLoading) {
     return (
@@ -20,7 +22,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isAuthenticated) {
-    return <Redirect to="/login" />;
+    const redirectTo = encodeURIComponent(location || "/");
+    return <Redirect to={`/login?redirect=${redirectTo}`} />;
   }
 
   return <>{children}</>;

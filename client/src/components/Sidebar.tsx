@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Map, UtensilsCrossed } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SidebarLinkProps {
   to: string;
@@ -37,9 +38,15 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
 }
 
 export function Sidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { logout, isAuthenticated } = useAuth();
 
   if (location === "/") return null;
+
+  const handleLogout = () => {
+    logout();
+    setLocation("/login", { replace: true });
+  };
 
   return (
     <aside className="fixed left-0 top-0 h-full w-16 hover:w-48 bg-[#1a1a1a] text-white transition-all duration-200 z-50 group">
@@ -68,6 +75,18 @@ export function Sidebar() {
           badge="Soon"
         />
       </nav>
+      {isAuthenticated && (
+        <div className="absolute bottom-4 left-0 right-0 px-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full rounded-full bg-[#E7C51C] text-[#232220] text-sm font-medium py-2 hover:bg-[#d8b614] transition-colors"
+            data-testid="button-sidebar-signout"
+          >
+            Sign Out
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

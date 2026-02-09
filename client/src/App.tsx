@@ -45,7 +45,13 @@ function Router() {
     <Layout>
       <Switch>
         {/* Home */}
-        <Route path="/" component={Home} />
+        <Route path="/">
+          {() => (
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          )}
+        </Route>
 
         {/* Public routes */}
         <Route path="/login" component={Login} />
@@ -89,7 +95,13 @@ function Router() {
         </Route>
 
         {/* Public itinerary view (must come after specific /itinerary/* routes) */}
-        <Route path="/itinerary/:slug" component={ViewItinerary} />
+        <Route path="/itinerary/:slug">
+          {() => (
+            <ProtectedRoute>
+              <ViewItinerary />
+            </ProtectedRoute>
+          )}
+        </Route>
 
         {/* Itinerary dashboard */}
         <Route path="/itinerary">
@@ -101,7 +113,13 @@ function Router() {
         </Route>
 
         {/* Meals Tool - Coming Soon */}
-        <Route path="/meals" component={MealsComingSoon} />
+        <Route path="/meals">
+          {() => (
+            <ProtectedRoute>
+              <MealsComingSoon />
+            </ProtectedRoute>
+          )}
+        </Route>
 
         {/* Catch-all redirect to home */}
         <Route>

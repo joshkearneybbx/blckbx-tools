@@ -45,7 +45,9 @@ export default function OAuthCallback() {
 
         // Redirect to dashboard after a short delay
         setTimeout(() => {
-          navigate("/itinerary");
+          const redirectTo = sessionStorage.getItem("blckbx_oauth_redirect") || "/itinerary";
+          sessionStorage.removeItem("blckbx_oauth_redirect");
+          navigate(redirectTo);
         }, 500);
       } catch (err: any) {
         console.error("OAuth callback error:", err);
