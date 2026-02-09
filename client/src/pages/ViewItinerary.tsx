@@ -720,36 +720,42 @@ export default function ViewItinerary() {
       if (!slug) throw new Error('No slug provided');
 
       console.log('Fetching itinerary by slug:', { slug, isLoggedIn });
+      console.log('Making API call to PocketBase...');
 
-      // Logged-in users can view all statuses. Public viewers only see published.
-      const filter = isLoggedIn
-        ? `customUrlSlug = "${slug}"`
-        : `customUrlSlug = "${slug}" && status = "published"`;
-
-      const records = await pb.collection('blckbx_projects').getList(1, 1, {
-        filter,
-      });
-
-      if (records.items.length === 0) {
+      // Always fetch by slug first and apply auth/status checks after response.
+      // This allows PocketBase view rules to decide public access for published records.
+      let project: any;
+      try {
+        project = await pb.collection('blckbx_projects').getFirstListItem(
+          `customUrlSlug = "${slug}"`
+        );
+      } catch (err: any) {
+        console.error('Project fetch error:', err);
         throw new Error('Itinerary not found');
       }
 
-      const project = records.items[0];
+      console.log('API response:', { id: project?.id, status: project?.status, slug: project?.customUrlSlug });
+
+      // Explicit client-side guard: public users cannot access drafts.
+      if (project?.status === 'draft' && !pb.authStore.isValid) {
+        throw new Error('This itinerary is not available');
+      }
+
       console.log('Project fetched:', { id: project.id, name: project.name, slug: project.customUrlSlug });
 
       // Fetch related collections
       const [
-        destinations, 
-        travellers, 
-        accommodations, 
-        activities, 
-        dining, 
-        bars, 
-        outboundTravel, 
-        returnTravel, 
-        helpfulInformation,
-        interDestinationTravel
-      ] = await Promise.all([
+        destinationsResult,
+        travellersResult,
+        accommodationsResult,
+        activitiesResult,
+        diningResult,
+        barsResult,
+        outboundTravelResult,
+        returnTravelResult,
+        helpfulInformationResult,
+        interDestinationTravelResult,
+      ] = await Promise.allSettled([
         pb.collection('blckbx_destinations').getFullList({
           filter: `project = "${project.id}"`,
           sort: 'displayOrder'
@@ -774,14 +780,36 @@ export default function ViewItinerary() {
           filter: `project = "${project.id}"`,
           sort: 'displayOrder'
         }),
-        pb.collection('blckbx_outbound_travel').getFirstListItem(`project = "${project.id}"`).catch(() => null),
-        pb.collection('blckbx_return_travel').getFirstListItem(`project = "${project.id}"`).catch(() => null),
-        pb.collection('blckbx_helpful_information').getFirstListItem(`project = "${project.id}"`).catch(() => null),
+        pb.collection('blckbx_outbound_travel').getFirstListItem(`project = "${project.id}"`),
+        pb.collection('blckbx_return_travel').getFirstListItem(`project = "${project.id}"`),
+        pb.collection('blckbx_helpful_information').getFirstListItem(`project = "${project.id}"`),
         pb.collection('blckbx_inter_destination_travel').getFullList({
           filter: `project = "${project.id}"`,
           sort: 'displayOrder'
-        }).catch(() => []),
+        }),
       ]);
+
+      const destinations = destinationsResult.status === 'fulfilled' ? destinationsResult.value : [];
+      const travellers = travellersResult.status === 'fulfilled' ? travellersResult.value : [];
+      const accommodations = accommodationsResult.status === 'fulfilled' ? accommodationsResult.value : [];
+      const activities = activitiesResult.status === 'fulfilled' ? activitiesResult.value : [];
+      const dining = diningResult.status === 'fulfilled' ? diningResult.value : [];
+      const bars = barsResult.status === 'fulfilled' ? barsResult.value : [];
+      const outboundTravel = outboundTravelResult.status === 'fulfilled' ? outboundTravelResult.value : null;
+      const returnTravel = returnTravelResult.status === 'fulfilled' ? returnTravelResult.value : null;
+      const helpfulInformation = helpfulInformationResult.status === 'fulfilled' ? helpfulInformationResult.value : null;
+      const interDestinationTravel = interDestinationTravelResult.status === 'fulfilled' ? interDestinationTravelResult.value : [];
+
+      if (destinationsResult.status === 'rejected') console.error('Destinations fetch error:', destinationsResult.reason);
+      if (travellersResult.status === 'rejected') console.error('Travellers fetch error:', travellersResult.reason);
+      if (accommodationsResult.status === 'rejected') console.error('Accommodations fetch error:', accommodationsResult.reason);
+      if (activitiesResult.status === 'rejected') console.error('Activities fetch error:', activitiesResult.reason);
+      if (diningResult.status === 'rejected') console.error('Dining fetch error:', diningResult.reason);
+      if (barsResult.status === 'rejected') console.error('Bars fetch error:', barsResult.reason);
+      if (outboundTravelResult.status === 'rejected') console.error('Outbound travel fetch error:', outboundTravelResult.reason);
+      if (returnTravelResult.status === 'rejected') console.error('Return travel fetch error:', returnTravelResult.reason);
+      if (helpfulInformationResult.status === 'rejected') console.error('Helpful information fetch error:', helpfulInformationResult.reason);
+      if (interDestinationTravelResult.status === 'rejected') console.error('Inter-destination travel fetch error:', interDestinationTravelResult.reason);
 
       console.log('Related collections fetched:', {
         destinations: destinations.length,

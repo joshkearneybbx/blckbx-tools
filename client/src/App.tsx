@@ -15,6 +15,7 @@ import OAuthCallback from "@/pages/OAuthCallback";
 import NotFound from "@/pages/not-found";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Sidebar } from "@/components/Sidebar";
+import { useAuth } from "@/hooks/useAuth";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -28,12 +29,13 @@ const queryClient = new QueryClient({
 
 function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const isHome = location === "/";
+  const { isAuthenticated } = useAuth();
+  const showSidebar = isAuthenticated && location !== "/";
 
   return (
     <div className="flex">
-      <Sidebar />
-      <main className={`flex-1 ${!isHome ? "ml-0 md:ml-16" : ""}`}>
+      {showSidebar && <Sidebar />}
+      <main className={`flex-1 ${showSidebar ? "ml-0 md:ml-16" : ""}`}>
         {children}
       </main>
     </div>
