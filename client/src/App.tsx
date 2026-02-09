@@ -95,13 +95,7 @@ function Router() {
         </Route>
 
         {/* Public itinerary view (must come after specific /itinerary/* routes) */}
-        <Route path="/itinerary/:slug">
-          {() => (
-            <ProtectedRoute>
-              <ViewItinerary />
-            </ProtectedRoute>
-          )}
-        </Route>
+        <Route path="/itinerary/:slug" component={ViewItinerary} />
 
         {/* Itinerary dashboard */}
         <Route path="/itinerary">

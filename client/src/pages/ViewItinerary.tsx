@@ -40,7 +40,13 @@ import { CSS } from "@dnd-kit/utilities";
 
 // Sortable Travel Item component for drag-and-drop
 // Supports both legacy AdditionalTravel format and new AdditionalTravelSegment format
-function SortableTravelItem({ travel }: { travel: any }) {
+function SortableTravelItem({
+  travel,
+  canReorder = true,
+}: {
+  travel: any;
+  canReorder?: boolean;
+}) {
   const {
     attributes,
     listeners,
@@ -183,26 +189,27 @@ function SortableTravelItem({ travel }: { travel: any }) {
         isDragging ? 'shadow-xl ring-2 ring-[#E7C51C]' : ''
       }`}
     >
-      {/* Header with drag handle and travel type */}
+      {/* Header with optional drag handle and travel type */}
       <div className="px-4 py-3 flex items-center gap-3 border-b bg-muted/30">
-        {/* Functional drag handle button */}
-        <button
-          type="button"
-          {...listeners}
-          {...attributes}
-          className="flex flex-col gap-1 cursor-grab active:cursor-grabbing hover:opacity-70 transition-opacity touch-none p-1 -m-1"
-          style={{ touchAction: 'none' }}
-          aria-label="Drag to reorder"
-        >
-          <div className="flex gap-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
-          </div>
-          <div className="flex gap-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
-          </div>
-        </button>
+        {canReorder && (
+          <button
+            type="button"
+            {...listeners}
+            {...attributes}
+            className="flex flex-col gap-1 cursor-grab active:cursor-grabbing hover:opacity-70 transition-opacity touch-none p-1 -m-1"
+            style={{ touchAction: 'none' }}
+            aria-label="Drag to reorder"
+          >
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+            </div>
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+            </div>
+          </button>
+        )}
         <h3 className="font-semibold text-lg">{displayType}</h3>
         {travel.date && (
           <span className="text-sm text-muted-foreground ml-auto">{travel.date}</span>
@@ -704,17 +711,23 @@ export default function ViewItinerary() {
   const { toast } = useToast();
   const [linkCopied, setLinkCopied] = useState(false);
   const { user, isAuthResolved } = useAuth();
+  const isLoggedIn = !!user;
+  const canEdit = isLoggedIn;
 
   const { data, isLoading, error } = useQuery<FullItinerary>({
-    queryKey: ["public_itinerary", slug],
+    queryKey: ["itinerary_by_slug", slug, isLoggedIn],
     queryFn: async () => {
       if (!slug) throw new Error('No slug provided');
 
-      console.log('Fetching public itinerary by slug:', slug);
+      console.log('Fetching itinerary by slug:', { slug, isLoggedIn });
 
-      // Fetch by customUrlSlug - this is for public viewing
+      // Logged-in users can view all statuses. Public viewers only see published.
+      const filter = isLoggedIn
+        ? `customUrlSlug = "${slug}"`
+        : `customUrlSlug = "${slug}" && status = "published"`;
+
       const records = await pb.collection('blckbx_projects').getList(1, 1, {
-        filter: `customUrlSlug = "${slug}" && status = "published"`,
+        filter,
       });
 
       if (records.items.length === 0) {
@@ -828,14 +841,13 @@ export default function ViewItinerary() {
         customSectionItems: [],
       };
     },
-    enabled: !!slug,
+    enabled: !!slug && isAuthResolved,
     staleTime: 0,
     gcTime: 0,
   });
 
-  // Check if current user is the owner of this itinerary
-  const isOwner = isAuthResolved && user?.id === data?.itinerary?.user;
-  const isOwnershipDetermined = isAuthResolved && !isLoading;
+  // Logged-in users have team-wide edit access.
+  const isAccessDetermined = isAuthResolved && !isLoading;
 
   // Pre-process images for PDF (convert to data URIs)
   const { processedItinerary, isLoading: isProcessingImages } = useImagePreprocessor(data);
@@ -901,6 +913,17 @@ export default function ViewItinerary() {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
+  if (!isAuthResolved) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" data-testid="loader-auth-resolve" />
+          <p className="text-lg text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -925,7 +948,7 @@ export default function ViewItinerary() {
           <p className="text-muted-foreground">
             We couldn't load this itinerary. Please check the link or contact support.
           </p>
-          {isAuthResolved && user && (
+          {isLoggedIn && (
             <Link href="/itinerary">
               <Button data-testid="button-back-home">
                 Return to Dashboard
@@ -1275,7 +1298,7 @@ export default function ViewItinerary() {
           <div className="max-w-5xl mx-auto px-4 md:px-6 py-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                {isOwnershipDetermined && isOwner ? (
+                {isAccessDetermined && canEdit ? (
                   <Link href="/itinerary">
                     <img
                       src={logoUrl}
@@ -1295,7 +1318,7 @@ export default function ViewItinerary() {
               </div>
               
               <div className="flex flex-wrap gap-2">
-                {isOwnershipDetermined && isOwner && (
+                {isAccessDetermined && canEdit && (
                   <Link href={`/itinerary/edit/${itinerary.id}`}>
                     <Button 
                       variant="outline"
@@ -1558,7 +1581,7 @@ export default function ViewItinerary() {
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
-                    onDragEnd={handleAdditionalTravelDragEnd}
+                    onDragEnd={canEdit ? handleAdditionalTravelDragEnd : undefined}
                   >
                     <SortableContext
                       items={fallbackAdditionalTravelItems.map((item) => item.id)}
@@ -1569,6 +1592,7 @@ export default function ViewItinerary() {
                           <SortableTravelItem
                             key={travel.id}
                             travel={travel}
+                            canReorder={canEdit}
                           />
                         ))}
                       </div>
