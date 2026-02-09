@@ -1,0 +1,171 @@
+TASK: Fix Drag-and-Drop on Preview & Arrange Page - Additional Travel Items Not Reordering
+
+ISSUE: On the Preview & Arrange page (/itinerary/:id/preview), the Additional Travel items show drag handles (⋮⋮) and cursor changes to "grab", but items don't actually move when dragged. Getting a "no entry" (🚫) cursor.
+
+LOCATION: This is on the PREVIEW page, NOT the published view page.
+
+DEBUGGING STEPS:
+
+1. FIND the Preview & Arrange component file (likely `PreviewArrange.tsx` or `ItineraryPreview.tsx`)
+
+2. CHECK if Additional Travel items are inside the DndContext:
+
+Look for this structure:
+```tsx
+<DndContext>
+  <SortableContext items={...}>
+    {/* Accommodations - these probably work */}
+    {/* Activities - these probably work */}
+    {/* Dining - these probably work */}
+    {/* Additional Travel - THESE DON'T WORK */}
+  </SortableContext>
+</DndContext>
+```
+
+3. THE PROBLEM: Additional Travel items might be OUTSIDE the sortable context or using different IDs
+
+4. FIX: Ensure Additional Travel items are properly wrapped:
+```tsx
+// State for additional travel
+const [additionalTravelItems, setAdditionalTravelItems] = useState(
+  itinerary.additionalTravel || []
+);
+
+// Make sure the IDs are in the items array
+const allSortableItems = [
+  ...accommodations.map((_, i) => `accommodation-${i}`),
+  ...activities.map((_, i) => `activity-${i}`),
+  ...dining.map((_, i) => `dining-${i}`),
+  ...additionalTravelItems.map((_, i) => `additional-travel-${i}`), // ADD THIS
+];
+
+// In JSX - wrap Additional Travel items with Sortable:
+<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+  <SortableContext items={allSortableItems} strategy={verticalListSortingStrategy}>
+    
+    {/* ... other sections ... */}
+    
+    {/* Additional Travel Section */}
+    {additionalTravelItems.map((travel, index) => (
+      <SortableItem
+        key={`additional-travel-${index}`}
+        id={`additional-travel-${index}`}
+        type="additional-travel"
+        index={index}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          {/* Drag handle */}
+          <DragHandle />
+          
+          <h3 className="font-semibold text-xl">
+            {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+          </h3>
+          
+          <div className="ml-auto">
+            <VisibilityToggle />
+          </div>
+        </div>
+        
+        {/* Travel content */}
+        <div className="space-y-2 text-sm">
+          <div><strong>Flight Number:</strong> {travel.flightNumber}</div>
+          <div><strong>Date:</strong> {travel.date}</div>
+          <div><strong>Departure:</strong> {travel.from} at {travel.departureTime}</div>
+          <div><strong>Arrival:</strong> {travel.to} at {travel.arrivalTime}</div>
+        </div>
+      </SortableItem>
+    ))}
+    
+  </SortableContext>
+</DndContext>
+```
+
+5. UPDATE handleDragEnd to handle additional-travel:
+```tsx
+const handleDragEnd = (event: DragEndEvent) => {
+  const { active, over } = event;
+  
+  if (!over || active.id === over.id) return;
+  
+  const activeId = active.id as string;
+  const overId = over.id as string;
+  
+  // Determine which section is being reordered
+  if (activeId.startsWith('additional-travel-') && overId.startsWith('additional-travel-')) {
+    const oldIndex = parseInt(activeId.split('-')[2]);
+    const newIndex = parseInt(overId.split('-')[2]);
+    
+    setAdditionalTravelItems((items) => arrayMove(items, oldIndex, newIndex));
+    
+    // Save to database
+    saveAdditionalTravelOrder(itinerary.id, arrayMove(additionalTravelItems, oldIndex, newIndex));
+  }
+  
+  // ... handle other sections (accommodations, activities, dining) ...
+};
+```
+
+6. VERIFY the SortableItem component has proper props:
+```tsx
+function SortableItem({ id, type, index, children }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-gray-100 rounded-lg p-6 mb-4">
+      {/* Clone children and inject drag handle props */}
+      {React.Children.map(children, (child) => {
+        if (React.isValidElement(child)) {
+          return React.cloneElement(child, { listeners, attributes });
+        }
+        return child;
+      })}
+    </div>
+  );
+}
+```
+
+7. ALTERNATIVE: If Additional Travel is in a separate component, make sure it's using the SAME DndContext:
+
+Don't create a new DndContext for Additional Travel - it must share the same context as the other sections.
+
+8. CONSOLE LOG for debugging:
+
+Add this temporarily to see what's happening:
+```tsx
+const handleDragEnd = (event) => {
+  console.log('Drag ended:', {
+    activeId: event.active.id,
+    overId: event.over?.id,
+    activeType: event.active.id.split('-')[0],
+  });
+  
+  // ... rest of handler
+};
+```
+
+Then check the browser console when you try to drag an Additional Travel item.
+
+EXPECTED BEHAVIOR:
+- Click and hold drag handle: cursor changes to "grab" ✅ (this works)
+- Start dragging: item should lift up and follow cursor
+- Drag over another item: items should swap positions
+- Release: new order should persist
+
+IF STILL NOT WORKING:
+Share the console output and I'll help debug further. The key is making sure Additional Travel items are:
+1. Inside the DndContext
+2. Using correct IDs that match the items array
+3. Have the dragHandleProps applied correctly

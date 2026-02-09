@@ -1,0 +1,93 @@
+TASK: Make Email Address Fit on One Line in PDF Sidebar - No Truncation
+
+PROBLEM: Email address wrapping to 2 lines. Need it to fit on ONE line without truncation.
+
+SOLUTION: Increase sidebar width and adjust font sizing properly
+
+## DEFINITIVE FIX:
+```tsx
+// PDF Styles - Update these values
+sidebar: {
+  width: 160,  // Increase from 120 to 160 (gives more room)
+  backgroundColor: '#000000',
+  padding: 20,
+},
+sidebarTitle: {
+  color: '#FFFFFF',
+  fontSize: 10,
+  fontWeight: 'bold',
+  marginBottom: 8,
+  maxWidth: 120,  // Adjust to new sidebar width
+},
+sidebarEmail: {
+  color: '#FFFFFF',
+  fontSize: 7,  // Small enough to fit most emails
+  marginBottom: 4,
+  maxWidth: 120,  // Adjust to new sidebar width
+  lineHeight: 1.2,
+},
+
+// Adjust main content accordingly
+mainContent: {
+  flex: 1,
+  paddingLeft: 180,  // Adjust for new sidebar width (160 + 20 padding)
+  paddingRight: 40,
+  paddingTop: 40,
+  paddingBottom: 40,
+},
+```
+
+## IF STILL WRAPPING - Try Even Wider Sidebar:
+```tsx
+sidebar: {
+  width: 180,  // Even wider
+  backgroundColor: '#000000',
+  padding: 20,
+},
+sidebarEmail: {
+  color: '#FFFFFF',
+  fontSize: 8,  // Can use slightly larger font with more width
+  marginBottom: 4,
+  maxWidth: 140,
+  lineHeight: 1.2,
+},
+mainContent: {
+  flex: 1,
+  paddingLeft: 200,  // Adjust for 180 + 20 padding
+  paddingRight: 40,
+  paddingTop: 40,
+  paddingBottom: 40,
+},
+```
+
+## ALTERNATIVE - Dynamic Font Sizing:
+```tsx
+// Calculate font size based on email length
+const getEmailFontSize = (email: string) => {
+  if (email.length <= 20) return 9;
+  if (email.length <= 25) return 8;
+  if (email.length <= 30) return 7;
+  return 6;
+};
+
+// In JSX
+<Text style={{
+  ...styles.sidebarEmail,
+  fontSize: getEmailFontSize(consultant.email)
+}}>
+  {consultant.email}
+</Text>
+```
+
+## WHAT TO IMPLEMENT:
+
+**Step 1:** Change sidebar width to 160px
+**Step 2:** Change sidebarEmail fontSize to 7
+**Step 3:** Adjust mainContent paddingLeft to 180px
+**Step 4:** Test with longest email address
+
+If it still wraps with width 160, go to 180px width.
+
+The email WILL fit - it's just a matter of finding the right width/font combination!
+
+NO truncation, NO ellipsis - just proper sizing.

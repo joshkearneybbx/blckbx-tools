@@ -1,0 +1,300 @@
+ITINERARY APP - REMOVE PAGE 9, MANAGE SECTIONS & ADD WIZARD NAVIGATION
+OBJECTIVE
+
+Remove Page 9 (Additional Notes) from wizard
+Remove "Manage Sections" button from dashboard
+Add direct page navigation to wizard for editing drafts
+
+⚠️ CRITICAL INSTRUCTION
+Implement all changes without asking for confirmation. I will test at the end.
+
+1. REMOVE PAGE 9 (ADDITIONAL NOTES)
+Remove from wizard:
+
+Delete Page9AdditionalNotes.tsx component file
+Remove from wizard routing/navigation
+Update progress indicator from "Page X of 9" to "Page X of 8"
+Remove any database fields related to Additional Notes
+Remove from display view if present
+
+Update wizard flow:
+
+Page 1: Basic Info & Travellers
+Page 2: Outbound Travel
+Page 3: Accommodation
+Page 4: Activities
+Page 5: Dining
+Page 6: Additional Travel
+Page 7: Return Travel
+Page 8: Helpful Information
+Page 9: Additional Notes (DELETE)
+
+After Page 8, go directly to Preview & Arrange
+
+2. REMOVE "MANAGE SECTIONS" BUTTON
+Location: Dashboard page (top area near "Create New Itinerary")
+Action:
+
+Delete the "Manage Sections" button completely
+Remove any associated routing to section builder
+Keep only "Create New Itinerary" button
+
+Before:
+[+ Create New Itinerary]  [⚙️ Manage Sections]
+After:
+[+ Create New Itinerary]
+Also remove:
+
+Section Builder page/component (if not already removed)
+Any routes to /section-builder
+Any API endpoints for custom section templates (if separate from itinerary sections)
+
+
+3. ADD WIZARD PAGE NAVIGATION (SIDEBAR)
+Requirement:
+When editing a draft, show a sidebar/navigation menu with all 8 pages listed. Users can click any page to jump directly to it without clicking "Next" multiple times.
+3.1 Design Concept
+Layout:
+┌─────────────┬──────────────────────────────────┐
+│             │                                  │
+│ Page Nav    │  Current Page Content            │
+│             │                                  │
+│ ✓ Page 1    │                                  │
+│ ✓ Page 2    │                                  │
+│ • Page 3    │  [Form fields here]              │
+│   Page 4    │                                  │
+│   Page 5    │                                  │
+│   Page 6    │                                  │
+│   Page 7    │                                  │
+│   Page 8    │                                  │
+│             │                                  │
+│             │  [Previous] [Next]               │
+│             │                                  │
+└─────────────┴──────────────────────────────────┘
+3.2 Navigation Sidebar
+Show on left side of wizard:
+tsx<div className="wizard-sidebar">
+  <h3>Itinerary Sections</h3>
+  <nav className="page-navigation">
+    {pages.map((page, index) => (
+      <button
+        key={page.id}
+        onClick={() => goToPage(index + 1)}
+        className={classNames({
+          'active': currentPage === index + 1,
+          'completed': page.isCompleted,
+          'incomplete': !page.isCompleted
+        })}
+      >
+        {page.isCompleted && '✓'} {page.name}
+      </button>
+    ))}
+  </nav>
+</div>
+Page list:
+
+Basic Info & Travellers
+Outbound Travel
+Accommodation
+Activities
+Dining
+Additional Travel
+Return Travel
+Helpful Information
+
+Visual indicators:
+
+✓ Green checkmark = Page completed (has data saved)
+• Blue dot = Current page
+Grey text = Not started yet
+
+Click behavior:
+
+Clicking any page navigates directly to it
+No validation required to jump between pages (it's a draft)
+Current page data auto-saves before navigating
+
+3.3 Implementation
+State management:
+tsxconst [currentPage, setCurrentPage] = useState(1);
+const [completedPages, setCompletedPages] = useState<number[]>([]);
+
+const goToPage = (pageNumber: number) => {
+  // Auto-save current page
+  saveDraft();
+  // Navigate to selected page
+  setCurrentPage(pageNumber);
+};
+
+// Mark page as completed when it has data
+const markPageComplete = (pageNumber: number) => {
+  if (!completedPages.includes(pageNumber)) {
+    setCompletedPages([...completedPages, pageNumber]);
+  }
+};
+Determine if page is completed:
+
+Page 1: Has assistantName and at least 1 traveller
+Page 2: Has outbound travel data
+Page 3: Has at least 1 accommodation
+Page 4: Has at least 1 activity (or marked as skipped)
+Page 5: Has at least 1 restaurant (or marked as skipped)
+Page 6: Has additional travel items (or marked as skipped)
+Page 7: Has return travel data
+Page 8: Has helpful info (or marked as skipped)
+
+3.4 Mobile Responsive
+On mobile/tablet:
+
+Sidebar collapses to dropdown at top
+"Jump to Page" dropdown selector
+Same functionality, different UI
+
+tsx// Mobile view
+<select onChange={(e) => goToPage(parseInt(e.target.value))}>
+  <option value="1">Page 1: Basic Info</option>
+  <option value="2">Page 2: Outbound Travel</option>
+  <option value="3">Page 3: Accommodation</option>
+  {/* ... */}
+</select>
+3.5 Auto-save on Navigation
+Important: When user clicks to jump to another page:
+
+Auto-save current page data
+Show "Saving..." indicator briefly
+Navigate to new page
+Load that page's existing data
+
+tsxconst handlePageNavigation = async (targetPage: number) => {
+  try {
+    setIsSaving(true);
+    await saveDraftData();
+    setCurrentPage(targetPage);
+  } catch (error) {
+    toast.error("Failed to save. Please try again.");
+  } finally {
+    setIsSaving(false);
+  }
+};
+3.6 Visual Design
+Sidebar styling:
+
+Fixed width: 240px
+Background: Light gray (#f5f5f5)
+Border-right: 1px solid #e0e0e0
+Padding: 20px
+
+Navigation buttons:
+
+Full width
+Left-aligned text
+Padding: 12px 16px
+Hover: Background lightens
+Active: Blue background, white text
+Completed: Green checkmark icon
+
+Page content area:
+
+Flexible width (takes remaining space)
+Padding: 40px
+Scrollable if content overflows
+
+
+4. UPDATE WIZARD FLOW
+New wizard behavior:
+Creating new itinerary:
+
+Start at Page 1
+Must complete Page 1 before seeing navigation (creates draft)
+After Page 1 saved, show full page navigation sidebar
+
+Editing existing draft:
+
+Load with page navigation visible immediately
+Show which pages are completed
+User can jump to any page
+Auto-save on page change
+
+Finishing itinerary:
+
+After Page 8, click "Preview & Arrange" button
+OR click "Publish" directly if no arrangement needed
+
+
+5. TESTING CHECKLIST
+
+ Page 9 removed from wizard
+ Progress shows "Page X of 8" (not 9)
+ "Manage Sections" button removed from dashboard
+ Create new itinerary - page navigation appears after Page 1
+ Edit draft - page navigation visible immediately
+ Click each page in navigation - jumps directly
+ Current page highlighted in navigation
+ Completed pages show checkmark
+ Data auto-saves when changing pages
+ Mobile: Navigation collapses to dropdown
+ Can jump backward and forward freely
+ Preview & Arrange works after Page 8
+ No broken routes or missing components
+
+
+IMPLEMENTATION ORDER
+
+Remove Page 9 component and all references
+Update wizard to show 8 pages total
+Remove "Manage Sections" button from dashboard
+Create WizardNavigation sidebar component
+Add page completion tracking logic
+Implement goToPage navigation function
+Add auto-save on page change
+Style navigation sidebar
+Add mobile responsive dropdown
+Test all page jumps
+Test with new and existing drafts
+
+
+VISUAL REFERENCE
+Desktop Layout:
+┌────────────────────────────────────────────────────────┐
+│  BlckBx Logo                              [Save Draft] │
+├──────────────┬─────────────────────────────────────────┤
+│              │                                         │
+│  Navigation  │  Page 3: Accommodation                  │
+│              │                                         │
+│  ✓ Basic     │  [+ Add Accommodation]                  │
+│  ✓ Outbound  │                                         │
+│  • Accom.    │  ┌─────────────────────────────────┐   │
+│    Activities│  │ Hotel ABC                       │   │
+│    Dining    │  │ Address: ...                    │   │
+│    Add.Trvl  │  │ [Edit] [Delete]                 │   │
+│    Return    │  └─────────────────────────────────┘   │
+│    Helpful   │                                         │
+│              │                                         │
+│              │  [← Previous]  [Next →]                 │
+└──────────────┴─────────────────────────────────────────┘
+Benefits:
+
+✅ Faster editing - jump to specific pages
+✅ Visual progress tracking
+✅ Better UX for long forms
+✅ No need to click through 6 pages to reach Page 7
+
+
+NOTES
+Page navigation only shows when:
+
+Editing an existing draft
+OR after Page 1 is completed in new itinerary
+
+Why?
+
+New itineraries need basic info first (assistant details, title)
+Once itinerary exists in database, can freely edit any section
+
+Auto-save is critical:
+
+Users expect changes to persist when jumping between pages
+Brief "Saving..." indicator provides feedback
+Error handling if save fails
+
+This makes editing drafts much more efficient and user-friendly!

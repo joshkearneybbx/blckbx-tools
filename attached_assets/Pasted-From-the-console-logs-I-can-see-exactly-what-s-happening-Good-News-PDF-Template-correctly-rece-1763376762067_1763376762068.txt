@@ -1,0 +1,176 @@
+From the console logs, I can see exactly what's happening:
+✅ Good News:
+
+PDF Template correctly receives data:
+
+Accommodations: 1 Array(1) ✅
+Activities: 2 Array(2) ✅
+Dining: 2 Array(2) ✅
+
+
+
+❌ The Problems:
+Problem 1: CORS Errors
+Access to fetch at 'https://offloadmedia.feverup.com/.../1024x576.jpg' 
+from origin 'https://08488a0d-eae7-401f-bd28-ca576ea9f962-00-8dusfmg12bew.worf.replit.dev' 
+has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header
+Problem 2: Not Valid Image Extension
+Not valid image extension (appears 4 times)
+Problem 3: Buffer Not Defined
+Buffer is not defined (appears 21 times)
+
+ROOT CAUSE:
+The activity/dining images have proper .jpg extensions, BUT:
+
+@react-pdf/renderer can't fetch them due to CORS - External sites block cross-origin requests
+The fixImageUrlForPdf function isn't working - Still getting "Not valid image extension" errors
+Buffer is not defined - Something is trying to use Node.js Buffer API in browser
+
+
+THE SOLUTION: Backend Image Proxy (Required)
+We need the backend proxy because:
+
+External image hosts (offloadmedia.feverup.com, galerieslafayette.com) don't allow CORS
+@react-pdf/renderer tries to fetch images in the browser, which fails
+Backend can fetch images and serve them without CORS issues
+
+
+IMPLEMENTATION:
+Step 1: Create Image Proxy Route
+Create file: server/routes/imageProxy.js
+javascriptimport express from 'express';
+
+const router = express.Router();
+
+router.get('/proxy-image', async (req, res) => {
+  const { url } = req.query;
+  
+  if (!url) {
+    return res.status(400).json({ error: 'URL parameter required' });
+  }
+
+  try {
+    // Validate URL
+    new URL(url);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  try {
+    // Import fetch dynamically (handles ES modules)
+    const fetch = (await import('node-fetch')).default;
+
+    console.log('🖼️ Proxying image:', url);
+
+    // Fetch the image from external source
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+      },
+      timeout: 10000
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch image:', response.status);
+      return res.status(response.status).json({ 
+        error: 'Failed to fetch image',
+        status: response.status 
+      });
+    }
+
+    // Get content type and determine extension
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    let extension = '.jpg';
+    
+    if (contentType.includes('png')) extension = '.png';
+    else if (contentType.includes('gif')) extension = '.gif';
+    else if (contentType.includes('webp')) extension = '.webp';
+
+    console.log('✅ Successfully fetched image, content-type:', contentType);
+
+    // Set response headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache 24 hours
+    res.setHeader('Content-Disposition', `inline; filename="image${extension}"`);
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS
+
+    // Stream the image to response
+    response.body.pipe(res);
+
+  } catch (error) {
+    console.error('❌ Image proxy error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+export default router;
+Step 2: Register Route in Main Server File
+In server/index.js (or wherever your Express app is defined):
+javascript// Add with other imports
+import imageProxyRouter from './routes/imageProxy.js';
+
+// Register the route (BEFORE app.listen())
+app.use('/api', imageProxyRouter);
+Step 3: Install Required Dependency
+bashnpm install node-fetch
+Step 4: Update fixImageUrlForPdf Function
+In client/src/components/pdf/ItineraryPDFTemplate.tsx:
+REPLACE the current fixImageUrlForPdf function with:
+typescript// Get API URL from environment or construct from window.location
+const getApiUrl = () => {
+  // In Replit, the API is on the same origin
+  return window.location.origin;
+};
+
+export const fixImageUrlForPdf = (url: string | null | undefined): string => {
+  if (!url) return '';
+
+  try {
+    // Parse the URL to check extension
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    
+    // Check if URL already has a valid image extension
+    const hasValidExtension = /\.(jpg|jpeg|png|gif|webp)$/i.test(pathname);
+
+    if (hasValidExtension) {
+      // IMPORTANT: Even with valid extension, external URLs need proxy due to CORS
+      // Check if it's an external URL
+      const isExternal = !url.startsWith(window.location.origin);
+      
+      if (isExternal) {
+        // Use proxy for external images to avoid CORS
+        const apiUrl = getApiUrl();
+        return `${apiUrl}/api/proxy-image?url=${encodeURIComponent(url)}`;
+      }
+      
+      // Internal URL with valid extension, return as-is
+      return url;
+    }
+
+    // No valid extension, use proxy
+    const apiUrl = getApiUrl();
+    return `${apiUrl}/api/proxy-image?url=${encodeURIComponent(url)}`;
+
+  } catch (error) {
+    console.error('Error processing image URL:', error);
+    return '';
+  }
+};
+Key Change: Even though activity/dining images have .jpg extensions, they're external URLs that cause CORS errors. So we proxy ALL external images, not just ones without extensions.
+
+WHY THIS FIXES EVERYTHING:
+Before (Current Situation):
+Browser tries to fetch: https://offloadmedia.feverup.com/.../image.jpg
+❌ CORS Error: "No 'Access-Control-Allow-Origin' header"
+❌ Image fails to load in PDF
+After (With Proxy):
+Browser requests: https://your-replit.dev/api/proxy-image?url=https://offloadmedia.feverup.com/.../image.jpg
+✅ Backend fetches image (no CORS restrictions on server)
+✅ Backend streams image to browser with proper headers
+✅ @react-pdf/renderer successfully loads image
+✅ Image appears in PDF

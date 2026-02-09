@@ -1,0 +1,125 @@
+TASK: Add Flight Tracker to Travel Itinerary System
+
+Add embedded flight tracking to web view and clickable links to PDF for outbound and return flights.
+
+IMPLEMENTATION:
+
+1. CREATE FILE: client/src/components/FlightTracker.tsx
+```typescript
+interface FlightTrackerProps {
+  flightNumber: string;
+  width?: string;
+  height?: string;
+}
+
+export function FlightTracker({ 
+  flightNumber, 
+  width = '100%', 
+  height = '500px' 
+}: FlightTrackerProps) {
+  const cleanFlightNumber = flightNumber.replace(/\s/g, '').toUpperCase();
+  
+  return (
+    <div className="flight-tracker-container my-6">
+      <h3 className="text-lg font-semibold mb-3">Track Your Flight</h3>
+      <iframe 
+        src={`https://www.flightradar24.com/data/flights/${cleanFlightNumber.toLowerCase()}`}
+        width={width}
+        height={height}
+        style={{ border: 'none', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+        title={`Flight ${cleanFlightNumber} Tracker`}
+        loading="lazy"
+      />
+      <p className="text-sm text-gray-600 mt-2">
+        Live flight tracking powered by FlightRadar24
+      </p>
+    </div>
+  );
+}
+```
+
+2. UPDATE: client/src/pages/ViewItinerary.tsx
+
+Import the component at the top:
+```typescript
+import { FlightTracker } from '../components/FlightTracker';
+```
+
+Add flight tracker to Outbound Travel section (after the travel details grid):
+```typescript
+{itinerary.outboundTravel?.flightNumber && (
+  <FlightTracker 
+    flightNumber={itinerary.outboundTravel.flightNumber}
+    height="450px"
+  />
+)}
+```
+
+Add flight tracker to Return Travel section (after the travel details grid):
+```typescript
+{itinerary.returnTravel?.flightNumber && (
+  <FlightTracker 
+    flightNumber={itinerary.returnTravel.flightNumber}
+    height="450px"
+  />
+)}
+```
+
+3. UPDATE: PDF Template (find your ItineraryPDFTemplate file)
+
+Add this helper function at the top of the component:
+```typescript
+const getFlightTrackerUrl = (flightNumber: string) => {
+  const clean = flightNumber.replace(/\s/g, '').toLowerCase();
+  return `https://www.flightradar24.com/data/flights/${clean}`;
+};
+```
+
+In the Outbound Travel section, add after the travel info fields:
+```typescript
+{itinerary.outboundTravel?.flightNumber && (
+  <Link 
+    src={getFlightTrackerUrl(itinerary.outboundTravel.flightNumber)}
+    style={styles.flightTrackerLink}
+  >
+    ✈️ Track Flight {itinerary.outboundTravel.flightNumber}
+  </Link>
+)}
+```
+
+In the Return Travel section, add after the travel info fields:
+```typescript
+{itinerary.returnTravel?.flightNumber && (
+  <Link 
+    src={getFlightTrackerUrl(itinerary.returnTravel.flightNumber)}
+    style={styles.flightTrackerLink}
+  >
+    ✈️ Track Flight {itinerary.returnTravel.flightNumber}
+  </Link>
+)}
+```
+
+Add to your PDF styles object:
+```typescript
+flightTrackerLink: {
+  color: '#0066CC',
+  textDecoration: 'none',
+  fontSize: 11,
+  marginTop: 8,
+  paddingVertical: 6,
+  paddingHorizontal: 10,
+  backgroundColor: '#F0F8FF',
+  borderRadius: 4,
+  alignSelf: 'flex-start',
+}
+```
+
+RESULT:
+- Web view: Interactive embedded flight tracker with live map
+- PDF: Clickable link that opens FlightRadar24 in browser
+- Works for both outbound and return flights
+- Only shows if flightNumber exists
+
+TEST:
+1. View an itinerary with flight numbers in web browser - should see embedded tracker
+2. Download PDF - should see clickable "Track Flight" links

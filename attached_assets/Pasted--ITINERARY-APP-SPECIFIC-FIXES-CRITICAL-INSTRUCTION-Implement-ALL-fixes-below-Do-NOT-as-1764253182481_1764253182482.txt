@@ -1,0 +1,144 @@
+# ITINERARY APP - SPECIFIC FIXES
+
+## ⚠️ CRITICAL INSTRUCTION
+Implement ALL fixes below. Do NOT ask for permission between steps. Complete everything and I will test at the end.
+
+---
+
+## FIX 1: ACCOMMODATION LINKS LAYOUT
+
+**Problem:** On the web view, "View on Google Maps" and "View Website" links are displayed on the same line horizontally.
+
+**Required:** Stack them vertically like the Activities section.
+
+**Current (wrong):**
+```
+View on Google Maps View Website
+```
+
+**Required (correct):**
+```
+View on Google Maps
+View Website
+```
+
+**Fix:** In the Accommodation display component, ensure the links are in a flex column or stacked with block display, matching the Activities section layout exactly.
+
+---
+
+## FIX 2: DYNAMIC WEATHER EMOJI
+
+**Problem:** Weather emoji shows a generic cloud icon regardless of what weather text the user enters.
+
+**Required:** Dynamic emoji based on weather text input.
+
+**Implementation:**
+
+Create a weather emoji mapping function:
+
+```typescript
+function getWeatherEmoji(weatherText: string): string {
+  const text = weatherText.toLowerCase();
+  
+  if (text.includes('hot') || text.includes('sunny') || text.includes('clear')) {
+    return '☀️';
+  }
+  if (text.includes('warm')) {
+    return '🌤️';
+  }
+  if (text.includes('cloud') || text.includes('overcast')) {
+    return '☁️';
+  }
+  if (text.includes('rain') || text.includes('shower')) {
+    return '🌧️';
+  }
+  if (text.includes('storm') || text.includes('thunder')) {
+    return '⛈️';
+  }
+  if (text.includes('snow') || text.includes('cold') || text.includes('freezing')) {
+    return '❄️';
+  }
+  if (text.includes('wind')) {
+    return '💨';
+  }
+  if (text.includes('fog') || text.includes('mist')) {
+    return '🌫️';
+  }
+  if (text.includes('mild') || text.includes('pleasant')) {
+    return '🌤️';
+  }
+  
+  // Default
+  return '🌡️';
+}
+```
+
+**Usage in display:**
+```tsx
+<span>{getWeatherEmoji(itinerary.weather)} {itinerary.weather}</span>
+```
+
+So if user enters "Hot" → displays "☀️ Hot"
+If user enters "Rainy" → displays "🌧️ Rainy"
+If user enters "Cold and snowy" → displays "❄️ Cold and snowy"
+
+---
+
+## FIX 3: PDF ACTIVITY IMAGES NOT SHOWING
+
+**Problem:** Images display correctly for Accommodation and Dining in the PDF, but Activity images are not appearing.
+
+**Debug steps:**
+1. Check the PDF generation code for Activities section
+2. Compare with Accommodation and Dining sections that ARE working
+3. The image loading/embedding logic should be identical
+
+**Likely causes:**
+- Activity images array not being passed to PDF generator
+- Different variable name for images in Activities
+- Missing await on image loading for Activities
+- Activities section processed before images fully load
+
+**Fix:** Ensure the Activities section in the PDF generation uses the EXACT same image handling as Accommodation and Dining.
+
+Look for differences like:
+- `activity.images` vs `accommodation.images` (check property names match schema)
+- Missing null/undefined check for activity images array
+- Different image rendering function being used
+
+**The PDF generation for Activities should mirror this pattern (copy from working Accommodation/Dining):**
+
+```typescript
+// For each activity
+if (activity.images && activity.images.length > 0) {
+  for (const imageUrl of activity.images) {
+    // Same image loading and embedding logic as Accommodation
+    // ...
+  }
+}
+```
+
+**Verify the database query for PDF includes activity images in the response.**
+
+---
+
+## TESTING CHECKLIST
+
+After fixes:
+- [ ] Accommodation links stack vertically (View on Google Maps above View Website)
+- [ ] Weather shows ☀️ when user enters "Hot"
+- [ ] Weather shows 🌧️ when user enters "Rainy"  
+- [ ] Weather shows ❄️ when user enters "Cold" or "Snow"
+- [ ] Activity images appear in downloaded PDF
+- [ ] Accommodation images still work in PDF
+- [ ] Dining images still work in PDF
+
+---
+
+## IMPLEMENTATION ORDER
+
+1. Fix Accommodation links layout (CSS change)
+2. Add weather emoji mapping function
+3. Update weather display to use dynamic emoji
+4. Debug and fix Activity images in PDF
+5. Test all three fixes

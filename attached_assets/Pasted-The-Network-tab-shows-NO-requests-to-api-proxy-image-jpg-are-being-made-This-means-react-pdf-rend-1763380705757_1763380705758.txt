@@ -1,0 +1,126 @@
+The Network tab shows NO requests to /api/proxy-image.jpg are being made! This means @react-pdf/renderer is rejecting the URLs during validation BEFORE even trying to fetch them.
+The query parameter approach doesn't work because @react-pdf/renderer sees:
+/api/proxy-image.jpg?url=https%3A%2F%2Flh3.googleusercontent.com%2F...
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         Still sees this as query params, not part of the image path!
+
+THE SOLUTION: Encode URL in Path
+We need the URL to literally END with .jpg with NO query parameters:
+Bad: /api/proxy-image.jpg?url=https://... ❌
+Good: /api/proxy-image/aHR0cHM6Ly9saD...==.jpg ✅
+
+IMPLEMENTATION:
+Step 1: Update fixImageUrlForPdf Function
+Replace your current fixImageUrlForPdf with:
+typescriptexport const fixImageUrlForPdf = (url: string | null | undefined): string => {
+  if (!url) return '';
+
+  try {
+    const urlObj = new URL(url);
+    const isExternal = urlObj.origin !== window.location.origin;
+    
+    if (isExternal) {
+      // Encode the URL in base64 and add .jpg extension
+      // This makes the proxy URL end with .jpg (no query params)
+      const API_URL = window.location.origin;
+      const base64Url = btoa(url); // Base64 encode the URL
+      return `${API_URL}/api/proxy-image/${base64Url}.jpg`;
+    }
+
+    return url;
+  } catch (error) {
+    console.error('Error in fixImageUrlForPdf:', error);
+    return '';
+  }
+};
+Step 2: Update Server Route
+Replace your image proxy route with:
+typescript// Path-based proxy route for @react-pdf/renderer compatibility
+// URL pattern: /api/proxy-image/{base64-encoded-url}.jpg
+app.get('/api/proxy-image/:encodedUrl', async (req, res) => {
+  const { encodedUrl } = req.params;
+  
+  if (!encodedUrl) {
+    return res.status(400).json({ error: 'Encoded URL parameter required' });
+  }
+
+  try {
+    // Remove .jpg extension and decode base64
+    const base64Url = encodedUrl.replace(/\.jpg$/, '');
+    const url = Buffer.from(base64Url, 'base64').toString('utf-8');
+    
+    console.log('🖼️  Proxying image:', url);
+
+    // Validate decoded URL
+    new URL(url);
+
+    // Fetch the image
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.google.com/',
+        'Sec-Fetch-Dest': 'image',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'cross-site'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch image:', response.status, response.statusText);
+      return res.status(response.status).json({ 
+        error: 'Failed to fetch image',
+        status: response.status 
+      });
+    }
+
+    // Get content type
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    console.log('✅ Successfully fetched image, content-type:', contentType);
+
+    // Set response headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache 24 hours
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+
+    // Stream the image to response
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+
+  } catch (error) {
+    console.error('❌ Image proxy error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+HOW IT WORKS:
+Before (Query Params - REJECTED):
+URL: /api/proxy-image.jpg?url=https://lh3.googleusercontent.com/...
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                             @react-pdf/renderer sees query params - REJECTED!
+Result: "Not valid image extension"
+After (Path-Based - ACCEPTED):
+URL: /api/proxy-image/aHR0cHM6Ly9saD...abc123xyz.jpg
+                                                  ^^^^
+                                                  Ends with .jpg - ACCEPTED!
+Backend: Decodes base64 -> gets original URL -> fetches image -> streams back
+
+URL STRUCTURE:
+Client generates:
+Original: https://lh3.googleusercontent.com/gps-cs-s/AG0ilSy...
+↓ Base64 encode
+Encoded: aHR0cHM6Ly9saD...
+↓ Add proxy prefix and .jpg
+Final: https://your-replit.dev/api/proxy-image/aHR0cHM6Ly9saD....jpg
+Server receives:
+Path param: aHR0cHM6Ly9saD....jpg
+↓ Remove .jpg
+Base64: aHR0cHM6Ly9saD...
+↓ Base64 decode
+Original: https://lh3.googleusercontent.com/gps-cs-s/AG0ilSy...
+↓ Fetch and stream back

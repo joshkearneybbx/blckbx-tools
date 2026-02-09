@@ -1,0 +1,125 @@
+I downloaded the PDF and checked the debug section. Here's what I found:
+Test Results:
+
+✅ Test: Known-good URL - DISPLAYS SUCCESSFULLY
+
+The Booking.com hotel image shows perfectly
+Confirms the Image component works
+
+
+❌ Test: Original Google URL - DOES NOT DISPLAY
+
+URL: https://lh3.googleusercontent.com/p/AF1QipOADVlWsQGnoVBu5eTIgTKRkGCcbvaW2HkRtU_G=s680-w680-h510-rw
+No image appears
+
+
+❌ Test: Fixed Google URL - DOES NOT DISPLAY
+
+The URL with #.jpg fragment added also fails
+Confirms the fragment approach doesn't work
+
+
+
+Conclusion:
+The fragment approach (#.jpg) does NOT work with @react-pdf/renderer. The library validates the actual URL path, not just the fragment identifier.
+
+SOLUTION: Backend Image Proxy
+We need a backend proxy that fetches Google Maps images and serves them with proper extensions.
+IMPLEMENTATION:
+Step 1: Create server/routes/imageProxy.js
+javascriptimport express from 'express';
+
+const router = express.Router();
+
+router.get('/proxy-image', async (req, res) => {
+  const { url } = req.query;
+  
+  if (!url) {
+    return res.status(400).json({ error: 'URL parameter required' });
+  }
+
+  try {
+    // Validate URL
+    try {
+      new URL(url);
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+
+    // Dynamically import node-fetch
+    const fetch = (await import('node-fetch')).default;
+
+    // Fetch the image
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 10000
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ 
+        error: 'Failed to fetch image',
+        status: response.status 
+      });
+    }
+
+    // Get content type and determine extension
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    let extension = '.jpg';
+    
+    if (contentType.includes('png')) extension = '.png';
+    else if (contentType.includes('gif')) extension = '.gif';
+    else if (contentType.includes('webp')) extension = '.webp';
+
+    // Set response headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Content-Disposition', `inline; filename="image${extension}"`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Stream the image
+    response.body.pipe(res);
+
+  } catch (error) {
+    console.error('Image proxy error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+export default router;
+Step 2: Register route in server/index.js
+Add near your other route imports:
+javascriptimport imageProxyRouter from './routes/imageProxy.js';
+Add with your other routes (before app.listen()):
+javascriptapp.use('/api', imageProxyRouter);
+Step 3: Install dependency
+bashnpm install node-fetch
+Step 4: Update fixImageUrlForPdf in client/src/components/pdf/ItineraryPDFTemplate.tsx
+Replace the current function with:
+typescriptconst API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+
+export const fixImageUrlForPdf = (url: string | null | undefined): string => {
+  if (!url) return '';
+
+  try {
+    // Check if URL already has a valid image extension
+    const hasValidExtension = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+
+    if (hasValidExtension) {
+      return url; // Already good
+    }
+
+    // Use backend proxy for URLs without extensions (like Google Maps)
+    return `${API_URL}/api/proxy-image?url=${encodeURIComponent(url)}`;
+
+  } catch (error) {
+    console.error('Error processing image URL:', error);
+    return '';
+  }
+};
+Step 5: Remove debug code
+Once confirmed working, remove the debug section from the PDF template.

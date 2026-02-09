@@ -1,0 +1,97 @@
+In client/src/components/pdf/ItineraryPDFTemplate.tsx, we need to fix the top spacing issue when content overflows to new pages. The problem is that @react-pdf/renderer doesn't preserve padding on page breaks, but it DOES preserve margins.
+
+Make these changes:
+
+## Fix 1: Update itemCard style to include top margin
+Find the itemCard style definition (around line 126) and change:
+
+FROM:
+```tsx
+itemCard: {
+  backgroundColor: "#f8f9fa",
+  padding: 20,
+  marginBottom: 20,
+  borderRadius: 8,
+  border: "1 solid #e0e0e0",
+},
+```
+
+TO:
+```tsx
+itemCard: {
+  backgroundColor: "#f8f9fa",
+  padding: 20,
+  marginTop: 30,     // Add top margin to create space on new pages
+  marginBottom: 20,
+  borderRadius: 8,
+  border: "1 solid #e0e0e0",
+},
+```
+
+## Fix 2: Update sectionTitle to remove top margin
+Find the sectionTitle style (around line 118) and change:
+
+FROM:
+```tsx
+sectionTitle: {
+  fontSize: 24,
+  fontWeight: "bold",
+  color: "#000000",
+  marginTop: 30,
+  marginBottom: 20,
+  borderBottom: "2 solid #e0e0e0",
+  paddingBottom: 10,
+},
+```
+
+TO:
+```tsx
+sectionTitle: {
+  fontSize: 24,
+  fontWeight: "bold",
+  color: "#000000",
+  marginTop: 0,      // Remove top margin
+  marginBottom: 20,
+  borderBottom: "2 solid #e0e0e0",
+  paddingBottom: 10,
+},
+```
+
+## Fix 3: Add firstItemCard style for the first card in each section
+Add this new style definition after itemCard:
+```tsx
+firstItemCard: {
+  backgroundColor: "#f8f9fa",
+  padding: 20,
+  marginTop: 0,      // No top margin for first card (section title provides spacing)
+  marginBottom: 20,
+  borderRadius: 8,
+  border: "1 solid #e0e0e0",
+},
+```
+
+## Fix 4: Update all section renderings to use firstItemCard for the first item
+For each section (Accommodations, Activities, Dining, Additional Travel), change the map function to use conditional styling:
+
+FROM:
+```tsx
+{accommodations.map((accommodation) => (
+  <View key={accommodation.id} style={styles.itemCard} wrap={false}>
+```
+
+TO:
+```tsx
+{accommodations.map((accommodation, index) => (
+  <View key={accommodation.id} style={index === 0 ? styles.firstItemCard : styles.itemCard} wrap={false}>
+```
+
+Apply this same pattern to:
+- Activities section
+- Dining section  
+- Additional Travel section
+
+This ensures:
+1. Section titles have proper spacing from the top of the page
+2. First cards in each section sit close to their section title
+3. Subsequent cards that overflow to new pages have proper top margin
+4. The margin-based spacing survives page breaks

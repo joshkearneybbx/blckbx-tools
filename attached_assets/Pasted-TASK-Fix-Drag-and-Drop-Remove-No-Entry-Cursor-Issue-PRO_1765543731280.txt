@@ -1,0 +1,251 @@
+TASK: Fix Drag-and-Drop - Remove "No Entry" Cursor Issue
+
+PROBLEM: When trying to drag, a "no entry" (🚫) cursor appears and items won't move.
+
+ROOT CAUSE: Likely a parent element has pointer-events issues or the drag detection isn't working properly.
+
+QUICK FIX:
+
+1. UPDATE the SortableTravelItem component with these changes:
+```tsx
+function SortableTravelItem({ travel, index }: { travel: any; index: number }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: `travel-${index}`,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    // Add these:
+    cursor: isDragging ? 'grabbing' : 'default',
+    touchAction: 'none', // Important for mobile
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-gray-100 rounded-lg p-6 shadow-sm ${
+        isDragging ? 'shadow-2xl ring-2 ring-black z-50' : ''
+      }`}
+    >
+      {/* Header with drag handle */}
+      <div className="flex items-center gap-3 mb-4">
+        {/* CRITICAL: Add touch-action-none and ensure button role */}
+        <button
+          type="button"
+          {...listeners}
+          {...attributes}
+          className="flex flex-col gap-1 cursor-grab active:cursor-grabbing hover:opacity-70 transition-opacity touch-none"
+          style={{ touchAction: 'none' }}
+          aria-label="Drag to reorder"
+        >
+          <div className="flex gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+          </div>
+          <div className="flex gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+          </div>
+        </button>
+
+        {/* Rest of header... */}
+        <h3 className="font-semibold text-xl">
+          {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+        </h3>
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-sm text-gray-600">Visible</span>
+          <div className="w-12 h-6 bg-purple-600 rounded-full"></div>
+        </div>
+      </div>
+
+      {/* Content - same as before */}
+      <div className="space-y-2 text-sm">
+        {/* ... travel content ... */}
+      </div>
+    </div>
+  );
+}
+```
+
+2. UPDATE the DndContext setup to use more permissive activation:
+```tsx
+// Inside ViewItinerary component
+const sensors = useSensors(
+  useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 8, // Require 8px movement before activating drag
+    },
+  }),
+  useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  })
+);
+```
+
+3. CHECK for conflicting CSS - add this to your global CSS or component:
+```css
+/* Add to your CSS file or inline styles */
+.sortable-item {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Prevent text selection during drag */
+.dragging * {
+  pointer-events: none;
+  user-select: none;
+}
+```
+
+4. ALTERNATIVE SIMPLER APPROACH - If above doesn't work:
+
+Replace the entire Additional Travel section with this simplified version:
+```tsx
+import { useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Simplified sortable item
+function SortableTravelItem({ travel, index }: { travel: any; index: number }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: index.toString(), // Use simple number ID
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-gray-100 rounded-lg p-6 shadow-sm ${
+        isDragging ? 'opacity-50' : ''
+      }`}
+    >
+      <div className="flex items-center gap-3 mb-4">
+        {/* Simple drag handle button */}
+        <button
+          {...listeners}
+          {...attributes}
+          className="p-2 cursor-grab active:cursor-grabbing hover:bg-gray-200 rounded"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
+            <circle cx="12" cy="4" r="1.5" fill="currentColor"/>
+            <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
+            <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+          </svg>
+        </button>
+
+        <h3 className="font-semibold text-xl">
+          {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+        </h3>
+
+        <div className="ml-auto">Visible</div>
+      </div>
+
+      <div className="space-y-2 text-sm">
+        {/* Travel content */}
+        <div><strong>Flight:</strong> {travel.flightNumber}</div>
+        <div><strong>Date:</strong> {travel.date}</div>
+        {/* ... etc */}
+      </div>
+    </div>
+  );
+}
+
+// In ViewItinerary
+const [items, setItems] = useState(itinerary.additionalTravel || []);
+
+const sensors = useSensors(
+  useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 5,
+    },
+  })
+);
+
+function handleDragEnd(event) {
+  const { active, over } = event;
+  if (over && active.id !== over.id) {
+    setItems((items) => {
+      const oldIndex = parseInt(active.id);
+      const newIndex = parseInt(over.id);
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  }
+}
+
+// JSX
+<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+  <SortableContext items={items.map((_, i) => i.toString())} strategy={verticalListSortingStrategy}>
+    <div className="space-y-4">
+      {items.map((travel, index) => (
+        <SortableTravelItem key={index} travel={travel} index={index} />
+      ))}
+    </div>
+  </SortableContext>
+</DndContext>
+```
+
+5. DEBUGGING - Check browser console for errors:
+
+Open DevTools (F12) and check for:
+- "Cannot read property of undefined" errors
+- "@dnd-kit" related warnings
+- Any JavaScript errors when clicking the drag handle
+
+6. NUCLEAR OPTION - If nothing works, reinstall @dnd-kit:
+```bash
+npm uninstall @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+```
+
+Then restart the dev server.
+
+KEY THINGS THAT FIX "NO ENTRY" CURSOR:
+1. `touchAction: 'none'` on drag handle
+2. `activationConstraint: { distance: 5 }` on sensor
+3. Using `<button>` instead of `<div>` for drag handle
+4. Simple numeric IDs instead of string IDs
+5. Ensuring no parent has `pointer-events: none`
+
+TEST:
+1. Click and hold drag handle - should show "grab" cursor
+2. Move mouse 5-8 pixels - drag should activate
+3. Item should follow cursor smoothly
+4. Drop should reorder items
+
+Which approach should I try first? The button fix or the simplified version?

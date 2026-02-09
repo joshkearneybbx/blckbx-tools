@@ -1,0 +1,141 @@
+THE ISSUE:
+From the console logs, we can see:
+✅ Dining Sphère image 0: https://lh3.googleusercontent.com/... 
+   -> https://...replit.dev/api/proxy-image?url=...
+✅ Dining Pink Mamma image 0: https://lh3.googleusercontent.com/...
+   -> https://...replit.dev/api/proxy-image?url=...
+❌ 4x "Not valid image extension"
+The proxy URLs are being generated correctly, BUT @react-pdf/renderer is rejecting them because the URL path is /api/proxy-image (no file extension), which fails its internal image validation.
+
+THE SOLUTION: Add Fake .jpg Extension
+We need to make the proxy URL look like it has a .jpg extension to pass @react-pdf/renderer's validation.
+Step 1: Update fixImageUrlForPdf Function
+Find the fixImageUrlForPdf function in your PDF template file and change:
+FROM:
+typescriptexport const fixImageUrlForPdf = (url: string | null | undefined): string => {
+  if (!url) return '';
+
+  try {
+    const urlObj = new URL(url);
+    const isExternal = urlObj.origin !== window.location.origin;
+    
+    if (isExternal) {
+      // Use proxy for all external URLs (to avoid CORS issues)
+      const API_URL = window.location.origin;
+      return `${API_URL}/api/proxy-image?url=${encodeURIComponent(url)}`;
+    }
+
+    return url;
+  } catch (error) {
+    console.error('Error in fixImageUrlForPdf:', error);
+    return '';
+  }
+};
+TO:
+typescriptexport const fixImageUrlForPdf = (url: string | null | undefined): string => {
+  if (!url) return '';
+
+  try {
+    const urlObj = new URL(url);
+    const isExternal = urlObj.origin !== window.location.origin;
+    
+    if (isExternal) {
+      // IMPORTANT: Add .jpg extension to trick @react-pdf/renderer's image validation
+      const API_URL = window.location.origin;
+      return `${API_URL}/api/proxy-image.jpg?url=${encodeURIComponent(url)}`;
+    }
+
+    return url;
+  } catch (error) {
+    console.error('Error in fixImageUrlForPdf:', error);
+    return '';
+  }
+};
+Change: /api/proxy-image?url= → /api/proxy-image.jpg?url=
+
+Step 2: Update Image Proxy Route
+Find your image proxy endpoint (likely in server/routes.ts or server/index.ts) and update it to accept both URL patterns:
+FROM:
+typescriptapp.get('/api/proxy-image', async (req, res) => {
+  const { url } = req.query;
+  // ... rest of code
+});
+TO:
+typescript// Accept both /proxy-image and /proxy-image.jpg (for @react-pdf/renderer compatibility)
+app.get(['/api/proxy-image', '/api/proxy-image.jpg'], async (req, res) => {
+  const { url } = req.query;
+  
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'URL parameter required' });
+  }
+
+  try {
+    // Validate URL
+    new URL(url);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  try {
+    console.log('🖼️  Proxying image:', url);
+
+    // Fetch the image from external source
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.google.com/',
+        'Sec-Fetch-Dest': 'image',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'cross-site'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch image:', response.status, response.statusText);
+      return res.status(response.status).json({ 
+        error: 'Failed to fetch image',
+        status: response.status 
+      });
+    }
+
+    // Get content type
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    console.log('✅ Successfully fetched image, content-type:', contentType);
+
+    // Set response headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache 24 hours
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+
+    // Stream the image to response
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+
+  } catch (error) {
+    console.error('❌ Image proxy error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+Key changes:
+
+Accept both /api/proxy-image and /api/proxy-image.jpg routes
+Enhanced error handling
+Better logging
+Proper CORS headers
+
+
+WHY THIS WORKS:
+@react-pdf/renderer validates image URLs by checking if they end with common image extensions (.jpg, .png, .gif, etc.). By adding .jpg to our proxy path:
+Before (REJECTED):
+https://...replit.dev/api/proxy-image?url=https%3A%2F%2Flh3...
+                         ^^^^^^^^^^^^ No extension - REJECTED!
+After (ACCEPTED):
+https://...replit.dev/api/proxy-image.jpg?url=https%3A%2F%2Flh3...
+                         ^^^^^^^^^^^^^^^^ Has .jpg extension - ACCEPTED!
+The query parameter (?url=...) comes after the .jpg, so the URL still looks like a valid image URL to the validator, but the actual route handling still works because we accept both patterns.

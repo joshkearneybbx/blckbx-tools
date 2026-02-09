@@ -1,0 +1,249 @@
+TASK: Create Beautiful Visual Flight Card Component
+
+Create a visually appealing flight card component that displays flight information in a modern card design. This component should be used in:
+1. Outbound Travel section
+2. Return Travel section  
+3. Additional Travel section (when travel type is "flight")
+
+IMPLEMENTATION:
+
+1. CREATE FILE: client/src/components/FlightCard.tsx
+```tsx
+import React from 'react';
+
+interface FlightCardProps {
+  flightNumber: string;
+  date: string;
+  departureAirport: string;
+  departureTime: string;
+  arrivalAirport: string;
+  arrivalTime: string;
+  passengers?: string; // e.g. "Adult 1: 1A | Adult 2: 2C"
+  notes?: string;
+  duration?: string; // optional, can calculate or pass in
+}
+
+export function FlightCard({
+  flightNumber,
+  date,
+  departureAirport,
+  departureTime,
+  arrivalAirport,
+  arrivalTime,
+  passengers,
+  notes,
+  duration
+}: FlightCardProps) {
+  const cleanFlightNumber = flightNumber.replace(/\s/g, '').toUpperCase();
+  const flightTrackerUrl = `https://www.flightradar24.com/data/flights/${cleanFlightNumber.toLowerCase()}`;
+
+  // Extract airport codes (first 3 letters or before the space/comma)
+  const getAirportCode = (airport: string) => {
+    // If it looks like a code already (3 letters), return it
+    if (/^[A-Z]{3}$/i.test(airport.trim())) return airport.trim().toUpperCase();
+    // Otherwise take first 3 characters as fallback
+    return airport.substring(0, 3).toUpperCase();
+  };
+
+  const depCode = getAirportCode(departureAirport);
+  const arrCode = getAirportCode(arrivalAirport);
+
+  return (
+    <div className="flight-card bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden my-4">
+      {/* Header */}
+      <div className="flight-card-header bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">✈️</span>
+          <span className="font-bold text-lg">{cleanFlightNumber}</span>
+        </div>
+        <div className="flex items-center gap-2 bg-green-500 px-3 py-1 rounded-full text-sm font-medium">
+          <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+          Scheduled
+        </div>
+      </div>
+
+      {/* Flight Route Visual */}
+      <div className="flight-route px-6 py-6">
+        <div className="flex items-center justify-between">
+          {/* Departure */}
+          <div className="text-center flex-1">
+            <div className="text-3xl font-bold text-gray-800">{depCode}</div>
+            <div className="text-xl font-semibold text-blue-600 mt-1">{departureTime}</div>
+            <div className="text-sm text-gray-500 mt-1 max-w-[120px] mx-auto truncate">{departureAirport}</div>
+          </div>
+
+          {/* Flight Path Visual */}
+          <div className="flex-1 flex flex-col items-center px-4">
+            <div className="text-xs text-gray-400 mb-2">{duration || 'Direct'}</div>
+            <div className="w-full flex items-center">
+              <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+              <div className="flex-1 h-0.5 bg-gradient-to-r from-blue-600 via-blue-400 to-blue-600 relative">
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-600 text-lg">
+                  ✈
+                </div>
+              </div>
+              <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+            </div>
+            <div className="text-xs text-gray-400 mt-2">Non-stop</div>
+          </div>
+
+          {/* Arrival */}
+          <div className="text-center flex-1">
+            <div className="text-3xl font-bold text-gray-800">{arrCode}</div>
+            <div className="text-xl font-semibold text-blue-600 mt-1">{arrivalTime}</div>
+            <div className="text-sm text-gray-500 mt-1 max-w-[120px] mx-auto truncate">{arrivalAirport}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Details Section */}
+      <div className="flight-details bg-gray-50 px-6 py-4 border-t border-gray-100">
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">📅</span>
+            <span className="text-gray-700">{date}</span>
+          </div>
+          {passengers && (
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400">👥</span>
+              <span className="text-gray-700">{passengers}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Notes */}
+        {notes && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500">📝</span>
+              <div>
+                <div className="text-xs font-semibold text-amber-700 uppercase">Things to Remember</div>
+                <div className="text-sm text-amber-800 mt-1">{notes}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer with Track Button */}
+      <div className="flight-footer px-6 py-4 border-t border-gray-100">
+        
+          href={flightTrackerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
+        >
+          <span>✈️</span>
+          Track Flight {cleanFlightNumber}
+          <span className="text-xs">↗</span>
+        </a>
+        <span className="text-xs text-gray-400 ml-3">Opens FlightRadar24 in a new tab</span>
+      </div>
+    </div>
+  );
+}
+```
+
+2. UPDATE: ViewItinerary.tsx (or wherever you display itinerary)
+
+Import the component:
+```tsx
+import { FlightCard } from '../components/FlightCard';
+```
+
+Replace the current Outbound Travel flight display with:
+```tsx
+{itinerary.outboundTravel && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Outbound Flight</h2>
+    <FlightCard
+      flightNumber={itinerary.outboundTravel.flightNumber}
+      date={itinerary.outboundTravel.date}
+      departureAirport={itinerary.outboundTravel.departureAirport}
+      departureTime={itinerary.outboundTravel.departureTime}
+      arrivalAirport={itinerary.outboundTravel.arrivalAirport}
+      arrivalTime={itinerary.outboundTravel.arrivalTime}
+      passengers={itinerary.outboundTravel.passengers}
+      notes={itinerary.outboundTravel.notes}
+    />
+  </section>
+)}
+```
+
+Replace the current Return Travel flight display with:
+```tsx
+{itinerary.returnTravel && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Return Flight</h2>
+    <FlightCard
+      flightNumber={itinerary.returnTravel.flightNumber}
+      date={itinerary.returnTravel.date}
+      departureAirport={itinerary.returnTravel.departureAirport}
+      departureTime={itinerary.returnTravel.departureTime}
+      arrivalAirport={itinerary.returnTravel.arrivalAirport}
+      arrivalTime={itinerary.returnTravel.arrivalTime}
+      passengers={itinerary.returnTravel.passengers}
+      notes={itinerary.returnTravel.notes}
+    />
+  </section>
+)}
+```
+
+For Additional Travel section, check if type is flight:
+```tsx
+{itinerary.additionalTravel && itinerary.additionalTravel.length > 0 && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Additional Travel</h2>
+    {itinerary.additionalTravel.map((travel, index) => (
+      <div key={index}>
+        {travel.type === 'flight' ? (
+          <FlightCard
+            flightNumber={travel.flightNumber}
+            date={travel.date}
+            departureAirport={travel.departureAirport || travel.from}
+            departureTime={travel.departureTime}
+            arrivalAirport={travel.arrivalAirport || travel.to}
+            arrivalTime={travel.arrivalTime}
+            passengers={travel.passengers}
+            notes={travel.notes}
+          />
+        ) : (
+          // Keep existing display for train/taxi/other travel types
+          <div className="existing-travel-card">
+            {/* Your existing non-flight travel display */}
+          </div>
+        )}
+      </div>
+    ))}
+  </section>
+)}
+```
+
+3. KEEP PDF LINK SIMPLE
+
+The PDF should NOT use this visual card. Keep the PDF with just the clickable link as previously implemented:
+```tsx
+{itinerary.outboundTravel?.flightNumber && (
+  <Link 
+    src={`https://www.flightradar24.com/data/flights/${itinerary.outboundTravel.flightNumber.replace(/\s/g, '').toLowerCase()}`}
+    style={styles.flightTrackerLink}
+  >
+    ✈️ Track Flight {itinerary.outboundTravel.flightNumber}
+  </Link>
+)}
+```
+
+VISUAL DESIGN SUMMARY:
+- Blue gradient header with flight number and "Scheduled" badge
+- Large airport codes (LGW → BER) with visual flight path line
+- Times displayed prominently under airport codes
+- Date and passenger info in gray details section
+- Amber/yellow highlighted notes box for "Things to Remember"
+- Blue "Track Flight" button that opens FlightRadar24
+
+TEST:
+1. View an itinerary with outbound flight - should see beautiful card
+2. View an itinerary with return flight - should see card
+3. View itinerary with additional travel (flight type) - should see card
+4. View itinerary with additional travel (train/taxi) - should show existing display
+5. Download PDF - should still show simple text link (not the visual card)

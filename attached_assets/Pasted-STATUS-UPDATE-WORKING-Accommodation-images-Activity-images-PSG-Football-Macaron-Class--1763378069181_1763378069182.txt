@@ -1,0 +1,167 @@
+STATUS UPDATE:
+✅ WORKING:
+
+Accommodation images ✅
+Activity images (PSG Football, Macaron Class) ✅
+
+❌ NOT WORKING:
+
+Dining images (Sphère, Pink Mamma) ❌
+
+User confirms dining images exist in database but aren't showing in PDF.
+
+ROOT CAUSE:
+The dining images are likely stored in a different format than activities, OR the PDF template isn't accessing them correctly.
+
+DEBUGGING STEPS:
+Step 1: Check Database Values
+Run this query to see the exact format:
+sqlSELECT id, name, images FROM dining WHERE itinerary_id = 1;
+This will show if the images field contains:
+
+A JSON array: ["url1.jpg", "url2.jpg"]
+A single URL: https://example.com/image.jpg
+Comma-separated: url1.jpg,url2.jpg
+NULL or empty
+
+Step 2: Check API Response
+Open browser dev tools (F12), go to Network tab, and look at the itinerary API response:
+json{
+  "dining": [
+    {
+      "name": "Sphère",
+      "images": "???"  // What does this show?
+    }
+  ]
+}
+
+SOLUTION: Update Backend to Parse Dining Images
+In your itinerary API endpoint (where you build the full itinerary), add this for dining:
+typescript// Get dining data
+const dining = await db.select().from(diningTable).where(...);
+
+// Parse images for dining (same logic as activities)
+const diningWithParsedImages = dining.map(restaurant => {
+  let imageUrl = null;
+  
+  if (restaurant.images) {
+    try {
+      // Try parsing as JSON array
+      const parsed = typeof restaurant.images === 'string' 
+        ? JSON.parse(restaurant.images) 
+        : restaurant.images;
+        
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        imageUrl = parsed[0]; // Get first image
+      } else if (typeof parsed === 'string' && parsed.startsWith('http')) {
+        imageUrl = parsed;
+      }
+    } catch {
+      // If not JSON, treat as plain string
+      if (typeof restaurant.images === 'string') {
+        // Handle comma-separated
+        if (restaurant.images.includes(',')) {
+          imageUrl = restaurant.images.split(',')[0].trim();
+        } else if (restaurant.images.startsWith('http')) {
+          imageUrl = restaurant.images;
+        }
+      }
+    }
+  }
+  
+  return {
+    ...restaurant,
+    imageUrl // Add imageUrl field
+  };
+});
+
+// Return in response
+return {
+  ...itinerary,
+  dining: diningWithParsedImages
+};
+
+ALTERNATIVE: Quick Frontend Fix
+If you can't modify backend right now, add this to your PDF template:
+tsx// Helper function to extract first image URL
+const getFirstImageUrl = (images: any): string | null => {
+  if (!images) return null;
+  
+  try {
+    // Already a direct URL string
+    if (typeof images === 'string' && images.startsWith('http')) {
+      return images;
+    }
+    
+    // Try parsing JSON
+    const parsed = typeof images === 'string' ? JSON.parse(images) : images;
+    
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed[0];
+    }
+  } catch {
+    // Not JSON, maybe comma-separated
+    if (typeof images === 'string' && images.includes(',')) {
+      return images.split(',')[0].trim();
+    }
+    // Just return as-is if it looks like a URL
+    if (typeof images === 'string' && images.length > 10) {
+      return images;
+    }
+  }
+  
+  return null;
+};
+
+// Then in your dining section:
+{itinerary.dining?.map((restaurant, index) => {
+  // Get image URL - try imageUrl first, then parse images field
+  const imageUrl = restaurant.imageUrl || getFirstImageUrl(restaurant.images);
+  
+  return (
+    <View key={index} style={styles.restaurantCard}>
+      <Text style={styles.restaurantName}>{restaurant.name}</Text>
+      <Text>Cuisine: {restaurant.cuisine}</Text>
+      <Text>Price Range: {restaurant.priceRange}</Text>
+      
+      {/* Display image if we found one */}
+      {imageUrl && (
+        <Image 
+          src={fixImageUrlForPdf(imageUrl)} 
+          style={styles.diningImage} 
+        />
+      )}
+      
+      {/* DEBUG - Remove after fixing */}
+      <Text style={{ fontSize: 8, color: 'red' }}>
+        Has imageUrl: {restaurant.imageUrl ? 'YES' : 'NO'}
+      </Text>
+      <Text style={{ fontSize: 8, color: 'red' }}>
+        Has images: {restaurant.images ? 'YES' : 'NO'}
+      </Text>
+      <Text style={{ fontSize: 8, color: 'red' }}>
+        Extracted: {imageUrl || 'NONE'}
+      </Text>
+    </View>
+  );
+})}
+
+COMPARISON: Why Activities Work but Dining Doesn't
+If activities work, check what's different:
+
+Activities parsing logic exists but dining doesn't?
+
+Look for where you parse activity.images → activity.imageUrl
+Apply the same logic to dining
+
+
+Different database structure?
+
+Activities might have imageUrl field already
+Dining might still have images array
+
+
+PDF template difference?
+
+Activities might use activity.imageUrl
+Dining might use restaurant.images incorrectly

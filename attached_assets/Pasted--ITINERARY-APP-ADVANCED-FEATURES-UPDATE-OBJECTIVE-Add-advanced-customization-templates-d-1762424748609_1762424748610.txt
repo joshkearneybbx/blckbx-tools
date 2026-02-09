@@ -1,0 +1,599 @@
+# ITINERARY APP - ADVANCED FEATURES UPDATE
+
+## OBJECTIVE
+Add advanced customization, templates, draft management, and PDF improvements to the existing itinerary app.
+
+## NEW FEATURES TO IMPLEMENT
+
+### 1. CLICKABLE LINKS IN PDF EXPORTS
+
+**Requirement:** All URLs in the PDF should be clickable hyperlinks.
+
+**Implementation:**
+Update the PDF export function in `client/src/utils/pdfExport.ts`:
+
+```typescript
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
+export async function generateItineraryPDF(itinerarySlug: string) {
+  const element = document.getElementById('itinerary-display');
+  if (!element) return;
+  
+  // Before converting, ensure all links have proper href attributes
+  const links = element.querySelectorAll('a');
+  
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    allowTaint: true
+  });
+  
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const imgData = canvas.toDataURL('image/png');
+  const imgWidth = 210;
+  const pageHeight = 297;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+  
+  // Add clickable link annotations
+  links.forEach((link: HTMLAnchorElement) => {
+    const rect = link.getBoundingClientRect();
+    const containerRect = element.getBoundingClientRect();
+    
+    // Calculate relative position in PDF
+    const x = ((rect.left - containerRect.left) / containerRect.width) * imgWidth;
+    const y = ((rect.top - containerRect.top) / containerRect.height) * imgHeight;
+    const width = (rect.width / containerRect.width) * imgWidth;
+    const height = (rect.height / containerRect.height) * imgHeight;
+    
+    // Add link annotation
+    pdf.link(x, y, width, height, { url: link.href });
+  });
+  
+  pdf.save(`${itinerarySlug}.pdf`);
+}
+```
+
+**Display all links as blue, underlined in the itinerary view:**
+- Google Maps links
+- Booking URLs
+- Consultant website
+- Any other URLs
+
+---
+
+### 2. ADDITIONAL NOTES PAGE (WIZARD PAGE 9)
+
+**Add new page to wizard:**
+
+**Page 9: Additional Notes**
+- Large text area for any additional information
+- Optional section
+- Examples shown: "Special dietary requirements", "Medical information", "Emergency contacts", etc.
+- Can skip entirely
+
+**Update wizard navigation:**
+- Progress indicator: "Page X of 9"
+- Add to wizard flow after Page 8 (Helpful Information)
+
+---
+
+### 3. FULLY CUSTOMIZABLE SECTIONS
+
+**MAJOR FEATURE:** Replace fixed sections with a flexible custom section system.
+
+#### 3.1 Database Schema Changes
+
+**Add new table: CustomSection**
+```typescript
+CustomSection {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  sectionName: string // e.g., "Accommodation", "Charging Points", "Visa Requirements"
+  sectionType: string // "accommodation", "activity", "dining", "custom"
+  displayOrder: number
+  icon: string (optional) // emoji or icon name
+}
+```
+
+**Add new table: CustomField**
+```typescript
+CustomField {
+  id: string (uuid)
+  customSectionId: string (foreign key)
+  fieldName: string // e.g., "Name", "Address", "Voltage", "Processing Time"
+  fieldType: string // "text", "textarea", "url", "date", "number", "email"
+  fieldValue: string (stores the actual value)
+  isRequired: boolean
+  placeholder: string (optional)
+  displayOrder: number
+}
+```
+
+**Add new table: CustomSectionItem**
+```typescript
+CustomSectionItem {
+  id: string (uuid)
+  customSectionId: string (foreign key)
+  displayOrder: number
+}
+```
+
+**Add new table: CustomFieldValue**
+```typescript
+CustomFieldValue {
+  id: string (uuid)
+  customSectionItemId: string (foreign key)
+  customFieldId: string (foreign key) // links to field definition
+  value: string // the actual value for this item
+}
+```
+
+**IMPORTANT:** This allows multiple items per section (e.g., 3 accommodations, 5 activities).
+
+#### 3.2 Remove Old Fixed Schemas
+
+**Delete these tables (migrate existing data to custom sections first):**
+- Accommodation
+- Activity
+- Dining
+- AdditionalTravel
+
+**Keep but make optional:**
+- OutboundTravel
+- ReturnTravel
+- HelpfulInformation
+
+These are special structured sections that most itineraries need.
+
+#### 3.3 API Routes for Custom Sections
+
+```typescript
+// Custom Sections
+GET    /api/itinerary/:id/custom-sections              // Get all sections for itinerary
+POST   /api/itinerary/:id/custom-sections              // Create new section
+PATCH  /api/custom-sections/:id                        // Update section (name, order)
+DELETE /api/custom-sections/:id                        // Delete section (cascade delete fields and items)
+
+// Custom Fields (field definitions for a section)
+GET    /api/custom-sections/:sectionId/fields          // Get field definitions
+POST   /api/custom-sections/:sectionId/fields          // Add field definition
+PATCH  /api/custom-fields/:id                          // Update field definition
+DELETE /api/custom-fields/:id                          // Delete field definition
+
+// Custom Section Items (individual entries like "Hotel ABC", "Eiffel Tower")
+GET    /api/custom-sections/:sectionId/items           // Get all items in section
+POST   /api/custom-sections/:sectionId/items           // Add new item
+PATCH  /api/custom-section-items/:id                   // Update item
+DELETE /api/custom-section-items/:id                   // Delete item
+
+// Custom Field Values (the actual data)
+GET    /api/custom-section-items/:itemId/values        // Get all field values for item
+POST   /api/custom-section-items/:itemId/values        // Save field values
+PATCH  /api/custom-field-values/:id                    // Update single value
+```
+
+#### 3.4 Section Builder UI
+
+**In Wizard - Add Section Management:**
+
+**Between each wizard page, show:**
+```
+┌─────────────────────────────────────┐
+│  ✓ Page 1: Travel Details           │
+│  ✓ Page 2: Outbound Travel          │
+│  ─────────────────────────           │
+│  [+ Add Custom Section]              │
+│  ─────────────────────────           │
+│  📍 Accommodation (3 items)          │
+│     [Edit] [Delete] [↑] [↓]         │
+│  🎯 Activities (2 items)             │
+│     [Edit] [Delete] [↑] [↓]         │
+│  ⚡ Charging Points (5 items)        │
+│     [Edit] [Delete] [↑] [↓]         │
+│  ─────────────────────────           │
+│  [+ Add Custom Section]              │
+│  ─────────────────────────           │
+│  ✓ Page 7: Return Travel            │
+│  ✓ Page 8: Helpful Information      │
+│  ✓ Page 9: Additional Notes         │
+└─────────────────────────────────────┘
+```
+
+**"Add Custom Section" Modal:**
+```
+┌─────────────────────────────────────┐
+│  Create Custom Section              │
+├─────────────────────────────────────┤
+│  Section Name: [_________________]  │
+│  Icon: [🏨] [dropdown of emojis]    │
+│                                     │
+│  Start from template:               │
+│  • Blank (custom fields)            │
+│  • Accommodation (Name, Address...) │
+│  • Activity (Name, Description...)  │
+│  • Dining (Name, Cuisine...)        │
+│  • Transport (Type, Details...)     │
+│                                     │
+│  [Cancel] [Create Section]          │
+└─────────────────────────────────────┘
+```
+
+**Edit Section - Field Builder:**
+```
+┌─────────────────────────────────────┐
+│  Section: Charging Points           │
+├─────────────────────────────────────┤
+│  Fields:                            │
+│                                     │
+│  1. Station Name                    │
+│     Type: Text                      │
+│     [Edit] [Delete] [↑] [↓]        │
+│                                     │
+│  2. Address                         │
+│     Type: Text                      │
+│     [Edit] [Delete] [↑] [↓]        │
+│                                     │
+│  3. Charging Speed                  │
+│     Type: Text                      │
+│     [Edit] [Delete] [↑] [↓]        │
+│                                     │
+│  4. Cost                            │
+│     Type: Number                    │
+│     [Edit] [Delete] [↑] [↓]        │
+│                                     │
+│  5. Booking URL                     │
+│     Type: URL                       │
+│     [Edit] [Delete] [↑] [↓]        │
+│                                     │
+│  [+ Add Field]                      │
+│                                     │
+│  [Save Section] [Cancel]            │
+└─────────────────────────────────────┘
+```
+
+**"Add Field" Modal:**
+```
+┌─────────────────────────────────────┐
+│  Add Field                          │
+├─────────────────────────────────────┤
+│  Field Name: [_________________]    │
+│                                     │
+│  Field Type:                        │
+│  ○ Text (single line)               │
+│  ○ Text Area (multiple lines)       │
+│  ○ URL (with validation)            │
+│  ○ Number                           │
+│  ○ Date                             │
+│  ○ Email                            │
+│                                     │
+│  ☑ Required field                   │
+│                                     │
+│  Placeholder: [_________________]   │
+│                                     │
+│  [Cancel] [Add Field]               │
+└─────────────────────────────────────┘
+```
+
+**Add Items to Section:**
+```
+┌─────────────────────────────────────┐
+│  Charging Points (5 items)          │
+├─────────────────────────────────────┤
+│  [+ Add Charging Point]             │
+│                                     │
+│  ┌─ Item 1 ───────────────────┐    │
+│  │ Station Name: Tesla SC      │    │
+│  │ Address: 123 Main St        │    │
+│  │ Charging Speed: 250kW       │    │
+│  │ Cost: £0.50/kWh            │    │
+│  │ Booking URL: [link]         │    │
+│  │ [Edit] [Delete] [↑] [↓]    │    │
+│  └─────────────────────────────┘    │
+│                                     │
+│  ┌─ Item 2 ───────────────────┐    │
+│  │ Station Name: Ionity        │    │
+│  │ ...                         │    │
+│  └─────────────────────────────┘    │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+#### 3.5 Display Custom Sections
+
+**In ViewItinerary.tsx:**
+
+Dynamically render sections based on database:
+
+```tsx
+{customSections.map(section => (
+  <div key={section.id} className="section">
+    <h2>{section.icon} {section.sectionName}</h2>
+    
+    {section.items.map(item => (
+      <div key={item.id} className="item-card">
+        {item.fieldValues.map(fieldValue => (
+          <div key={fieldValue.id}>
+            <strong>{fieldValue.fieldName}:</strong>
+            {fieldValue.fieldType === 'url' ? (
+              <a href={fieldValue.value} target="_blank">
+                {fieldValue.value}
+              </a>
+            ) : (
+              <span>{fieldValue.value}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>
+))}
+```
+
+---
+
+### 4. TEMPLATES SYSTEM
+
+#### 4.1 Database Changes
+
+**Update Itinerary table:**
+```typescript
+Itinerary {
+  // ... existing fields ...
+  status: string // "draft", "published", "template"
+  isTemplate: boolean
+  templateName: string (optional) // e.g., "Ski Holiday", "Beach Vacation"
+  templateDescription: string (optional)
+}
+```
+
+#### 4.2 Dashboard with Tabs
+
+**Update Dashboard.tsx:**
+
+```
+┌─────────────────────────────────────┐
+│  BlckBx Logo          [Create New]  │
+├─────────────────────────────────────┤
+│  [Published] [Drafts] [Templates]   │
+├─────────────────────────────────────┤
+│  Search: [___________] 🔍           │
+│  Sort: [Recent] Filter: [All]       │
+│                                     │
+│  ┌─ Itinerary Card ──────────┐     │
+│  │ Latvia Christmas           │     │
+│  │ Riga, Latvia • Dec 25-28   │     │
+│  │ Created: Nov 5, 2025       │     │
+│  │ Status: Published          │     │
+│  │ [View] [Edit] [Delete]     │     │
+│  └────────────────────────────┘     │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Tab Logic:**
+- **Published**: `status === "published"`
+- **Drafts**: `status === "draft"`
+- **Templates**: `isTemplate === true`
+
+#### 4.3 Template Features
+
+**Save as Template:**
+- From any itinerary view page, add button: "Save as Template"
+- Opens modal:
+```
+┌─────────────────────────────────────┐
+│  Save as Template                   │
+├─────────────────────────────────────┤
+│  Template Name:                     │
+│  [e.g., Ski Holiday Template]       │
+│                                     │
+│  Description:                       │
+│  [7-day ski trip with...  ]         │
+│                                     │
+│  This will create a reusable        │
+│  template with all sections and     │
+│  field structures (but no data).    │
+│                                     │
+│  [Cancel] [Save Template]           │
+└─────────────────────────────────────┘
+```
+
+**Create from Template:**
+- On dashboard, when viewing Templates tab
+- Each template card has "Use Template" button
+- Copies structure (sections, fields) but not actual data
+- Opens wizard pre-configured with template structure
+
+**Pre-built Templates:**
+Seed database with common templates:
+- "Ski Holiday" (Accommodation, Ski Passes, Equipment Rental, Restaurants)
+- "Beach Vacation" (Accommodation, Water Activities, Dining, Beach Clubs)
+- "City Break" (Accommodation, Museums & Attractions, Restaurants, Shopping)
+- "Road Trip" (Accommodation, Route Details, Fuel Stops, Attractions)
+- "Motorhome Tour" (Charging/Fuel Points, Overnight Stops, Attractions, Groceries)
+
+#### 4.4 API Routes
+
+```typescript
+// Templates
+GET    /api/templates                    // List all templates
+GET    /api/templates/:id                // Get template details
+POST   /api/itineraries/:id/save-template // Save itinerary as template
+POST   /api/templates/:id/create-from    // Create new itinerary from template
+DELETE /api/templates/:id                // Delete template
+```
+
+---
+
+### 5. DRAFT MANAGEMENT
+
+**Auto-save Drafts:**
+- While editing wizard, auto-save every 30 seconds
+- Show "Saving..." / "Saved" indicator
+- Store as `status: "draft"`
+
+**Draft Actions:**
+- Resume editing (loads wizard with saved data)
+- Publish draft (changes status to "published")
+- Delete draft
+
+**Manual Save:**
+- "Save as Draft" button on every wizard page
+- Returns to dashboard
+- Can resume later
+
+---
+
+### 6. DUPLICATE ITINERARY
+
+**Add feature to duplicate existing itineraries:**
+
+**From itinerary view page:**
+- Add button: "Duplicate"
+- Opens modal:
+```
+┌─────────────────────────────────────┐
+│  Duplicate Itinerary                │
+├─────────────────────────────────────┤
+│  New Title:                         │
+│  [Copy of Latvia Christmas]         │
+│                                     │
+│  This will create a complete copy   │
+│  of this itinerary that you can     │
+│  edit independently.                │
+│                                     │
+│  [Cancel] [Duplicate]               │
+└─────────────────────────────────────┘
+```
+
+**API Route:**
+```typescript
+POST /api/itineraries/:id/duplicate
+```
+
+**Duplicates:**
+- Itinerary base info
+- All custom sections
+- All custom fields
+- All items and values
+- Creates new unique slug
+
+---
+
+## MIGRATION STRATEGY
+
+**For existing itineraries with old fixed schemas:**
+
+1. Create migration script to convert old data to custom sections:
+   - Accommodation → Custom Section "Accommodation"
+   - Activities → Custom Section "Activities"
+   - Dining → Custom Section "Dining"
+   
+2. Map old fields to custom fields with appropriate types
+
+3. After migration, drop old tables
+
+---
+
+## IMPLEMENTATION ORDER
+
+1. Add clickable PDF links
+2. Add Additional Notes page (Page 9)
+3. Update dashboard with tabs (Published/Drafts/Templates)
+4. Implement draft auto-save and management
+5. Implement duplicate itinerary feature
+6. Create custom sections database schema
+7. Build section builder UI (add/edit sections)
+8. Build field builder UI (add/edit fields within sections)
+9. Build item management UI (add/edit items within sections)
+10. Update itinerary display to render custom sections dynamically
+11. Migrate existing data to custom sections
+12. Implement template system (save as template, create from template)
+13. Seed pre-built templates
+14. Test all features thoroughly
+
+---
+
+## CRITICAL REQUIREMENTS
+
+**Flexibility:**
+- Users can create ANY section with ANY fields
+- No limits on number of sections or fields
+- Drag-and-drop to reorder everything
+
+**Usability:**
+- Section builder must be intuitive
+- Preview what section looks like before saving
+- Clear field type indicators (URL, Date, etc.)
+
+**Data Integrity:**
+- Cascade deletes (delete section → delete fields → delete values)
+- Validate field types (URL must be valid URL, etc.)
+- Save progress automatically
+
+**Performance:**
+- Loading custom sections should be fast (optimize queries)
+- Auto-save shouldn't block UI
+
+**Backwards Compatibility:**
+- Migrate existing itineraries to custom sections
+- Don't lose any data
+
+---
+
+## DELIVERABLES
+
+- ✅ Clickable links in PDF exports
+- ✅ Additional Notes page in wizard
+- ✅ Fully customizable sections with custom fields
+- ✅ Section builder UI
+- ✅ Field builder UI
+- ✅ Dashboard with Published/Drafts/Templates tabs
+- ✅ Draft auto-save system
+- ✅ Template creation and usage
+- ✅ Pre-built templates
+- ✅ Duplicate itinerary feature
+- ✅ Dynamic section rendering
+- ✅ Migration script for existing data
+
+---
+
+## TESTING CHECKLIST
+
+- [ ] Create custom section from scratch
+- [ ] Add custom fields of each type (text, url, date, number, etc.)
+- [ ] Reorder sections and fields
+- [ ] Add multiple items to a custom section
+- [ ] Delete sections, fields, items
+- [ ] Create itinerary with custom sections
+- [ ] View itinerary displays custom sections correctly
+- [ ] PDF export includes custom sections with clickable links
+- [ ] Save itinerary as template
+- [ ] Create new itinerary from template
+- [ ] Auto-save drafts work
+- [ ] Resume draft editing
+- [ ] Publish draft
+- [ ] Duplicate existing itinerary
+- [ ] Filter dashboard by Published/Drafts/Templates
+- [ ] Pre-built templates load correctly
+- [ ] Migration of old data to custom sections
+
+---
+
+## NOTES
+
+This is a major architectural change from fixed sections to fully dynamic custom sections. Take time to implement carefully. The custom section system is the foundation for ultimate flexibility - users can create itineraries for ANY type of trip with ANY information structure.

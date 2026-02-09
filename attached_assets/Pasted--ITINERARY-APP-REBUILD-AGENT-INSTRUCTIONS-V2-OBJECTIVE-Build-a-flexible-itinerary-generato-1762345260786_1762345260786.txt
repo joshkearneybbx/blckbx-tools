@@ -1,0 +1,1181 @@
+# ITINERARY APP REBUILD - AGENT INSTRUCTIONS V2
+
+## OBJECTIVE
+Build a flexible itinerary generator for BlckBx consultants. Each field is optional and can be customized or removed. All itineraries use the same consistent template.
+
+## CRITICAL FEATURES - MUST IMPLEMENT
+
+### 1. PERSISTENT STORAGE
+- **ALL itineraries are saved to database** (Neon PostgreSQL)
+- Users can view list of all their itineraries on dashboard
+- Each itinerary can be edited after creation
+- Each itinerary can be deleted
+- Search/filter functionality on dashboard
+
+### 2. UNIQUE SHAREABLE URLs
+- **Every itinerary gets a custom URL**: `/itinerary/[custom-slug]`
+- Slug auto-generated from title (e.g., "Latvia Christmas" → `/itinerary/latvia-christmas`)
+- Ensure slug uniqueness (append number if duplicate)
+- URL is shareable with clients - they can view without login
+- Display full URL on itinerary page for easy copying
+
+### 3. PDF DOWNLOAD
+- **"Download PDF" button** on every itinerary view page
+- PDF contains complete itinerary matching web display
+- PDF is professional, print-friendly, includes BlckBx branding
+- Client can download and view offline
+- PDF filename matches itinerary slug
+
+### 4. OTHER KEY FEATURES
+- **Optional fields**: Every field can be toggled on/off or deleted if not needed
+- **Flexible sections**: Add multiple items (clients, activities, restaurants, accommodations)
+- **Conditional logic**: Show/hide fields based on dropdowns (e.g., "client driven" vs "paid service")
+- **Google Maps preview**: Auto-fetch map image when maps link is pasted
+- **Consistent template**: All itineraries display in identical format
+
+## 1. DATABASE SCHEMA
+
+### Update: server/storage.ts
+
+**DELETE ALL EXISTING TABLES AND START FRESH**
+
+**IMPORTANT NOTES:**
+- Use Drizzle ORM (already set up in project)
+- All foreign keys should CASCADE on delete (when itinerary deleted, delete all related data)
+- String arrays (images) should be stored as JSON or TEXT[] depending on database support
+- NULL is allowed for optional fields
+- Don't create records for optional sections if they're skipped (e.g., if no activities, don't create activity records)
+
+**CREATE NEW SCHEMAS:**
+
+```typescript
+Itinerary {
+  id: string (uuid)
+  userId: string | null
+  title: string (required)
+  customUrlSlug: string (unique, indexed, required)
+  consultantName: string (required)
+  consultantEmail: string (required)
+  consultantWebsite: string (required)
+  createdAt: timestamp
+  updatedAt: timestamp
+}
+
+TravelDetails {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  dates: string
+  location: string
+  weather: string
+}
+
+Client {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  name: string
+  passportNumber: string
+  displayOrder: number
+}
+
+OutboundTravel {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  // Transfer to Airport
+  transferToAirportType: string (dropdown: "client_driven" | "paid_service")
+  transferToAirportAgency: string (optional, shown if paid_service)
+  transferToAirportContact: string (optional)
+  transferToAirportCollectionTime: string (optional)
+  transferToAirportPickupAddress: string (optional)
+  transferToAirportPaymentStatus: string (optional)
+  // Flight
+  flightNumber: string
+  departure: string
+  arrival: string
+  seatsAndPassengers: string (text field for all passenger/seat info)
+  thingsToRemember: string (text, for passports/visas/etc)
+  // Transfer to Accommodation
+  transferToAccomCompany: string
+  transferToAccomCollectionPoint: string
+  transferToAccomCollectionTime: string
+  transferToAccomPassengers: string
+  transferToAccomCarType: string
+  transferToAccomBookingRef: string
+  transferToAccomContact: string
+  transferToAccomExtraInfo: string (text, optional)
+}
+
+Accommodation {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  name: string
+  address: string
+  googleMapsLink: string
+  googleMapsImageUrl: string (auto-generated from maps link)
+  checkInDetails: string (text)
+  images: string[] (array of URLs)
+  displayOrder: number
+}
+
+Activity {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  name: string
+  description: string (text)
+  price: string
+  images: string[] (array of URLs, optional)
+  displayOrder: number
+}
+
+Dining {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  name: string
+  cuisine: string
+  price: string
+  images: string[] (array of URLs, optional)
+  displayOrder: number
+}
+
+AdditionalTravel {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  travelType: string (e.g., "Ferry", "Train", "Internal Flight")
+  details: string (text)
+  displayOrder: number
+}
+
+ReturnTravel {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  // Transfer to Airport
+  transferToAirportAgency: string
+  transferToAirportContact: string
+  transferToAirportCollectionTime: string
+  transferToAirportPickupAddress: string
+  transferToAirportPaymentStatus: string
+  // Return Flight
+  flightNumber: string
+  departure: string
+  arrival: string
+  seatsAndPassengers: string
+  // Transfer Home
+  transferHomeType: string (dropdown: "client_driven" | "paid_service")
+  transferHomeCompany: string (optional, if paid_service)
+  transferHomeCollectionPoint: string (optional)
+  transferHomePassengers: string (optional)
+  transferHomeCarType: string (optional)
+  transferHomeBookingRef: string (optional)
+  transferHomeContact: string (optional)
+  transferHomeExtraInfo: string (text, optional)
+}
+
+HelpfulInformation {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  localEmergency: string
+  nearestEmbassy: string
+  travelInsurance: string
+  airlineCustomerService: string
+  accommodationContact: string
+  localMedicalClinic: string
+  transportContacts: string
+  cardCancellation: string
+}
+```
+
+## 2. API ROUTES
+
+### Update: server/routes.ts
+
+**CREATE ENDPOINTS FOR ALL ENTITIES:**
+
+```typescript
+// Itineraries
+GET    /api/itineraries                    // List all
+GET    /api/itinerary/:slug                // Get by slug (for public viewing) - returns complete itinerary with all related data
+GET    /api/itineraries/:id                // Get by ID (for editing) - returns complete itinerary with all related data
+POST   /api/itineraries                    // Create new
+PATCH  /api/itineraries/:id                // Update
+DELETE /api/itineraries/:id                // Delete (cascade deletes all related data)
+
+**IMPORTANT:** GET /api/itinerary/:slug and GET /api/itineraries/:id should return:
+```json
+{
+  "itinerary": { /* itinerary object */ },
+  "travelDetails": { /* or null */ },
+  "clients": [ /* array */ ],
+  "outboundTravel": { /* or null */ },
+  "accommodation": [ /* array */ ],
+  "activities": [ /* array */ ],
+  "dining": [ /* array */ ],
+  "additionalTravel": [ /* array */ ],
+  "returnTravel": { /* or null */ },
+  "helpfulInfo": { /* or null */ }
+}
+```
+This single response contains everything needed to display or edit the itinerary.
+
+// Travel Details
+GET    /api/itinerary/:id/travel-details
+POST   /api/itinerary/:id/travel-details
+PATCH  /api/travel-details/:id
+
+// Clients
+GET    /api/itinerary/:id/clients
+POST   /api/itinerary/:id/clients          // Add client
+PATCH  /api/clients/:id                    // Update client
+DELETE /api/clients/:id                    // Remove client
+
+// Outbound Travel
+GET    /api/itinerary/:id/outbound-travel
+POST   /api/itinerary/:id/outbound-travel
+PATCH  /api/outbound-travel/:id
+
+// Accommodation
+GET    /api/itinerary/:id/accommodation
+POST   /api/itinerary/:id/accommodation    // Add accommodation
+PATCH  /api/accommodation/:id
+DELETE /api/accommodation/:id
+
+// Activities
+GET    /api/itinerary/:id/activities
+POST   /api/itinerary/:id/activities       // Add activity
+PATCH  /api/activities/:id
+DELETE /api/activities/:id
+
+// Dining
+GET    /api/itinerary/:id/dining
+POST   /api/itinerary/:id/dining           // Add restaurant
+PATCH  /api/dining/:id
+DELETE /api/dining/:id
+
+// Additional Travel
+GET    /api/itinerary/:id/additional-travel
+POST   /api/itinerary/:id/additional-travel
+PATCH  /api/additional-travel/:id
+DELETE /api/additional-travel/:id
+
+// Return Travel
+GET    /api/itinerary/:id/return-travel
+POST   /api/itinerary/:id/return-travel
+PATCH  /api/return-travel/:id
+
+// Helpful Information
+GET    /api/itinerary/:id/helpful-info
+POST   /api/itinerary/:id/helpful-info
+PATCH  /api/helpful-info/:id
+
+// Google Maps Image
+POST   /api/generate-maps-image            // Takes maps link, returns static image URL
+```
+
+**SLUG GENERATION (in POST /api/itineraries):**
+```typescript
+app.post("/api/itineraries", async (req, res) => {
+  try {
+    const userId = req.user?.claims?.sub || null;
+    
+    // Auto-generate customUrlSlug from title
+    if (!req.body.customUrlSlug && req.body.title) {
+      const baseSlug = req.body.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      // Ensure uniqueness
+      let slug = baseSlug;
+      let counter = 1;
+      while (await storage.getItineraryBySlug(slug)) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+      req.body.customUrlSlug = slug;
+    }
+    
+    const itinerary = await storage.createItinerary({
+      ...req.body,
+      userId
+    });
+    
+    // CRITICAL: Return full itinerary object including customUrlSlug
+    res.json(itinerary);
+  } catch (error) {
+    console.error("Error creating itinerary:", error);
+    res.status(500).json({ message: "Failed to create itinerary" });
+  }
+});
+```
+
+**GOOGLE MAPS IMAGE GENERATION:**
+```typescript
+app.post("/api/generate-maps-image", async (req, res) => {
+  try {
+    const { mapsLink } = req.body;
+    
+    // Extract coordinates or place name from Google Maps link
+    // Generate static map image URL using Google Maps Static API
+    // Format: https://maps.googleapis.com/maps/api/staticmap?center=...&zoom=15&size=600x400&markers=...
+    
+    // For now, use a simple approach:
+    // Extract place query from link and create static map URL
+    const imageUrl = generateStaticMapUrl(mapsLink);
+    
+    res.json({ imageUrl });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to generate map image" });
+  }
+});
+
+function generateStaticMapUrl(mapsLink: string): string {
+  // Parse the maps link to extract coordinates or place name
+  // Return Google Static Maps API URL
+  // Example: https://maps.googleapis.com/maps/api/staticmap?center=Brooklyn+Bridge,New+York,NY&zoom=13&size=600x300&maptype=roadmap&markers=color:red%7Clabel:A%7CBrooklyn+Bridge,New+York,NY
+  
+  // Simple implementation: extract query parameter
+  try {
+    const url = new URL(mapsLink);
+    const query = url.searchParams.get('query') || 'location';
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(query)}&zoom=15&size=600x400&markers=color:red%7C${encodeURIComponent(query)}`;
+  } catch {
+    return '';
+  }
+}
+```
+
+## 3. FRONTEND STRUCTURE
+
+### Create: client/src/pages/
+
+```
+Dashboard.tsx              // Landing page with itinerary list
+CreateItinerary.tsx        // Multi-page wizard
+ViewItinerary.tsx          // Display page
+EditItinerary.tsx          // Edit existing
+```
+
+### Create: client/src/components/
+
+```
+ItineraryWizard/
+  ├── Page1TravelDetails.tsx
+  ├── Page1ClientDetails.tsx
+  ├── Page2OutboundTravel.tsx
+  ├── Page3Accommodation.tsx
+  ├── Page4Activities.tsx
+  ├── Page5Dining.tsx
+  ├── Page6AdditionalTravel.tsx
+  ├── Page7ReturnTravel.tsx
+  ├── Page8HelpfulInfo.tsx
+  └── WizardNavigation.tsx
+
+ItineraryDisplay/
+  ├── DisplayTemplate.tsx       // Main template component
+  ├── TravelDetailsSection.tsx
+  ├── ClientDetailsSection.tsx
+  ├── OutboundSection.tsx
+  ├── AccommodationSection.tsx
+  ├── ActivitiesSection.tsx
+  ├── DiningSection.tsx
+  ├── AdditionalTravelSection.tsx
+  ├── ReturnTravelSection.tsx
+  └── HelpfulInfoSection.tsx
+
+Shared/
+  ├── OptionalField.tsx         // Field with toggle/delete button
+  ├── GoogleMapsPreview.tsx     // Shows map image when link pasted
+  ├── ImageUpload.tsx
+  ├── AddItemButton.tsx         // "Add another..." button
+  └── ConditionalFields.tsx     // Shows/hides based on dropdown
+```
+
+## 4. DASHBOARD PAGE (Dashboard.tsx)
+
+**CRITICAL:** Dashboard shows ALL created itineraries with search/filter capabilities.
+
+**LAYOUT:**
+```
+┌─────────────────────────────────────────┐
+│  BlckBx Logo              User Menu     │
+├─────────────────────────────────────────┤
+│                                         │
+│     [+ Create New Itinerary]            │
+│                                         │
+│  ──────── Your Itineraries ────────     │
+│                                         │
+│  Search: [___________] 🔍               │
+│  Filter: [All] [2025] [2024]            │
+│                                         │
+│  ┌─────────────────────────────────┐   │
+│  │ Latvia2025                      │   │
+│  │ Riga, Latvia • 25-28 Dec        │   │
+│  │ Created: Nov 5, 2025            │   │
+│  │ 🔗 /itinerary/latvia-christmas-1│   │
+│  │ [View] [Edit] [Delete]          │   │
+│  └─────────────────────────────────┘   │
+│                                         │
+│  ┌─────────────────────────────────┐   │
+│  │ Paris Summer Trip               │   │
+│  │ Paris, France • Jun 10-17       │   │
+│  │ Created: Oct 20, 2025           │   │
+│  │ 🔗 /itinerary/paris-summer      │   │
+│  │ [View] [Edit] [Delete]          │   │
+│  └─────────────────────────────────┘   │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**FEATURES:**
+- Show all itineraries created by logged-in user
+- Display: Title, Destination, Dates, Created Date, Custom URL
+- Search box (searches title and destination)
+- Filter by year or date range
+- Sort by created date (newest first)
+- **View button** - opens `/itinerary/:slug`
+- **Edit button** - opens `/edit/:id` (loads all data into wizard for editing)
+- **Delete button** - shows confirmation dialog, then deletes
+
+**Each itinerary card shows:**
+- Itinerary title
+- Destination
+- Dates
+- Custom URL slug (for reference)
+- Action buttons
+
+**Empty state:**
+"No itineraries yet. Create your first one!"
+
+## 5. CREATE ITINERARY WIZARD (CreateItinerary.tsx)
+
+**MULTI-PAGE WIZARD with progress indicator**
+
+**IMPORTANT - SAVE STRATEGY:**
+- Create the itinerary record (POST /api/itineraries) on Page 1 completion
+- Save the itinerary ID in wizard state
+- All subsequent pages POST/PATCH related entities to this itinerary ID
+- This allows "Save as Draft" to work - user can exit and resume later
+- On wizard completion, just navigate to view page (itinerary already saved)
+
+### Page 1: Travel Details + Client Details
+
+**Travel Details Section:**
+- Title (required) - auto-generates slug, show preview
+- Dates
+- Location
+- Weather
+
+**Consultant Details Section:**
+- Consultant Name (required, manual entry)
+- Consultant Email (required, manual entry)
+- Consultant Website (required, manual entry)
+
+**Client Details Section:**
+- Client 1: Name, Passport Number
+- [+ Add Another Client] button
+- Each client has [X Remove] button
+- Drag to reorder clients
+
+**All fields have small [x] button to exclude from final itinerary (except required fields)**
+
+**Travel Details Section:**
+- Title (required) - auto-generates slug, show preview
+- Dates
+- Location
+- Weather
+
+**Client Details Section:**
+- Client 1: Name, Passport Number
+- [+ Add Another Client] button
+- Each client has [X Remove] button
+- Drag to reorder clients
+
+**All fields have small [x] button to exclude from final itinerary**
+
+### Page 2: Outbound Travel
+
+**Transfer to Airport:**
+- Dropdown: "Client Driven" | "Paid Service"
+- If "Paid Service" selected, show:
+  - Transfer agency name
+  - Contact details
+  - Collection time
+  - Pickup address
+  - Payment status
+- Each field has [x] to remove
+
+**Outbound Flight:**
+- Flight number
+- Departure
+- Arrival
+- Seats and passenger info (text area)
+- **Things to Remember** (text area for passports, visas, etc)
+
+**Transfer to Accommodation:**
+- Transfer company name
+- Collection point
+- Collection time
+- Number of passengers
+- Type of car
+- Booking confirmation
+- Contact details
+- Extra info (text area)
+
+**Each subsection can be toggled on/off**
+
+### Page 3: Accommodation
+
+- [+ Add Accommodation] button
+- For each accommodation:
+  - Name
+  - Address
+  - Google Maps link (paste link)
+    - **Auto-fetch map preview image when link is pasted**
+    - Show preview below field
+  - Check-in details (text area)
+  - Images (upload or URL)
+  - [X Remove] button
+- Drag to reorder
+- At least 1 accommodation required
+
+### Page 4: Activity Suggestions
+
+- [+ Add Activity] button
+- For each activity:
+  - Name
+  - Description (text area)
+  - Price
+  - Images (upload or URL, optional)
+  - [X Remove] button
+- Drag to reorder
+- Section is optional (can skip entire page)
+
+### Page 5: Dining Suggestions
+
+- [+ Add Restaurant] button
+- For each restaurant:
+  - Name
+  - Cuisine
+  - Price
+  - Images (upload or URL, optional)
+  - [X Remove] button
+- Drag to reorder
+- Section is optional (can skip entire page)
+
+### Page 6: Additional Flights/Travel (Optional)
+
+- Large [Skip This Section] button at top
+- [+ Add Travel Item] button
+- For each item:
+  - Type (dropdown: Ferry, Train, Internal Flight, Bus, Other)
+  - Details (text area)
+  - [X Remove] button
+- Entire page is optional
+
+### Page 7: Return Travel
+
+**Transfer to Airport:**
+- Transfer agency
+- Contact details
+- Collection time
+- Pickup address
+- Payment status
+
+**Return Flight:**
+- Flight number
+- Departure
+- Arrival
+- Seats and passenger info (text area)
+
+**Transfer Home:**
+- Dropdown: "Client Driven" | "Paid Service"
+- If "Paid Service" selected, show:
+  - Transfer company
+  - Collection point
+  - Number of passengers
+  - Type of car
+  - Booking confirmation
+  - Contact details
+  - Extra info (text area)
+
+### Page 8: Helpful Information
+
+All fields optional:
+- Local emergency number
+- Nearest British Embassy/Consulate
+- Travel insurance contact info
+- Airline/travel provider customer service
+- Hotel/accommodation contact
+- Local medical clinic/hospital
+- Transport contacts
+- 24/7 card cancellation number
+
+**Each field has [x] to remove**
+
+### Wizard Navigation
+
+**Bottom of each page:**
+- [← Previous] button (disabled on page 1)
+- [Save as Draft] button (saves progress, returns to dashboard)
+- [Next →] button (or [Finish] on last page)
+- Progress indicator: "Page 2 of 8"
+
+**On Finish:**
+- Validate required fields (title, consultant details)
+- Create itinerary
+- Navigate to `/itinerary/${customUrlSlug}`
+
+## 6. VIEW ITINERARY PAGE (ViewItinerary.tsx)
+
+**URL:** `/itinerary/:slug`
+
+**CRITICAL REQUIREMENTS:**
+1. **Public access** - Anyone with the URL can view (no login required for viewing)
+2. **Shareable URL displayed** - Show full URL prominently so consultant can copy and share
+3. **PDF download** - Large "Download PDF" button
+4. **Edit access** - Show "Edit" button only if user is the creator
+
+**CRITICAL:** Use ONE reusable DisplayTemplate component. ALL itineraries use this EXACT layout.
+
+**TOP SECTION:**
+```
+┌─────────────────────────────────────────┐
+│  BlckBx Logo         [Edit] [Share] [📄 Download PDF] │
+├─────────────────────────────────────────┤
+│  Share this itinerary:                  │
+│  🔗 https://yourapp.replit.app/itinerary/latvia-christmas-1 │
+│  [Copy Link] button                     │
+└─────────────────────────────────────────┘
+```
+
+**ACTION BUTTONS (top right):**
+- **[Edit]** - visible only if user is creator, goes to edit page
+- **[Share]** - existing email share functionality
+- **[📄 Download PDF]** - generates and downloads PDF of itinerary
+
+**SHAREABLE URL:**
+- Display full URL prominently below header
+- Include "Copy Link" button that copies URL to clipboard
+- Show success message "Link copied!" when clicked
+
+**LAYOUT STRUCTURE:**
+
+```
+┌─────────────────────────────────────────┐
+│  BlckBx Logo    [Edit] [Share] [📄 PDF]│
+├─────────────────────────────────────────┤
+│  🔗 Share: https://...latvia-christmas-1│
+│     [Copy Link]                         │
+├─────────────────────────────────────────┤
+│                                         │
+│           ITINERARY TITLE               │
+│                                         │
+│  📍 Location                            │
+│  📅 Dates                               │
+│  👥 6 Adults (list names)               │
+│  ☀️ Weather                             │
+│                                         │
+│  ═══ Outbound Travel ═══                │
+│                                         │
+│  Transfer to Airport                    │
+│  [Show details if included]             │
+│                                         │
+│  Outbound Flight                        │
+│  Flight: XX123                          │
+│  Departure: London 10:30 AM             │
+│  Arrival: Riga 3:45 PM                  │
+│  Seats/Passengers: [info]               │
+│                                         │
+│  ⚠️ Things to Remember:                 │
+│  • Passports                            │
+│  • Visas if required                    │
+│  • ...                                  │
+│                                         │
+│  Transfer to Accommodation              │
+│  Company: XYZ Transfers                 │
+│  [Show all details]                     │
+│                                         │
+│  ═══ Accommodation ═══                  │
+│                                         │
+│  📍 Hotel ABC                           │
+│  Address: 123 Main St                   │
+│  [📍 View on Google Maps]               │
+│  [MAP IMAGE PREVIEW]                    │
+│  Check-in: 3 PM, bring ID               │
+│  [Images grid]                          │
+│                                         │
+│  [If multiple accommodations, repeat]   │
+│                                         │
+│  ═══ Activity Suggestions ═══           │
+│  [Only show if activities exist]        │
+│                                         │
+│  🎯 Activity Name                       │
+│  Description text...                    │
+│  Price: $50/person                      │
+│  [Images if available]                  │
+│                                         │
+│  [Repeat for each activity]             │
+│                                         │
+│  ═══ Dining Suggestions ═══             │
+│  [Only show if restaurants exist]       │
+│                                         │
+│  🍽️ Restaurant Name                    │
+│  Cuisine: Italian                       │
+│  Price: $$                              │
+│  [Images if available]                  │
+│                                         │
+│  [Repeat for each restaurant]           │
+│                                         │
+│  ═══ Additional Travel ═══              │
+│  [Only show if additional travel exists]│
+│                                         │
+│  🚢 Ferry to Island                     │
+│  Details...                             │
+│                                         │
+│  ═══ Return Travel ═══                  │
+│  [Similar structure to outbound]        │
+│                                         │
+│  ═══ Helpful Information ═══            │
+│  [Only show fields that were filled]    │
+│                                         │
+│  🚨 Local Emergency: 112                │
+│  🏛️ British Embassy: [details]         │
+│  [Only show included fields]            │
+│                                         │
+│  ─────────────────────────────           │
+│  Your Assistant: [consultantName]       │
+│  📧 [consultantEmail]                   │
+│  🌐 [consultantWebsite]                 │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**STYLING:**
+- Clean, professional design
+- Use icons for visual interest (📍 🎯 🍽️ etc)
+- Section headers: Bold, larger text with divider line
+- Subsections: Medium bold text
+- Good spacing between sections
+- Images in responsive grid (2-3 columns)
+- Mobile responsive
+- Print-friendly
+
+**KEY FEATURES:**
+- Only show sections/fields that were included (hide empty sections)
+- Google Maps links styled as buttons with map icon
+- Map preview images displayed for accommodations
+- Images in clean grids
+- Clickable links open in new tab
+
+**ACTION BUTTONS (top right):**
+- [Share] - existing email share functionality
+- [Download PDF] - generate PDF of itinerary
+- [Edit] - if user is creator
+
+## 7. GOOGLE MAPS FUNCTIONALITY
+
+### Auto-fetch map preview
+
+**When user pastes Google Maps link in accommodation form:**
+
+```tsx
+const handleMapsLinkChange = async (value: string) => {
+  setGoogleMapsLink(value);
+  
+  if (value && value.includes('google.com/maps')) {
+    // Call API to generate static map image
+    try {
+      const response = await fetch('/api/generate-maps-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mapsLink: value })
+      });
+      const data = await response.json();
+      setMapImageUrl(data.imageUrl);
+    } catch (error) {
+      console.error('Failed to generate map image:', error);
+    }
+  }
+};
+```
+
+**Display preview in form:**
+```tsx
+{mapImageUrl && (
+  <div className="mt-2">
+    <img src={mapImageUrl} alt="Map preview" className="w-full rounded" />
+  </div>
+)}
+```
+
+## 8. OPTIONAL FIELDS FUNCTIONALITY
+
+**Create: client/src/components/Shared/OptionalField.tsx**
+
+```tsx
+interface OptionalFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onRemove: () => void;
+  type?: 'text' | 'textarea';
+  placeholder?: string;
+}
+
+export function OptionalField({ label, value, onChange, onRemove, type = 'text', placeholder }: OptionalFieldProps) {
+  return (
+    <div className="relative">
+      <label className="block mb-1 font-medium">
+        {label}
+        <button
+          onClick={onRemove}
+          className="ml-2 text-red-500 text-sm hover:text-red-700"
+          title="Remove this field"
+        >
+          ✕
+        </button>
+      </label>
+      {type === 'textarea' ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full p-2 border rounded"
+          rows={3}
+        />
+      ) : (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full p-2 border rounded"
+        />
+      )}
+    </div>
+  );
+}
+```
+
+**Track which fields are included in form state**
+
+## 9. CONDITIONAL FIELDS
+
+**For dropdowns that show/hide fields (e.g., "Client Driven" vs "Paid Service"):**
+
+```tsx
+<select value={transferType} onChange={(e) => setTransferType(e.target.value)}>
+  <option value="client_driven">Client Driven</option>
+  <option value="paid_service">Paid Service</option>
+</select>
+
+{transferType === 'paid_service' && (
+  <>
+    <OptionalField label="Transfer Agency" value={agency} onChange={setAgency} onRemove={removeAgency} />
+    <OptionalField label="Contact Details" value={contact} onChange={setContact} onRemove={removeContact} />
+    {/* More fields... */}
+  </>
+)}
+```
+
+## 10. PDF EXPORT
+
+**Install library:**
+```bash
+npm install jspdf html2canvas
+```
+
+**Create: client/src/utils/pdfExport.ts**
+
+```typescript
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
+export async function generateItineraryPDF(itinerarySlug: string) {
+  // Get the itinerary display container
+  const element = document.getElementById('itinerary-display');
+  if (!element) return;
+  
+  // Convert HTML to canvas
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    allowTaint: true
+  });
+  
+  // Create PDF - handle multi-page content
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const imgData = canvas.toDataURL('image/png');
+  const imgWidth = 210; // A4 width in mm
+  const pageHeight = 297; // A4 height in mm
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  // Add first page
+  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  // Add additional pages if content is longer than one page
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+  
+  pdf.save(`${itinerarySlug}.pdf`);
+}
+```
+
+**Button in ViewItinerary.tsx:**
+```tsx
+<button 
+  onClick={() => generateItineraryPDF(itinerary.customUrlSlug)}
+  className="btn-primary"
+>
+  📄 Download PDF
+</button>
+```
+
+**IMPORTANT:** 
+- Wrap itinerary content in div with id="itinerary-display"
+- Ensure images load with CORS headers
+- Show loading spinner during PDF generation
+- Handle errors gracefully
+
+## 11. IMAGE UPLOAD
+
+**IMPORTANT: Create uploads directory if it doesn't exist**
+
+**Backend endpoint:**
+```typescript
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+// Ensure uploads directory exists
+const uploadsDir = './public/uploads';
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: uploadsDir,
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    // Only allow images
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+app.post('/api/upload-image', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+  res.json({ url: `/uploads/${req.file.filename}` });
+});
+```
+
+**Frontend component:**
+```tsx
+<ImageUpload
+  images={images}
+  onAdd={(url) => setImages([...images, url])}
+  onRemove={(index) => setImages(images.filter((_, i) => i !== index))}
+/>
+```
+
+## 12. DRAG TO REORDER
+
+**Use library:**
+```bash
+npm install @dnd-kit/core @dnd-kit/sortable
+```
+
+**Implement for:**
+- Clients list
+- Accommodations list
+- Activities list
+- Restaurants list
+- Additional travel items
+
+## 13. ROUTING
+
+**Update: client/src/App.tsx**
+
+```tsx
+<Routes>
+  <Route path="/" element={<Dashboard />} />
+  <Route path="/create" element={<CreateItinerary />} />
+  <Route path="/itinerary/:slug" element={<ViewItinerary />} />
+  <Route path="/edit/:id" element={<EditItinerary />} />
+</Routes>
+```
+
+**EDIT FUNCTIONALITY:**
+
+EditItinerary.tsx should:
+1. Fetch itinerary by ID (not slug) - use `/api/itineraries/:id` endpoint (need to add GET by ID)
+2. Fetch all related data (clients, travel details, accommodation, activities, etc.)
+3. Load CreateItinerary wizard with all existing data pre-filled
+4. Update mode: PATCH existing records instead of POST new ones
+5. Keep same itinerary ID and slug (don't regenerate)
+
+**Add to API routes:**
+```typescript
+GET /api/itineraries/:id  // Get itinerary by ID (for editing)
+```
+
+## 14. VALIDATION & ERROR HANDLING
+
+**Required fields:**
+- Title
+- Consultant name, email, website (manual entry on Page 1)
+- At least 1 accommodation
+
+**All other fields optional**
+
+**Show warnings if:**
+- No outbound travel details
+- No return travel details
+- No helpful information
+
+But allow saving anyway.
+
+**VALIDATION RULES:**
+- Email format validation for consultant email
+- URL format validation for consultant website (optional protocol)
+- Title must be unique (or slug will have number appended)
+
+**ERROR HANDLING:**
+- Show error messages for failed API calls
+- Display validation errors clearly on forms
+- Handle network errors gracefully
+- Show "Loading..." states during API calls
+- Show success messages after saves ("Itinerary saved!", "Client added!")
+
+**LOADING STATES:**
+- Show spinner/skeleton while fetching itinerary data
+- Disable buttons during save operations
+- Show progress indicator during PDF generation
+
+## 15. MAINTAIN EXISTING
+
+**KEEP:**
+- Replit Auth system
+- Email sharing (/api/share/email)
+- Express server setup
+- Vite configuration
+
+## 16. TESTING CHECKLIST
+
+- [ ] Create itinerary with all sections
+- [ ] Create itinerary with minimal fields (title + accommodation only)
+- [ ] Add multiple clients
+- [ ] Remove optional fields
+- [ ] Toggle "Client Driven" vs "Paid Service" dropdowns
+- [ ] Paste Google Maps link and see preview
+- [ ] Upload images
+- [ ] Add multiple accommodations
+- [ ] Add multiple activities
+- [ ] Add multiple restaurants
+- [ ] Skip optional pages (Activities, Dining, Additional Travel)
+- [ ] Drag to reorder items
+- [ ] Save as draft and resume editing
+- [ ] View published itinerary
+- [ ] Verify only included fields show in display
+- [ ] PDF export works and looks good
+- [ ] Edit existing itinerary
+- [ ] Delete itinerary
+- [ ] Email sharing works
+- [ ] Unique URL slug generated correctly
+- [ ] Mobile responsive
+
+## 17. IMPLEMENTATION ORDER
+
+1. Drop all existing tables and create new schemas
+2. Create all API endpoints
+3. Build Dashboard with itinerary list
+4. Build wizard Page 1 (Travel + Client Details)
+5. Build wizard Page 2 (Outbound Travel with conditional fields)
+6. Build wizard Page 3 (Accommodation with maps preview)
+7. Build wizard Page 4 (Activities)
+8. Build wizard Page 5 (Dining)
+9. Build wizard Page 6 (Additional Travel with skip option)
+10. Build wizard Page 7 (Return Travel)
+11. Build wizard Page 8 (Helpful Info)
+12. Build Display Template component
+13. Connect all display sections
+14. Implement optional fields toggle
+15. Implement drag-to-reorder
+16. Add Google Maps preview functionality
+17. Add image upload
+18. Implement PDF export
+19. Add Edit functionality
+20. Test all features
+
+## DELIVERABLES
+
+- Flexible itinerary creation wizard (8 pages)
+- Optional/removable fields system
+- Conditional field visibility based on dropdowns
+- Multiple item support (clients, accommodations, activities, restaurants)
+- Google Maps preview images
+- Image upload system
+- Drag-to-reorder functionality
+- Consistent display template for all itineraries
+- PDF export matching web display
+- Unique URL per itinerary
+- Mobile responsive design
+- Skip optional sections feature
+
+## 18. COMMON ISSUES & SOLUTIONS
+
+**If "column does not exist" errors:**
+- Run database migration to add missing columns
+- Or drop and recreate all tables
+
+**If slug is undefined:**
+- Ensure POST /api/itineraries returns full itinerary object with customUrlSlug
+- Check frontend extracts response.customUrlSlug (not response.id)
+
+**If images don't display:**
+- Ensure /public/uploads directory exists and is writable
+- Check image URLs are correct (/uploads/filename.jpg)
+- Verify CORS settings for external image URLs
+
+**If PDF export fails:**
+- Check element has id="itinerary-display"
+- Ensure all images loaded before generating PDF
+- Add error handling and user feedback
+
+**If maps preview doesn't work:**
+- Google Maps Static API may need API key
+- Fallback: just show the clickable link without preview
+- Consider using iframe embed as alternative
+
+**If drag-and-drop doesn't work:**
+- Ensure @dnd-kit libraries are installed
+- Check displayOrder is being saved to database
+- Verify reorder updates are PATCHed to API
+
+## CRITICAL NOTES
+
+- **Flexibility is key**: Every field must be optional except title and consultant details
+- **Consistency is mandatory**: All itineraries use same display template
+- **Only show what's included**: Display page hides empty sections/fields
+- **Auto-generate slug**: From title, ensure uniqueness
+- **Maps preview**: Auto-fetch when link is pasted
+- **User-friendly**: Clear navigation, drag-to-reorder, remove buttons

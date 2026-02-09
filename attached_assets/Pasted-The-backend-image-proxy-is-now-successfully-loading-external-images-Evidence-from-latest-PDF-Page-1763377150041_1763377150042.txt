@@ -1,0 +1,160 @@
+The backend image proxy is now successfully loading external images! Evidence from latest PDF:
+
+Page 4: ✅ Accommodation image (Booking.com) displays
+Page 5: ✅ PSG Football stadium image displays! (via proxy from offloadmedia.feverup.com)
+
+The CORS issue is SOLVED! 🎊
+
+❌ Remaining Issues:
+Issue 1: Macaron Class Activity (Page 6) - No Image
+Issue 2: Dining Images (Page 7) - No Images for Sphère or Pink Mamma
+Both are missing images in the PDF. This is likely because the image URLs aren't in the correct format in the database.
+
+DIAGNOSIS:
+Let me check the actual image data structure in the database:
+sql-- Check activities images
+SELECT id, name, images FROM activities WHERE itinerary_id = 1;
+
+-- Check dining images  
+SELECT id, name, images FROM dining WHERE itinerary_id = 1;
+The problem is likely one of these:
+
+Images stored as JSON array string: '["url1.jpg", "url2.jpg"]'
+Images stored as comma-separated: 'url1.jpg,url2.jpg'
+Images field is null or empty
+
+
+SOLUTION: Parse Images Field Correctly
+Update Backend API Response
+In your itinerary API endpoint (likely server/routes.ts or similar), add this transformation:
+typescript// After fetching activities from database
+const activitiesWithParsedImages = activities.map(activity => {
+  let imageUrl = null;
+  
+  if (activity.images) {
+    try {
+      // Try parsing as JSON array
+      const parsed = JSON.parse(activity.images);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        imageUrl = parsed[0]; // Get first image
+      } else if (typeof parsed === 'string') {
+        imageUrl = parsed;
+      }
+    } catch {
+      // If not JSON, treat as plain string
+      if (typeof activity.images === 'string') {
+        // Check if comma-separated
+        if (activity.images.includes(',')) {
+          imageUrl = activity.images.split(',')[0].trim();
+        } else {
+          imageUrl = activity.images;
+        }
+      }
+    }
+  }
+  
+  return {
+    ...activity,
+    imageUrl // Add imageUrl field for PDF template
+  };
+});
+
+// Do the same for dining
+const diningWithParsedImages = dining.map(restaurant => {
+  let imageUrl = null;
+  
+  if (restaurant.images) {
+    try {
+      const parsed = JSON.parse(restaurant.images);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        imageUrl = parsed[0];
+      } else if (typeof parsed === 'string') {
+        imageUrl = parsed;
+      }
+    } catch {
+      if (typeof restaurant.images === 'string') {
+        if (restaurant.images.includes(',')) {
+          imageUrl = restaurant.images.split(',')[0].trim();
+        } else {
+          imageUrl = restaurant.images;
+        }
+      }
+    }
+  }
+  
+  return {
+    ...restaurant,
+    imageUrl
+  };
+});
+
+// Return in API response
+res.json({
+  ...itinerary,
+  activities: activitiesWithParsedImages,
+  dining: diningWithParsedImages
+});
+
+ALTERNATIVE QUICK FIX: Update PDF Template
+If you can't modify the backend right now, update the PDF template to handle the images field directly:
+In client/src/components/pdf/ItineraryPDFTemplate.tsx:
+tsx// Helper function at top of file
+const getFirstImageUrl = (images: any): string | null => {
+  if (!images) return null;
+  
+  try {
+    // If it's already a string URL
+    if (typeof images === 'string' && images.startsWith('http')) {
+      return images;
+    }
+    
+    // Try parsing as JSON
+    const parsed = typeof images === 'string' ? JSON.parse(images) : images;
+    
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed[0];
+    }
+  } catch {
+    // Not JSON, might be comma-separated
+    if (typeof images === 'string' && images.includes(',')) {
+      return images.split(',')[0].trim();
+    }
+    return images;
+  }
+  
+  return null;
+};
+
+// Then use it in your template:
+{activities.map((activity, index) => {
+  const imageUrl = activity.imageUrl || getFirstImageUrl(activity.images);
+  
+  return (
+    <View key={index}>
+      <Text>{activity.name}</Text>
+      {imageUrl && (
+        <Image 
+          src={fixImageUrlForPdf(imageUrl)} 
+          style={styles.activityImage} 
+        />
+      )}
+    </View>
+  );
+})}
+
+// Same for dining:
+{dining.map((restaurant, index) => {
+  const imageUrl = restaurant.imageUrl || getFirstImageUrl(restaurant.images);
+  
+  return (
+    <View key={index}>
+      <Text>{restaurant.name}</Text>
+      {imageUrl && (
+        <Image 
+          src={fixImageUrlForPdf(imageUrl)} 
+          style={styles.diningImage} 
+        />
+      )}
+    </View>
+  );
+})}

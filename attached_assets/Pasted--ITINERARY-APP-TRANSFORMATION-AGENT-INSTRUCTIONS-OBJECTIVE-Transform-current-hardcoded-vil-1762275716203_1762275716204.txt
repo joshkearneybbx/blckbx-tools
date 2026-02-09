@@ -1,0 +1,612 @@
+# ITINERARY APP TRANSFORMATION - AGENT INSTRUCTIONS
+
+## OBJECTIVE
+Transform current hardcoded villa app into multi-itinerary generator following exact PDF template structure.
+
+## 1. DATABASE SCHEMA MODIFICATIONS
+
+### Update: server/storage.ts
+
+**DELETE:**
+- All Villa schema references
+- seedDatabase() function
+- All hardcoded Algarve data
+
+**CREATE NEW SCHEMAS:**
+
+```typescript
+Itinerary {
+  id: string (uuid)
+  userId: string | null
+  title: string
+  destination: string
+  dates: string
+  travellers: string
+  location: string
+  weather: string
+  thingsToRemember: string (text)
+  customUrlSlug: string (unique, indexed)
+  consultantName: string
+  consultantEmail: string
+  consultantWebsite: string
+  createdAt: timestamp
+  updatedAt: timestamp
+}
+
+Accommodation {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  accommodationType: string (Hotel|Villa|Airbnb|Motel|Resort|Apartment|Other)
+  name: string
+  address: string
+  googleMapsLink: string
+  checkInDetails: string (text)
+  images: string[] (array of URLs)
+  notes: string (text, optional)
+  displayOrder: number
+}
+
+OutboundTravel {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  // Transfer to Airport
+  transferToAirportCompany: string
+  transferToAirportContact: string
+  transferToAirportCollectionTime: string
+  transferToAirportPickupAddress: string
+  transferToAirportPaymentStatus: string
+  transferToAirportCarParking: string (optional)
+  // Outbound Flight
+  outboundFlightNumber: string
+  outboundDeparture: string
+  outboundArrival: string
+  outboundSeats: string
+  outboundTravellers: string
+  // Transfer to Accommodation
+  transferToAccomCompany: string
+  transferToAccomCollectionPoint: string
+  transferToAccomCollectionTime: string
+  transferToAccomPassengers: string
+  transferToAccomCarType: string
+  transferToAccomBookingRef: string
+  transferToAccomContact: string
+  transferToAccomExtraInfo: string (text, optional)
+}
+
+ReturnTravel {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  // Transfer to Airport
+  transferToAirportCompany: string
+  transferToAirportContact: string
+  transferToAirportCollectionTime: string
+  transferToAirportPickupAddress: string
+  transferToAirportPaymentStatus: string
+  // Return Flight
+  returnFlightNumber: string
+  returnDeparture: string
+  returnArrival: string
+  returnSeats: string
+  returnTravellers: string
+  // Transfer Home
+  transferHomeCompany: string
+  transferHomeCollectionPoint: string
+  transferHomeCollectionTime: string
+  transferHomePassengers: string
+  transferHomeCarType: string
+  transferHomeBookingRef: string
+  transferHomeContact: string
+  transferHomeExtraInfo: string (text, optional)
+  transferHomeCarCollection: string (text, optional)
+}
+
+Activity {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  name: string
+  description: string (text)
+  location: string
+  googleMapsLink: string
+  cost: string (optional)
+  bookingUrl: string (optional)
+  images: string[] (array of URLs)
+  displayOrder: number
+}
+
+Dining {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  name: string
+  description: string (text)
+  location: string
+  googleMapsLink: string
+  priceRange: string (optional)
+  bookingUrl: string (optional)
+  images: string[] (array of URLs)
+  displayOrder: number
+}
+
+HelpfulInformation {
+  id: string (uuid)
+  itineraryId: string (foreign key)
+  localEmergency: string
+  nearestEmbassy: string
+  travelInsurance: string
+  airlineCustomerService: string
+  accommodationContact: string
+  localMedicalClinic: string
+  transportContacts: string
+  cardCancellation: string
+}
+```
+
+## 2. API ROUTES
+
+### Update: server/routes.ts
+
+**DELETE:**
+- /api/villas endpoints
+- All villa-related handlers
+
+**CREATE NEW ENDPOINTS:**
+
+```typescript
+// Itineraries
+GET    /api/itineraries              // List all (filter by userId if query param)
+GET    /api/itinerary/:slug          // Get by customUrlSlug
+POST   /api/itineraries              // Create new
+PATCH  /api/itineraries/:id          // Update
+DELETE /api/itineraries/:id          // Delete
+
+// Accommodation
+GET    /api/itinerary/:id/accommodation
+POST   /api/itinerary/:id/accommodation
+PATCH  /api/accommodation/:id
+DELETE /api/accommodation/:id
+
+// Outbound Travel
+GET    /api/itinerary/:id/outbound-travel
+POST   /api/itinerary/:id/outbound-travel
+PATCH  /api/outbound-travel/:id
+
+// Return Travel
+GET    /api/itinerary/:id/return-travel
+POST   /api/itinerary/:id/return-travel
+PATCH  /api/return-travel/:id
+
+// Activities
+GET    /api/itinerary/:id/activities
+POST   /api/itinerary/:id/activities
+PATCH  /api/activities/:id
+DELETE /api/activities/:id
+
+// Dining
+GET    /api/itinerary/:id/dining
+POST   /api/itinerary/:id/dining
+PATCH  /api/dining/:id
+DELETE /api/dining/:id
+
+// Helpful Information
+GET    /api/itinerary/:id/helpful-info
+POST   /api/itinerary/:id/helpful-info
+PATCH  /api/helpful-info/:id
+```
+
+**SLUG GENERATION FUNCTION:**
+```typescript
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// Check uniqueness, append number if exists
+async function ensureUniqueSlug(baseSlug: string): Promise<string> {
+  let slug = baseSlug;
+  let counter = 1;
+  while (await storage.getItineraryBySlug(slug)) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+  return slug;
+}
+```
+
+## 3. FRONTEND STRUCTURE
+
+### Create: client/src/pages/
+
+```
+Dashboard.tsx          // Landing page with itinerary list
+CreateItinerary.tsx    // Multi-step form
+ViewItinerary.tsx      // Display page matching PDF template
+EditItinerary.tsx      // Edit existing itinerary
+```
+
+### Create: client/src/components/
+
+```
+ItineraryForm/
+  ├── Step1BasicDetails.tsx
+  ├── Step2OutboundTravel.tsx
+  ├── Step3Accommodation.tsx
+  ├── Step4Activities.tsx
+  ├── Step5Dining.tsx
+  ├── Step6ReturnTravel.tsx
+  ├── Step7HelpfulInfo.tsx
+  └── FormNavigation.tsx
+
+ItineraryDisplay/
+  ├── ItineraryHeader.tsx
+  ├── OutboundTravelSection.tsx
+  ├── AccommodationSection.tsx
+  ├── ActivitiesSection.tsx
+  ├── DiningSection.tsx
+  ├── ReturnTravelSection.tsx
+  ├── HelpfulInfoSection.tsx
+  └── ItinerarySidebar.tsx
+
+PDFExport.tsx
+ImageUpload.tsx
+GoogleMapsLink.tsx
+```
+
+## 4. DASHBOARD PAGE (Dashboard.tsx)
+
+**LAYOUT:**
+```
+┌─────────────────────────────────────────┐
+│  BlckBx Logo                    User    │
+├─────────────────────────────────────────┤
+│                                         │
+│     [ Create New Itinerary ]            │
+│                                         │
+│  ─── Your Itineraries ───────────────   │
+│                                         │
+│  ┌─────────────────────────────────┐   │
+│  │ Title          | Destination    │   │
+│  │ Algarve 2025   | Portugal       │   │
+│  │ Created: Jan 5 | [View][Edit]   │   │
+│  └─────────────────────────────────┘   │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**FEATURES:**
+- Large primary button: "Create New Itinerary"
+- Table/grid of existing itineraries
+- Columns: Title, Destination, Dates, Created Date
+- Actions: View, Edit, Delete (with confirmation)
+- Filter by consultant (if admin)
+
+## 5. CREATE ITINERARY FORM (CreateItinerary.tsx)
+
+**MULTI-STEP WIZARD:**
+- Use state management (useState or context)
+- Progress indicator showing 7 steps
+- Previous/Next navigation
+- Save as Draft button on all steps
+- Final step: Review & Publish
+
+**STEP 1: Basic Details**
+- Title (required)
+- Destination (required)
+- Dates (required)
+- Travellers (required)
+- Location (required)
+- Weather (text input)
+- Things to Remember (textarea)
+- Custom URL Slug (auto-generated, editable, show preview)
+- Consultant Name (pre-filled from auth)
+- Consultant Email (pre-filled from auth)
+- Consultant Website (pre-filled from auth)
+
+**STEP 2: Outbound Travel**
+Three subsections with collapsible panels:
+1. Transfer to Airport (all fields from schema)
+2. Outbound Flight (all fields from schema)
+3. Transfer to Accommodation (all fields from schema)
+
+**STEP 3: Accommodation**
+- "Add Accommodation" button
+- Repeatable form fields:
+  - Type (dropdown)
+  - Name
+  - Address
+  - Google Maps Link (auto-generate button)
+  - Check-in Details
+  - Images (upload + URL input)
+  - Notes
+- Drag to reorder
+- Delete button per item
+
+**STEP 4: Activity Suggestions**
+- "Add Activity" button
+- Repeatable form fields:
+  - Name
+  - Description
+  - Location
+  - Google Maps Link (auto-generate)
+  - Cost
+  - Booking URL
+  - Images
+- Drag to reorder
+- Delete button per item
+
+**STEP 5: Dining Suggestions**
+- "Add Restaurant" button
+- Repeatable form fields:
+  - Name
+  - Description
+  - Location
+  - Google Maps Link (auto-generate)
+  - Price Range
+  - Booking URL
+  - Images
+- Drag to reorder
+- Delete button per item
+
+**STEP 6: Return Travel**
+Three subsections:
+1. Transfer to Airport (all fields)
+2. Return Flight (all fields)
+3. Transfer Home (all fields including optional car collection)
+
+**STEP 7: Helpful Information**
+All contact fields:
+- Local Emergency Number
+- Nearest British Embassy/Consulate
+- Travel Insurance Contact Info
+- Airline/Travel Provider Customer Service
+- Hotel/Accommodation Contact
+- Local Medical Clinic or Hospital
+- Transport Contacts
+- 24/7 Card Cancellation Number
+
+**STEP 8: Review & Publish**
+- Show summary of all sections
+- "Publish Itinerary" button
+- "Save as Draft" button
+
+## 6. VIEW ITINERARY PAGE (ViewItinerary.tsx)
+
+**URL:** `/itinerary/:slug`
+
+**CRITICAL REQUIREMENT:** 
+Create ONE reusable template component. ALL itineraries must use this EXACT SAME layout/styling. Consistency is mandatory.
+
+**LAYOUT REQUIREMENTS:**
+
+Design a clean, professional itinerary display with these sections IN THIS ORDER:
+
+1. **Header Section**
+   - BlckBx logo
+   - Title
+   - Dates, Location, Weather, Travellers
+   - Things to Remember
+
+2. **Outbound Travel Section**
+   - Transfer to Airport subsection (all fields)
+   - Outbound Flight subsection (all fields)
+   - Transfer to Accommodation subsection (all fields)
+
+3. **Accommodation Section**
+   - Display all accommodations
+   - Show: Type, Name, Address, Google Maps link, Check-in details, Images
+   - If multiple accommodations, display as cards/list
+
+4. **Activity Suggestions Section**
+   - Display all activities as cards
+   - Show: Name, Description, Location, Google Maps link, Cost, Booking link, Images
+
+5. **Dining Suggestions Section**
+   - Display all restaurants as cards
+   - Show: Name, Description, Location, Google Maps link, Price range, Booking link, Images
+
+6. **Return Travel Section**
+   - Transfer to Airport subsection
+   - Return Flight subsection
+   - Transfer Home subsection
+
+7. **Helpful Information Section**
+   - All emergency/contact information in organized format
+
+8. **Footer**
+   - Consultant name and contact details
+
+**STYLING GUIDELINES:**
+- Use professional color scheme (suggest navy/blue for headers, white background)
+- Clear section headers with visual separation
+- Consistent spacing and typography throughout
+- Images in responsive grid (2-3 columns depending on screen size)
+- Google Maps links styled as clickable buttons/links with icon
+- Mobile responsive
+- Print-friendly styles for PDF export
+
+**ACTION BUTTONS:**
+- "Download PDF" button (top right)
+- "Share" button (top right, use existing functionality)
+- "Edit Itinerary" button (if user is creator)
+
+**COMPONENT STRUCTURE:**
+```tsx
+<ItineraryTemplate>
+  <ItineraryHeader />
+  <OutboundTravelSection />
+  <AccommodationSection />
+  <ActivitiesSection />
+  <DiningSection />
+  <ReturnTravelSection />
+  <HelpfulInfoSection />
+  <ItineraryFooter />
+</ItineraryTemplate>
+```
+
+**IMPORTANT:** This template component must be used for ALL itineraries. No variations in layout between different itineraries.
+
+## 7. PDF EXPORT FUNCTIONALITY
+
+**Install library:**
+```bash
+npm install jspdf jspdf-autotable html2canvas
+```
+
+**Create: client/src/utils/pdfExport.ts**
+
+```typescript
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
+export async function generateItineraryPDF(itinerary: Itinerary, data: AllItineraryData) {
+  const pdf = new jsPDF();
+  
+  // Convert the itinerary display HTML to PDF
+  // Use the SAME layout as the web view for consistency
+  // Include:
+  // 1. BlckBx branding/logo
+  // 2. All sections in order
+  // 3. All text content formatted clearly
+  // 4. Images (embedded or as URLs)
+  // 5. Google Maps links as clickable URLs
+  // 6. Consultant details at bottom
+  
+  pdf.save(`${itinerary.customUrlSlug}.pdf`);
+}
+```
+
+**Button in ViewItinerary.tsx:**
+```tsx
+<button onClick={() => generateItineraryPDF(itinerary, allData)}>
+  Download PDF
+</button>
+```
+
+**REQUIREMENT:** PDF should match the web display layout for consistency. Make it print-friendly and professional.
+
+## 8. GOOGLE MAPS LINK AUTO-GENERATION
+
+**Create: client/src/utils/googleMaps.ts**
+
+```typescript
+export function generateGoogleMapsLink(address: string): string {
+  const encoded = encodeURIComponent(address);
+  return `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+}
+```
+
+**Usage in forms:**
+```tsx
+<button onClick={() => {
+  const link = generateGoogleMapsLink(addressValue);
+  setGoogleMapsLink(link);
+}}>
+  Generate Maps Link
+</button>
+```
+
+**Display in itinerary:**
+```tsx
+<a href={googleMapsLink} target="_blank" rel="noopener noreferrer">
+  View on Google Maps 📍
+</a>
+```
+
+## 9. IMAGE HANDLING
+
+**Create: client/src/components/ImageUpload.tsx**
+
+```tsx
+// Allow both:
+// 1. File upload (save to /public/uploads/)
+// 2. URL input (paste image URL)
+
+// Display preview thumbnails
+// Return array of URLs to save in database
+```
+
+**Backend endpoint for file upload:**
+```typescript
+// server/routes.ts
+app.post('/api/upload-image', upload.single('image'), (req, res) => {
+  // Save to /public/uploads/
+  // Return URL: /uploads/filename.jpg
+});
+```
+
+## 10. ROUTING
+
+**Update: client/src/App.tsx**
+
+```tsx
+<Routes>
+  <Route path="/" element={<Dashboard />} />
+  <Route path="/create" element={<CreateItinerary />} />
+  <Route path="/itinerary/:slug" element={<ViewItinerary />} />
+  <Route path="/edit/:id" element={<EditItinerary />} />
+</Routes>
+```
+
+## 11. MAINTAIN EXISTING
+
+**KEEP:**
+- Replit Auth (setupAuth, isAuthenticated)
+- Email sharing endpoint (/api/share/email)
+- Existing UI styling framework (Tailwind/CSS)
+- Express server setup
+- Vite configuration
+
+**UPDATE:**
+- Remove villa references from shared schema
+- Update any villa-specific UI components
+
+## 12. VALIDATION & ERROR HANDLING
+
+**Required fields validation:**
+- Title, Destination, Dates, Travellers, Location (Step 1)
+- All other fields optional but show warnings if key sections empty
+
+**Error handling:**
+- Show toast/alert on save errors
+- Validate URL slug uniqueness before save
+- Handle image upload failures gracefully
+
+## 13. TESTING CHECKLIST
+
+- [ ] Create new itinerary (all 7 steps)
+- [ ] Save as draft and resume editing
+- [ ] Add multiple accommodations, activities, dining options
+- [ ] Auto-generate Google Maps links
+- [ ] Upload images and enter image URLs
+- [ ] Generate unique URL slug
+- [ ] View published itinerary at /itinerary/:slug
+- [ ] PDF export matches template
+- [ ] Edit existing itinerary
+- [ ] Delete itinerary
+- [ ] Email sharing still works
+- [ ] Authentication still works
+- [ ] Mobile responsive
+
+## IMPLEMENTATION ORDER
+
+1. Update database schemas (storage.ts)
+2. Create new API routes (routes.ts)
+3. Build Dashboard page
+4. Build multi-step form (CreateItinerary.tsx)
+5. Build display page matching PDF (ViewItinerary.tsx)
+6. Add Google Maps integration
+7. Add image upload functionality
+8. Implement PDF export
+9. Add edit functionality
+10. Test all features
+
+## DELIVERABLES
+
+- Fully functional itinerary creation system
+- PDF-template-matching display page
+- PDF export functionality
+- Unique URL per itinerary
+- Complete CRUD operations
+- Image upload system
+- Google Maps integration
+- Mobile responsive design

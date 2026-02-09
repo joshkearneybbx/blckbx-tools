@@ -1,0 +1,267 @@
+TASK: Add Functional Drag-and-Drop Reordering for Additional Travel Only
+
+ISSUE: Drag handle dots are visible but not functional. Need actual drag-and-drop capability for Additional Travel items only.
+
+IMPLEMENTATION:
+
+1. INSTALL react-beautiful-dnd (if not already installed):
+```bash
+npm install react-beautiful-dnd @types/react-beautiful-dnd
+```
+
+2. UPDATE ViewItinerary.tsx (or wherever Additional Travel is displayed):
+```tsx
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { useState } from 'react';
+
+// Inside your component, add state for additional travel items:
+const [additionalTravelItems, setAdditionalTravelItems] = useState(
+  itinerary.additionalTravel || []
+);
+
+// Add drag end handler:
+const handleAdditionalTravelDragEnd = (result: DropResult) => {
+  if (!result.destination) return;
+  
+  const items = Array.from(additionalTravelItems);
+  const [reorderedItem] = items.splice(result.source.index, 1);
+  items.splice(result.destination.index, 0, reorderedItem);
+  
+  setAdditionalTravelItems(items);
+  
+  // Optional: Save new order to database
+  // await updateAdditionalTravelOrder(itinerary.id, items);
+};
+
+// Replace the Additional Travel section with this:
+{additionalTravelItems && additionalTravelItems.length > 0 && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Additional Travel</h2>
+    
+    <DragDropContext onDragEnd={handleAdditionalTravelDragEnd}>
+      <Droppable droppableId="additional-travel-list">
+        {(provided) => (
+          <div
+            {...provided.droppableProps}
+            ref={provided.innerRef}
+            className="space-y-4"
+          >
+            {additionalTravelItems.map((travel, index) => (
+              <Draggable
+                key={`travel-${index}-${travel.flightNumber || travel.trainService || index}`}
+                draggableId={`travel-${index}`}
+                index={index}
+              >
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={`bg-gray-100 rounded-lg p-6 shadow-sm transition-shadow ${
+                      snapshot.isDragging ? 'shadow-2xl ring-2 ring-black' : ''
+                    }`}
+                  >
+                    {/* Header with drag handle and capitalized type */}
+                    <div className="flex items-center gap-3 mb-4">
+                      {/* Drag handle - attach dragHandleProps here */}
+                      <div
+                        {...provided.dragHandleProps}
+                        className="flex flex-col gap-1 cursor-grab active:cursor-grabbing hover:opacity-70 transition-opacity"
+                      >
+                        <div className="flex gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+                        </div>
+                        <div className="flex gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+                        </div>
+                      </div>
+
+                      {/* Capitalize travel type */}
+                      <h3 className="font-semibold text-xl">
+                        {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+                      </h3>
+
+                      {/* Visible toggle */}
+                      <div className="ml-auto flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Visible</span>
+                        <div className="w-12 h-6 bg-purple-600 rounded-full"></div>
+                      </div>
+                    </div>
+
+                    {/* Content based on travel type */}
+                    <div className="space-y-2 text-sm">
+                      {travel.type === 'flight' && (
+                        <>
+                          <div>
+                            <span className="font-semibold">Flight Number:</span> {travel.flightNumber}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Date:</span> {travel.date}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Departure:</span>{' '}
+                            {travel.departureAirport || travel.from} at {travel.departureTime}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Arrival:</span>{' '}
+                            {travel.arrivalAirport || travel.to} at {travel.arrivalTime}
+                          </div>
+                        </>
+                      )}
+                      
+                      {travel.type === 'train' && (
+                        <>
+                          <div>
+                            <span className="font-semibold">Train Service:</span> {travel.trainService}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Date:</span> {travel.date}
+                          </div>
+                          <div>
+                            <span className="font-semibold">From:</span> {travel.from} at {travel.departureTime}
+                          </div>
+                          <div>
+                            <span className="font-semibold">To:</span> {travel.to} at {travel.arrivalTime}
+                          </div>
+                        </>
+                      )}
+                      
+                      {travel.type === 'taxi' && (
+                        <>
+                          <div>
+                            <span className="font-semibold">Pickup:</span> {travel.from}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Dropoff:</span> {travel.to}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Time:</span> {travel.departureTime}
+                          </div>
+                        </>
+                      )}
+                      
+                      {travel.type === 'transfer' && (
+                        <>
+                          <div>
+                            <span className="font-semibold">From:</span> {travel.from}
+                          </div>
+                          <div>
+                            <span className="font-semibold">To:</span> {travel.to}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Time:</span> {travel.departureTime}
+                          </div>
+                        </>
+                      )}
+                      
+                      {travel.notes && (
+                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <span className="text-amber-500">⚠️</span>
+                            <div>
+                              <div className="text-xs font-semibold text-amber-700 uppercase">
+                                Things to Remember
+                              </div>
+                              <div className="text-sm text-amber-800 mt-1">{travel.notes}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
+  </section>
+)}
+```
+
+3. REMOVE drag handles from other sections (Outbound Flight, Return Flight, Accommodations, Activities, Dining)
+
+These sections should NOT have drag handles. Make sure they look like this:
+```tsx
+{/* Outbound Flight - NO DRAG HANDLES */}
+<section className="mb-8">
+  <h2 className="text-2xl font-bold mb-4">Outbound Flight</h2>
+  <FlightCard {...} />
+</section>
+
+{/* Return Flight - NO DRAG HANDLES */}
+<section className="mb-8">
+  <h2 className="text-2xl font-bold mb-4">Return Flight</h2>
+  <FlightCard {...} />
+</section>
+
+{/* Accommodations - NO DRAG HANDLES */}
+<section className="mb-8">
+  <h2 className="text-2xl font-bold mb-4">Accommodation</h2>
+  {/* accommodation content */}
+</section>
+
+{/* Activities - NO DRAG HANDLES */}
+<section className="mb-8">
+  <h2 className="text-2xl font-bold mb-4">Activities</h2>
+  {/* activity content */}
+</section>
+
+{/* Dining - NO DRAG HANDLES */}
+<section className="mb-8">
+  <h2 className="text-2xl font-bold mb-4">Dining</h2>
+  {/* dining content */}
+</section>
+```
+
+4. OPTIONAL: Save reorder to database
+
+Add this function to persist the new order:
+```tsx
+const handleAdditionalTravelDragEnd = async (result: DropResult) => {
+  if (!result.destination) return;
+  
+  const items = Array.from(additionalTravelItems);
+  const [reorderedItem] = items.splice(result.source.index, 1);
+  items.splice(result.destination.index, 0, reorderedItem);
+  
+  setAdditionalTravelItems(items);
+  
+  // Save to database
+  try {
+    await fetch(`/api/itineraries/${itinerary.id}/additional-travel/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items })
+    });
+  } catch (error) {
+    console.error('Failed to save order:', error);
+  }
+};
+```
+
+SUMMARY OF CHANGES:
+- Wrapped Additional Travel section in DragDropContext, Droppable, Draggable
+- Attached dragHandleProps to the 4-dot drag handle
+- Added cursor-grab and hover effects to indicate draggability
+- Added visual feedback when dragging (shadow and ring)
+- State management to track reordered items
+- Optional database persistence
+- Drag handles ONLY on Additional Travel, not on other sections
+
+HOW IT WORKS:
+1. Click and hold the 4 dots on any Additional Travel item
+2. Drag up or down to reorder
+3. Release to drop in new position
+4. Visual feedback shows while dragging (shadow, darker appearance)
+5. Order is saved to state (and optionally to database)
+
+TEST:
+1. Go to itinerary with multiple additional travel items
+2. Click and hold the dots on one item
+3. Drag it up or down
+4. Release - item should move to new position
+5. Verify other sections (Outbound/Return/Activities/Dining) have NO drag handles

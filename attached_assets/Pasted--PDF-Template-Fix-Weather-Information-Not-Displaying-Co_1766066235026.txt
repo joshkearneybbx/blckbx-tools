@@ -1,0 +1,82 @@
+# PDF Template Fix: Weather Information Not Displaying
+
+**Continuing from:** https://claude.ai/chat/de4a6057-96b4-4ef4-94c0-98e15dc56f72
+
+**Live URL:** https://08488a0d-eae7-401f-bd28-ca576ea9f962-00-8dusfmg12bew.worf.replit.dev/itinerary/portugal-HRGx
+
+**File:** `client/src/components/pdf/ItineraryPDFTemplate.tsx`
+
+---
+
+## Issue: Weather Shows on Web View but NOT on PDF
+
+The web view correctly displays:
+- 📅 Dates
+- 📍 Location  
+- 🌤️ Weather link ("Click here to see live weather")
+
+But the PDF only shows:
+- Dates:
+- Location:
+
+**Weather is completely missing from the PDF output.**
+
+---
+
+## Debug Steps Required
+
+### 1. Check what data the PDF template receives
+
+Add console logging at the top of the PDF template component:
+
+```tsx
+console.log('PDF Template - Full itinerary data:', JSON.stringify(itinerary, null, 2));
+console.log('PDF Template - Weather field:', itinerary?.weather);
+console.log('PDF Template - Travel details:', itinerary?.travelDetails);
+```
+
+### 2. Check where weather data lives
+
+Weather might be in:
+- `itinerary.weather`
+- `itinerary.travelDetails.weather`
+- `itinerary.travelDetails.weatherUrl`
+- Some other nested location
+
+### 3. Add weather to the PDF Overview section
+
+Once you find where the weather data is, add it to the PDF. Looking at the web view, it shows a clickable weather link, so the PDF should show:
+
+```tsx
+{/* Weather Section */}
+{weather && (
+  <View style={styles.infoRow}>
+    <Text style={styles.label}>Weather:</Text>
+    <Text style={styles.value}>{weather}</Text>
+  </View>
+)}
+
+{/* Or if it's a URL */}
+{weatherUrl && (
+  <View style={styles.infoRow}>
+    <Text style={styles.label}>Weather:</Text>
+    <Link src={weatherUrl}>
+      <Text style={styles.link}>View live weather forecast</Text>
+    </Link>
+  </View>
+)}
+```
+
+### 4. Compare web component to PDF component
+
+Find where the web view renders weather (likely in `ViewItinerary.tsx` or a sub-component) and ensure the PDF template uses the same data path.
+
+---
+
+## Expected Outcome
+
+The PDF should display weather information in the same section as Dates and Location, matching what appears on the web view.
+
+---
+
+Please add the debug logging first, generate a PDF, and share the console output so we can see exactly what data structure is available.

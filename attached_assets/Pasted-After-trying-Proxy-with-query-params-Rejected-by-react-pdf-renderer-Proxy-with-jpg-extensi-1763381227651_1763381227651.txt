@@ -1,0 +1,258 @@
+After trying:
+
+❌ Proxy with query params - Rejected by @react-pdf/renderer
+❌ Proxy with .jpg extension - Rejected by @react-pdf/renderer
+❌ Path-based proxy with base64 - URLs too long, rejected by @react-pdf/renderer
+
+@react-pdf/renderer is too strict with URL validation. Let's bypass it entirely.
+THE SOLUTION: Data URIs
+Instead of giving @react-pdf/renderer a URL, we give it a data URI (base64-encoded image embedded directly in the HTML):
+data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...
+This bypasses ALL URL validation because it's not a URL - it's the actual image data!
+
+IMPLEMENTATION:
+Step 1: Create Image Pre-processor Hook
+Create file: client/src/hooks/useImagePreprocessor.ts
+typescriptimport { useState, useEffect } from 'react';
+
+interface ImageCache {
+  [url: string]: string; // Maps original URL -> data URI
+}
+
+export function useImagePreprocessor(itinerary: any) {
+  const [processedItinerary, setProcessedItinerary] = useState(itinerary);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cache] = useState<ImageCache>({});
+
+  useEffect(() => {
+    async function preprocessImages() {
+      if (!itinerary) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+
+        // Collect all image URLs
+        const imageUrls: string[] = [];
+
+        // Accommodation images
+        itinerary.accommodations?.forEach((acc: any) => {
+          if (acc.images && Array.isArray(acc.images)) {
+            imageUrls.push(...acc.images);
+          }
+        });
+
+        // Activity images
+        itinerary.activities?.forEach((activity: any) => {
+          if (activity.images && Array.isArray(activity.images)) {
+            imageUrls.push(...activity.images);
+          }
+        });
+
+        // Dining images
+        itinerary.dining?.forEach((restaurant: any) => {
+          if (restaurant.images && Array.isArray(restaurant.images)) {
+            imageUrls.push(...restaurant.images);
+          }
+        });
+
+        // Remove duplicates
+        const uniqueUrls = [...new Set(imageUrls)];
+
+        console.log(`📸 Pre-processing ${uniqueUrls.length} images...`);
+
+        // Fetch and convert all images to data URIs
+        const dataUris = await Promise.all(
+          uniqueUrls.map(async (url) => {
+            // Check cache first
+            if (cache[url]) {
+              console.log(`✅ Using cached image: ${url.substring(0, 50)}...`);
+              return { url, dataUri: cache[url] };
+            }
+
+            try {
+              // Use proxy to fetch image
+              const proxyUrl = `${window.location.origin}/api/proxy-image/${btoa(url)}.jpg`;
+              const response = await fetch(proxyUrl);
+
+              if (!response.ok) {
+                console.error(`❌ Failed to fetch ${url}:`, response.status);
+                return { url, dataUri: null };
+              }
+
+              // Convert to blob then to data URI
+              const blob = await response.blob();
+              const dataUri = await blobToDataUri(blob);
+
+              // Cache it
+              cache[url] = dataUri;
+
+              console.log(`✅ Converted to data URI: ${url.substring(0, 50)}...`);
+              return { url, dataUri };
+            } catch (error) {
+              console.error(`❌ Error processing ${url}:`, error);
+              return { url, dataUri: null };
+            }
+          })
+        );
+
+        // Create mapping of original URL -> data URI
+        const urlMap: { [key: string]: string } = {};
+        dataUris.forEach(({ url, dataUri }) => {
+          if (dataUri) {
+            urlMap[url] = dataUri;
+          }
+        });
+
+        // Replace URLs in itinerary with data URIs
+        const processed = {
+          ...itinerary,
+          accommodations: itinerary.accommodations?.map((acc: any) => ({
+            ...acc,
+            images: acc.images?.map((url: string) => urlMap[url] || url)
+          })),
+          activities: itinerary.activities?.map((activity: any) => ({
+            ...activity,
+            images: activity.images?.map((url: string) => urlMap[url] || url)
+          })),
+          dining: itinerary.dining?.map((restaurant: any) => ({
+            ...restaurant,
+            images: restaurant.images?.map((url: string) => urlMap[url] || url)
+          }))
+        };
+
+        console.log(`✅ All images pre-processed successfully!`);
+        setProcessedItinerary(processed);
+      } catch (error) {
+        console.error('❌ Error pre-processing images:', error);
+        setProcessedItinerary(itinerary); // Fallback to original
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    preprocessImages();
+  }, [itinerary]);
+
+  return { processedItinerary, isLoading };
+}
+
+// Helper function to convert blob to data URI
+function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+Step 2: Update PDF Download Component
+In your component that handles PDF generation, use the hook:
+typescriptimport { useImagePreprocessor } from '@/hooks/useImagePreprocessor';
+
+function PDFDownloadButton({ itinerary }: { itinerary: any }) {
+  const { processedItinerary, isLoading } = useImagePreprocessor(itinerary);
+
+  const handleDownload = async () => {
+    if (isLoading) {
+      alert('Please wait while images are being processed...');
+      return;
+    }
+
+    // Generate PDF with processed itinerary
+    const blob = await pdf(
+      <ItineraryPDFTemplate itinerary={processedItinerary} />
+    ).toBlob();
+    
+    saveAs(blob, `itinerary-${itinerary.id}.pdf`);
+  };
+
+  return (
+    <button 
+      onClick={handleDownload}
+      disabled={isLoading}
+    >
+      {isLoading ? 'Processing images...' : 'Download PDF'}
+    </button>
+  );
+}
+
+Step 3: Simplify PDF Template
+In your PDF template, images are now data URIs, so you can use them directly:
+typescript{/* Accommodation images */}
+{accommodation.images?.[0] && (
+  <Image 
+    src={accommodation.images[0]} 
+    // No need for fixImageUrlForPdf - it's already a data URI!
+    style={styles.accommodationImage} 
+  />
+)}
+
+{/* Activity images */}
+{activity.images?.[0] && (
+  <Image 
+    src={activity.images[0]}
+    style={styles.activityImage} 
+  />
+)}
+
+{/* Dining images */}
+{restaurant.images?.[0] && (
+  <Image 
+    src={restaurant.images[0]}
+    style={styles.diningImage} 
+  />
+)}
+
+HOW IT WORKS:
+
+User clicks "Download PDF"
+Hook fetches all images through proxy (one-time fetch)
+Converts each to data URI (data:image/jpeg;base64,...)
+Replaces URLs in itinerary with data URIs
+PDF template receives processed itinerary with embedded images
+@react-pdf/renderer accepts data URIs (they're not URLs!)
+PDF generates with all images ✅
+
+
+ADVANTAGES:
+✅ No URL validation issues - Data URIs bypass all URL checks
+✅ Works with ANY image source - Google Maps, external sites, etc.
+✅ One-time fetch - Images cached in memory during processing
+✅ Reliable - No network issues during PDF generation
+✅ Self-contained PDF - Images embedded, no external dependencies
+DISADVANTAGES:
+⚠️ Slower initial load - Must fetch all images before generating PDF
+⚠️ Larger PDF file - Images embedded as base64 (roughly 33% larger)
+⚠️ Memory usage - All images in memory during processing
+
+EXPECTED RESULT:
+After implementing:
+
+Click "Download PDF"
+See "Processing images..." button (2-5 seconds)
+Console shows:
+
+   📸 Pre-processing 5 images...
+   ✅ Converted to data URI: https://lh3.googleusercontent.com...
+   ✅ Converted to data URI: https://lh3.googleusercontent.com...
+   ✅ Converted to data URI: https://lh3.googleusercontent.com...
+   ✅ Converted to data URI: https://lh3.googleusercontent.com...
+   ✅ Converted to data URI: https://lh3.googleusercontent.com...
+   ✅ All images pre-processed successfully!
+
+PDF downloads with ALL images ✅
+
+
+WHY THIS IS THE BEST SOLUTION:
+We've spent hours fighting with @react-pdf/renderer's URL validation. This approach:
+
+Sidesteps the problem entirely
+Uses a proven technique (data URIs)
+Guarantees images will work
+Is the approach many production apps use
+
+Sometimes the best solution is to work around the library's limitations rather than fight them! 🚀

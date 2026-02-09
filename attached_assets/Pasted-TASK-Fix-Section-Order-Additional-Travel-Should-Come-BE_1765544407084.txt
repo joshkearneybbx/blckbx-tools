@@ -1,0 +1,123 @@
+TASK: Fix Section Order - Additional Travel Should Come BEFORE Return Travel
+
+ISSUE: On the Preview & Arrange page, Additional Travel is appearing LAST, but it should come BEFORE Return Travel. Return Travel should always be the last travel-related section.
+
+CORRECT ORDER:
+1. Travel Details
+2. Travellers
+3. Outbound Travel
+4. Accommodation
+5. Activities
+6. Dining
+7. **Additional Travel** ← Should be here
+8. **Return Travel** ← Should always be last
+9. Helpful Information
+
+FIX:
+
+1. FIND the Preview & Arrange component where sections are rendered
+
+2. LOCATE where sections are ordered (likely a defaultSectionOrder array or similar)
+
+3. UPDATE the order to ensure Return Travel comes after Additional Travel:
+```tsx
+const defaultSectionOrder = [
+  'travel-details',
+  'travellers',
+  'outbound-travel',
+  'accommodation',
+  'activities',
+  'dining',
+  'additional-travel',    // Position 7
+  'return-travel',        // Position 8 - ALWAYS LAST
+  'helpful-information',
+];
+```
+
+4. IF sections are rendered in JSX order, rearrange them:
+```tsx
+<div>
+  {/* Travel Details */}
+  {/* Travellers */}
+  {/* Outbound Travel */}
+  
+  {/* Accommodation */}
+  {accommodations.map(...)}
+  
+  {/* Activities */}
+  {activities.map(...)}
+  
+  {/* Dining */}
+  {dining.map(...)}
+  
+  {/* Additional Travel - BEFORE Return Travel */}
+  {additionalTravel && additionalTravel.length > 0 && (
+    <section>
+      <h2>Additional Travel</h2>
+      {additionalTravel.map(...)}
+    </section>
+  )}
+  
+  {/* Return Travel - ALWAYS LAST */}
+  {returnTravel && (
+    <section>
+      <h2>Return Travel</h2>
+      {/* return travel content */}
+    </section>
+  )}
+  
+  {/* Helpful Information */}
+</div>
+```
+
+5. IF using display_order in database, ensure Return Travel has the highest number:
+```sql
+-- Check current display_order values
+SELECT section_name, display_order FROM itinerary_sections WHERE itinerary_id = X;
+
+-- Update if needed
+UPDATE itinerary_sections SET display_order = 7 WHERE section_name = 'additional-travel';
+UPDATE itinerary_sections SET display_order = 8 WHERE section_name = 'return-travel';
+```
+
+6. MAKE SURE Return Travel is NOT draggable (if it should always stay last):
+```tsx
+{/* Return Travel - NO drag handle, fixed position */}
+<section className="mb-8">
+  <h2 className="text-2xl font-bold mb-4">Return Travel</h2>
+  {/* No drag handle dots here */}
+  {/* Just content */}
+</section>
+```
+
+7. IF Additional Travel can be dragged but should stay before Return Travel:
+
+Add a constraint in the drag handler:
+```tsx
+const handleDragEnd = (event) => {
+  const { active, over } = event;
+  
+  // Prevent dragging Additional Travel after Return Travel
+  if (active.id.startsWith('additional-travel-') && over.id === 'return-travel') {
+    return; // Block the drop
+  }
+  
+  // ... rest of drag logic
+};
+```
+
+LOGICAL ORDER EXPLANATION:
+- Additional Travel = extra flights/trains during the trip (between activities)
+- Return Travel = final journey home (always at the end)
+
+So chronologically:
+1. Arrive (Outbound)
+2. Stay & explore (Accommodation, Activities, Dining)
+3. Move around during trip (Additional Travel)
+4. Go home (Return Travel) ← ALWAYS LAST
+
+TEST:
+1. View Preview & Arrange page
+2. Additional Travel section should appear before Return Travel
+3. Return Travel should be the last travel-related section
+4. Order should make chronological sense

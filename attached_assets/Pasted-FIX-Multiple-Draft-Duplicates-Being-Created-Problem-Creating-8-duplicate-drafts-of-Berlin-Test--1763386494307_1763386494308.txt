@@ -1,0 +1,72 @@
+FIX: Multiple Draft Duplicates Being Created
+Problem:
+
+Creating 8 duplicate drafts of "Berlin Test"
+Each save creates a NEW draft instead of updating the existing one
+URLs are different for each duplicate
+
+Root Cause:
+The save/update logic isn't checking if a draft already exists before creating a new one, OR the draft ID isn't being tracked properly.
+
+SOLUTION:
+Option 1: Fix the Save Logic (Recommended)
+Find your itinerary save/create function and update it:
+javascript// ❌ WRONG - Always creates new itinerary
+async function saveItinerary(data) {
+  const result = await fetch('/api/itineraries', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  return result.json();
+}
+
+// ✅ CORRECT - Updates existing draft or creates new one
+async function saveItinerary(data, itineraryId) {
+  if (itineraryId) {
+    // Update existing itinerary
+    const result = await fetch(`/api/itineraries/${itineraryId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    return result.json();
+  } else {
+    // Create new itinerary
+    const result = await fetch('/api/itineraries', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    return result.json();
+  }
+}
+Option 2: Track Draft ID in Component State
+In your itinerary creation/edit component:
+javascriptconst [itineraryId, setItineraryId] = useState(null);
+
+// On initial save
+const handleFirstSave = async (data) => {
+  const newItinerary = await saveItinerary(data, null);
+  setItineraryId(newItinerary.id); // Store the ID!
+  console.log('Created draft:', newItinerary.id);
+};
+
+// On subsequent saves
+const handleUpdate = async (data) => {
+  if (itineraryId) {
+    await saveItinerary(data, itineraryId); // Update existing
+    console.log('Updated draft:', itineraryId);
+  }
+};
+Option 3: Prevent Auto-Save Spam
+If you have auto-save, debounce it:
+javascriptimport { debounce } from 'lodash'; // or create your own
+
+const debouncedSave = debounce(async (data, id) => {
+  console.log('Saving...', id);
+  await saveItinerary(data, id);
+}, 1000); // Wait 1 second after user stops typing
+
+// Use it
+const handleChange = (data) => {
+  setFormData(data);
+  debouncedSave(data, itineraryId);
+};

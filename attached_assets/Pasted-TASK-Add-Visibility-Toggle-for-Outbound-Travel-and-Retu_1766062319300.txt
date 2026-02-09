@@ -1,0 +1,257 @@
+TASK: Add Visibility Toggle for Outbound Travel and Return Travel Sections
+
+PROBLEM: User is toggling OFF Outbound Travel and Return Travel on Preview page, but they still appear in published view and PDF. These are fixed sections, not array items.
+
+SOLUTION: Add visibility fields for these fixed sections
+
+## 1. UPDATE DATABASE SCHEMA
+
+Add visibility columns to itineraries table for fixed sections:
+```sql
+ALTER TABLE itineraries ADD COLUMN outbound_travel_visible BOOLEAN DEFAULT true;
+ALTER TABLE itineraries ADD COLUMN return_travel_visible BOOLEAN DEFAULT true;
+
+-- Optional: Add for other fixed sections too
+ALTER TABLE itineraries ADD COLUMN helpful_info_visible BOOLEAN DEFAULT true;
+ALTER TABLE itineraries ADD COLUMN travel_details_visible BOOLEAN DEFAULT true;
+```
+
+## 2. UPDATE PreviewArrange - Track Fixed Section Visibility
+```tsx
+// In PreviewArrange component
+const [sectionVisibility, setSectionVisibility] = useState({
+  // Existing array items
+  accommodations: itinerary.accommodations?.map(a => a.visible ?? true) || [],
+  activities: itinerary.activities?.map(a => a.visible ?? true) || [],
+  dining: itinerary.dining?.map(d => d.visible ?? true) || [],
+  additionalTravel: itinerary.additionalTravel?.map(t => t.visible ?? true) || [],
+  
+  // NEW: Fixed sections
+  outboundTravel: itinerary.outboundTravelVisible ?? true,
+  returnTravel: itinerary.returnTravelVisible ?? true,
+  helpfulInfo: itinerary.helpfulInfoVisible ?? true,
+});
+
+// Toggle handler for fixed sections
+const handleToggleFixedSection = (sectionName: string) => {
+  setSectionVisibility(prev => ({
+    ...prev,
+    [sectionName]: !prev[sectionName]
+  }));
+};
+
+// In your Outbound Travel section JSX
+<div className="flex items-center gap-3 mb-4">
+  <h3 className="font-semibold text-xl">Outbound Travel</h3>
+  
+  <div className="ml-auto flex items-center gap-2">
+    <span className="text-sm text-gray-600">Visible</span>
+    <button
+      onClick={() => handleToggleFixedSection('outboundTravel')}
+      className={`w-12 h-6 rounded-full transition-colors ${
+        sectionVisibility.outboundTravel ? 'bg-purple-600' : 'bg-gray-300'
+      }`}
+    >
+      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+        sectionVisibility.outboundTravel ? 'translate-x-6' : 'translate-x-1'
+      }`}></div>
+    </button>
+  </div>
+</div>
+
+// Same for Return Travel
+<div className="flex items-center gap-3 mb-4">
+  <h3 className="font-semibold text-xl">Return Travel</h3>
+  
+  <div className="ml-auto flex items-center gap-2">
+    <span className="text-sm text-gray-600">Visible</span>
+    <button
+      onClick={() => handleToggleFixedSection('returnTravel')}
+      className={`w-12 h-6 rounded-full transition-colors ${
+        sectionVisibility.returnTravel ? 'bg-purple-600' : 'bg-gray-300'
+      }`}
+    >
+      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+        sectionVisibility.returnTravel ? 'translate-x-6' : 'translate-x-1'
+      }`}></div>
+    </button>
+  </div>
+</div>
+```
+
+## 3. UPDATE handlePublish to Save Fixed Section Visibility
+```tsx
+const handlePublish = async () => {
+  try {
+    // Save arrangement including fixed section visibility
+    await fetch(`/api/itineraries/${id}/arrange`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accommodations: itinerary.accommodations?.map((item, index) => ({
+          id: item.id,
+          displayOrder: index,
+          visible: sectionVisibility.accommodations[index],
+        })),
+        activities: itinerary.activities?.map((item, index) => ({
+          id: item.id,
+          displayOrder: index,
+          visible: sectionVisibility.activities[index],
+        })),
+        dining: itinerary.dining?.map((item, index) => ({
+          id: item.id,
+          displayOrder: index,
+          visible: sectionVisibility.dining[index],
+        })),
+        additionalTravel: itinerary.additionalTravel?.map((item, index) => ({
+          id: item.id,
+          displayOrder: index,
+          visible: sectionVisibility.additionalTravel[index],
+        })),
+        
+        // NEW: Save fixed section visibility
+        outboundTravelVisible: sectionVisibility.outboundTravel,
+        returnTravelVisible: sectionVisibility.returnTravel,
+        helpfulInfoVisible: sectionVisibility.helpfulInfo,
+      }),
+    });
+
+    // Mark as published
+    await fetch(`/api/itineraries/${id}/publish`, {
+      method: 'PUT',
+    });
+
+    navigate(`/${itinerary.slug}`);
+  } catch (error) {
+    console.error('Failed to publish:', error);
+  }
+};
+```
+
+## 4. UPDATE Backend - Save Fixed Section Visibility
+```javascript
+// In server/routes.ts - /api/itineraries/:id/arrange endpoint
+app.put('/api/itineraries/:id/arrange', async (req, res) => {
+  const { id } = req.params;
+  const { 
+    accommodations, 
+    activities, 
+    dining, 
+    additionalTravel,
+    outboundTravelVisible,
+    returnTravelVisible,
+    helpfulInfoVisible
+  } = req.body;
+
+  // Update array items visibility (existing code)
+  // ... accommodation, activities, dining, additionalTravel updates ...
+
+  // NEW: Update fixed section visibility on itinerary
+  await db.query(
+    `UPDATE itineraries 
+     SET outbound_travel_visible = $1,
+         return_travel_visible = $2,
+         helpful_info_visible = $3
+     WHERE id = $4`,
+    [outboundTravelVisible, returnTravelVisible, helpfulInfoVisible, id]
+  );
+
+  res.json({ success: true });
+});
+```
+
+## 5. UPDATE ViewItinerary - Conditionally Render Fixed Sections
+```tsx
+// In ViewItinerary component
+{/* Only show if visible */}
+{itinerary.outboundTravelVisible !== false && itinerary.outboundTravel && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Outbound Travel</h2>
+    
+    {/* Transfer to Airport */}
+    <div className="mb-4">
+      <h4 className="font-semibold text-sm mb-2">Transfer to Airport</h4>
+      {itinerary.outboundTravel.transferToAirport ? (
+        <p>{itinerary.outboundTravel.transferToAirport}</p>
+      ) : (
+        <p className="text-gray-400 text-sm italic">—</p>
+      )}
+    </div>
+    
+    {/* Flight */}
+    {itinerary.outboundTravel.flightNumber && (
+      <FlightCard {...itinerary.outboundTravel} />
+    )}
+    
+    {/* Transfer to Accommodation */}
+    <div className="mb-4">
+      <h4 className="font-semibold text-sm mb-2">Transfer to Accommodation</h4>
+      {itinerary.outboundTravel.transferToAccommodation ? (
+        <p>{itinerary.outboundTravel.transferToAccommodation}</p>
+      ) : (
+        <p className="text-gray-400 text-sm italic">—</p>
+      )}
+    </div>
+  </section>
+)}
+
+{/* Return Travel - Only show if visible */}
+{itinerary.returnTravelVisible !== false && itinerary.returnTravel && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Return Travel</h2>
+    {/* ... return travel content ... */}
+  </section>
+)}
+
+{/* Helpful Information - Only show if visible */}
+{itinerary.helpfulInfoVisible !== false && itinerary.helpfulInfo && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Helpful Information</h2>
+    {/* ... helpful info content ... */}
+  </section>
+)}
+```
+
+## 6. UPDATE PDF Template - Conditionally Render Fixed Sections
+```tsx
+// In ItineraryPDFTemplate
+{/* Outbound Travel - Only if visible */}
+{itinerary.outboundTravelVisible !== false && itinerary.outboundTravel && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Outbound Travel</Text>
+    {/* ... outbound travel content ... */}
+  </View>
+)}
+
+{/* Return Travel - Only if visible */}
+{itinerary.returnTravelVisible !== false && itinerary.returnTravel && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Return Travel</Text>
+    {/* ... return travel content ... */}
+  </View>
+)}
+
+{/* Helpful Information - Only if visible */}
+{itinerary.helpfulInfoVisible !== false && itinerary.helpfulInfo && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Helpful Information</Text>
+    {/* ... helpful info content ... */}
+  </View>
+)}
+```
+
+## SUMMARY:
+
+The issue is that Outbound Travel and Return Travel are **fixed sections** stored directly on the itinerary, not array items. They need:
+
+1. Visibility columns on the `itineraries` table
+2. Visibility tracking in PreviewArrange state
+3. Save visibility when publishing
+4. Conditional rendering based on visibility in view and PDF
+
+TEST:
+1. Toggle OFF Outbound Travel - switch turns gray
+2. Click "Publish Itinerary"
+3. View published page - Outbound Travel should NOT appear
+4. Download PDF - Outbound Travel should NOT appear
+5. Toggle back ON - should reappear

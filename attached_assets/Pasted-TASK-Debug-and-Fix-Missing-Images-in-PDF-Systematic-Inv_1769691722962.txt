@@ -1,0 +1,451 @@
+TASK: Debug and Fix Missing Images in PDF - Systematic Investigation
+
+PROBLEM: Some images display on the website but are completely missing from the generated PDF.
+
+STEP-BY-STEP DEBUGGING PROTOCOL:
+
+## STEP 1: Identify Exactly Which Images Are Missing
+
+Add this temporary logging to your PDF download handler:
+```tsx
+const handleDownloadPDF = async () => {
+  console.log('=== PDF GENERATION DEBUG ===');
+  console.log('Raw itinerary data:');
+  console.log('- Accommodations:', itinerary.accommodations?.map(a => ({
+    name: a.title || a.name,
+    images: a.images,
+    hasImages: !!a.images
+  })));
+  console.log('- Activities:', itinerary.activities?.map(a => ({
+    name: a.name,
+    images: a.images,
+    hasImages: !!a.images
+  })));
+  console.log('- Dining:', itinerary.dining?.map(d => ({
+    name: d.name,
+    images: d.images,
+    hasImages: !!d.images
+  })));
+  console.log('- Additional Travel:', itinerary.additionalTravel?.map(t => ({
+    type: t.type,
+    images: t.images,
+    hasImages: !!t.images
+  })));
+  
+  // If using preprocessor
+  if (processedItinerary) {
+    console.log('Processed itinerary data:');
+    console.log('- Accommodations:', processedItinerary.accommodations?.map(a => ({
+      name: a.title || a.name,
+      images: a.images,
+      isDataUri: typeof a.images === 'string' && a.images.startsWith('data:')
+    })));
+    console.log('- Activities:', processedItinerary.activities?.map(a => ({
+      name: a.name,
+      images: a.images,
+      isDataUri: typeof a.images === 'string' && a.images.startsWith('data:')
+    })));
+    console.log('- Dining:', processedItinerary.dining?.map(d => ({
+      name: d.name,
+      images: d.images,
+      isDataUri: typeof d.images === 'string' && d.images.startsWith('data:')
+    })));
+  }
+  
+  // Generate PDF
+  const blob = await pdf(<ItineraryPDFTemplate itinerary={processedItinerary || itinerary} />).toBlob();
+  saveAs(blob, `itinerary-${itinerary.id}.pdf`);
+};
+```
+
+Run this, download the PDF, and check the console output. Share what you see.
+
+## STEP 2: Verify Image Preprocessing Hook Exists and Works
+
+Search for the file:
+```bash
+find client/src -name "*imagePreprocessor*" -o -name "*ImagePreprocessor*"
+```
+
+If it doesn't exist, CREATE IT at `client/src/hooks/useImagePreprocessor.ts`:
+```tsx
+import { useState, useEffect } from 'react';
+
+interface ImageCache {
+  [url: string]: string;
+}
+
+export function useImagePreprocessor(itinerary: any) {
+  const [processedItinerary, setProcessedItinerary] = useState(itinerary);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cache] = useState<ImageCache>({});
+
+  useEffect(() => {
+    async function preprocessImages() {
+      if (!itinerary) {
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Starting image preprocessing...');
+      
+      // Collect all image URLs
+      const imageUrls: string[] = [];
+      
+      // Helper to extract URLs from various formats
+      const extractUrls = (images: any): string[] => {
+        if (!images) return [];
+        if (typeof images === 'string') {
+          if (images.startsWith('http')) return [images];
+          try {
+            const parsed = JSON.parse(images);
+            if (Array.isArray(parsed)) return parsed.filter(url => url && url.startsWith('http'));
+            if (typeof parsed === 'string' && parsed.startsWith('http')) return [parsed];
+          } catch {
+            return [];
+          }
+        }
+        if (Array.isArray(images)) {
+          return images.filter(url => url && typeof url === 'string' && url.startsWith('http'));
+        }
+        return [];
+      };
+
+      // Collect from accommodations
+      itinerary.accommodations?.forEach((acc: any) => {
+        const urls = extractUrls(acc.images);
+        imageUrls.push(...urls);
+        console.log(`Accommodation "${acc.title || acc.name}": found ${urls.length} images`, urls);
+      });
+
+      // Collect from activities
+      itinerary.activities?.forEach((act: any) => {
+        const urls = extractUrls(act.images);
+        imageUrls.push(...urls);
+        console.log(`Activity "${act.name}": found ${urls.length} images`, urls);
+      });
+
+      // Collect from dining
+      itinerary.dining?.forEach((din: any) => {
+        const urls = extractUrls(din.images);
+        imageUrls.push(...urls);
+        console.log(`Dining "${din.name}": found ${urls.length} images`, urls);
+      });
+
+      // Collect from additional travel
+      itinerary.additionalTravel?.forEach((travel: any) => {
+        const urls = extractUrls(travel.images);
+        imageUrls.push(...urls);
+        console.log(`Additional Travel "${travel.type}": found ${urls.length} images`, urls);
+      });
+
+      // Remove duplicates
+      const uniqueUrls = [...new Set(imageUrls)];
+      console.log(`Total unique images to process: ${uniqueUrls.length}`);
+
+      if (uniqueUrls.length === 0) {
+        console.log('No images to process');
+        setProcessedItinerary(itinerary);
+        setIsLoading(false);
+        return;
+      }
+
+      // Convert images to data URIs
+      const urlMap: { [key: string]: string } = {};
+      
+      for (const url of uniqueUrls) {
+        try {
+          // Check cache
+          if (cache[url]) {
+            urlMap[url] = cache[url];
+            console.log(`Using cached data URI for: ${url.substring(0, 50)}...`);
+            continue;
+          }
+
+          console.log(`Processing: ${url.substring(0, 50)}...`);
+          
+          const proxyUrl = `${window.location.origin}/api/proxy-image/${btoa(url)}.jpg`;
+          const response = await fetch(proxyUrl);
+          
+          if (!response.ok) {
+            console.error(`Failed to fetch (${response.status}): ${url}`);
+            continue;
+          }
+
+          let blob = await response.blob();
+          console.log(`Fetched blob type: ${blob.type}, size: ${blob.size}`);
+
+          // Convert WebP to JPG if needed
+          if (blob.type === 'image/webp') {
+            console.log('Converting WebP to JPG...');
+            blob = await convertWebPToJPG(blob);
+            console.log('Converted to JPG');
+          }
+
+          // Convert to data URI
+          const dataUri = await blobToDataUri(blob);
+          urlMap[url] = dataUri;
+          cache[url] = dataUri;
+          console.log(`✓ Converted to data URI (${dataUri.substring(0, 50)}...)`);
+        } catch (error) {
+          console.error(`Error processing image: ${url}`, error);
+        }
+      }
+
+      console.log(`Successfully processed ${Object.keys(urlMap).length} images`);
+
+      // Replace URLs with data URIs in itinerary
+      const replaceUrls = (images: any): any => {
+        if (!images) return images;
+        
+        if (typeof images === 'string') {
+          if (images.startsWith('http')) {
+            return urlMap[images] || images;
+          }
+          try {
+            const parsed = JSON.parse(images);
+            if (Array.isArray(parsed)) {
+              return parsed.map(url => urlMap[url] || url);
+            }
+            if (typeof parsed === 'string' && parsed.startsWith('http')) {
+              return urlMap[parsed] || parsed;
+            }
+          } catch {
+            return images;
+          }
+        }
+        
+        if (Array.isArray(images)) {
+          return images.map(url => urlMap[url] || url);
+        }
+        
+        return images;
+      };
+
+      const processed = {
+        ...itinerary,
+        accommodations: itinerary.accommodations?.map((acc: any) => ({
+          ...acc,
+          images: replaceUrls(acc.images)
+        })),
+        activities: itinerary.activities?.map((act: any) => ({
+          ...act,
+          images: replaceUrls(act.images)
+        })),
+        dining: itinerary.dining?.map((din: any) => ({
+          ...din,
+          images: replaceUrls(din.images)
+        })),
+        additionalTravel: itinerary.additionalTravel?.map((travel: any) => ({
+          ...travel,
+          images: replaceUrls(travel.images)
+        }))
+      };
+
+      console.log('Image preprocessing complete');
+      setProcessedItinerary(processed);
+      setIsLoading(false);
+    }
+
+    preprocessImages();
+  }, [itinerary]);
+
+  return { processedItinerary, isLoading };
+}
+
+async function convertWebPToJPG(webpBlob: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(webpBlob);
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to convert to JPG'));
+          }
+        },
+        'image/jpeg',
+        0.92
+      );
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load WebP image'));
+    };
+    
+    img.src = objectUrl;
+  });
+}
+
+async function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+```
+
+## STEP 3: Use the Hook in ViewItinerary
+
+In your ViewItinerary component:
+```tsx
+import { useImagePreprocessor } from '../hooks/useImagePreprocessor';
+
+function ViewItinerary() {
+  const { itinerary } = useItinerary(); // or however you get itinerary
+  
+  // ADD THIS
+  const { processedItinerary, isLoading: imagesLoading } = useImagePreprocessor(itinerary);
+
+  const handleDownloadPDF = async () => {
+    if (imagesLoading) {
+      alert('Please wait while images are being processed...');
+      return;
+    }
+
+    // CRITICAL: Use processedItinerary
+    const blob = await pdf(
+      <ItineraryPDFTemplate itinerary={processedItinerary} />
+    ).toBlob();
+    
+    saveAs(blob, `itinerary-${itinerary.id}.pdf`);
+  };
+
+  // Rest of component...
+}
+```
+
+## STEP 4: Fix PDF Template Image Rendering
+
+In your ItineraryPDFTemplate, ensure images are rendered correctly:
+```tsx
+// Helper function at top of file
+const getFirstImage = (images: any): string | null => {
+  if (!images) return null;
+  
+  // Already a data URI or URL
+  if (typeof images === 'string') {
+    if (images.startsWith('data:') || images.startsWith('http')) {
+      return images;
+    }
+    // Try parsing if it's a JSON string
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0];
+      }
+      if (typeof parsed === 'string') {
+        return parsed;
+      }
+    } catch {
+      return null;
+    }
+  }
+  
+  // Already an array
+  if (Array.isArray(images) && images.length > 0) {
+    return images[0];
+  }
+  
+  return null;
+};
+
+// In your PDF sections:
+{itinerary.accommodations?.filter(a => a.visible !== false).map((acc, index) => {
+  const imageUrl = getFirstImage(acc.images);
+  
+  return (
+    <View key={index} style={styles.accommodationSection}>
+      <Text style={styles.accommodationName}>{acc.title || acc.name}</Text>
+      
+      {imageUrl && (
+        <Image 
+          src={imageUrl} 
+          style={styles.accommodationImage}
+        />
+      )}
+      
+      {/* Rest of accommodation content */}
+    </View>
+  );
+})}
+
+// Same pattern for activities, dining, additional travel
+```
+
+## STEP 5: Test the Full Pipeline
+
+1. Clear browser cache (Ctrl+Shift+Delete)
+2. Reload the published itinerary page
+3. Open DevTools Console (F12)
+4. Click "Download PDF"
+5. Watch the console logs
+6. Share the console output with me
+
+## STEP 6: If Images Still Don't Show
+
+Check the PDF template styles - images might be hidden:
+```tsx
+const styles = StyleSheet.create({
+  accommodationImage: {
+    width: '100%',
+    height: 200,
+    objectFit: 'cover',
+    marginVertical: 10,
+    borderRadius: 8,
+  },
+  activityImage: {
+    width: '100%',
+    height: 200,
+    objectFit: 'cover',
+    marginVertical: 10,
+    borderRadius: 8,
+  },
+  diningImage: {
+    width: '100%',
+    height: 200,
+    objectFit: 'cover',
+    marginVertical: 10,
+    borderRadius: 8,
+  }
+});
+```
+
+Make sure these styles exist and are applied to the Image components.
+
+## EXPECTED CONSOLE OUTPUT
+
+You should see something like:
+Starting image preprocessing...
+Accommodation "Hotel Name": found 1 images ["https://..."]
+Activity "Activity Name": found 1 images ["https://..."]
+Dining "Restaurant Name": found 1 images ["https://..."]
+Total unique images to process: 5
+Processing: https://lh3.googleusercontent.com/...
+Fetched blob type: image/jpeg, size: 145623
+✓ Converted to data URI (data:image/jpeg;base64,/9j/4AAQSkZJ...)
+Processing: https://images.unsplash.com/...
+Fetched blob type: image/webp, size: 89234
+Converting WebP to JPG...
+Converted to JPG
+✓ Converted to data URI (data:image/jpeg;base64,/9j/4AAQSkZJ...)
+Successfully processed 5 images
+Image preprocessing complete
+
+If you see errors, share them and I can help fix them.

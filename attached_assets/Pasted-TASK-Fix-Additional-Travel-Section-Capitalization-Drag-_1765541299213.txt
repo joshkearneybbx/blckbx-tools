@@ -1,0 +1,255 @@
+TASK: Fix Additional Travel Section - Capitalization + Drag-to-Reorder
+
+ISSUES TO FIX:
+1. "flight" should be "Flight" (capitalize)
+2. Add drag handles (dots) to all additional travel items for reordering
+3. Ensure all travel types (flight, train, taxi, transfer) have drag handles
+
+IMPLEMENTATION:
+
+1. UPDATE: ViewItinerary.tsx (or wherever Additional Travel is displayed in publish mode)
+
+Find the Additional Travel section and update it:
+```tsx
+{itinerary.additionalTravel && itinerary.additionalTravel.length > 0 && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Additional Travel</h2>
+    <div className="space-y-4">
+      {itinerary.additionalTravel.map((travel, index) => (
+        <div 
+          key={index}
+          className="bg-gray-100 rounded-lg shadow-sm border border-gray-200 overflow-hidden"
+        >
+          {/* Header with drag handle and type */}
+          <div className="bg-white px-6 py-3 flex items-center justify-between border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              {/* Drag handle dots */}
+              <div className="flex flex-col gap-1 cursor-move">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                </div>
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                </div>
+              </div>
+              {/* Capitalize first letter of travel type */}
+              <h3 className="font-semibold text-lg">
+                {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+              </h3>
+            </div>
+            <span className="text-sm text-gray-500">Visible</span>
+          </div>
+
+          {/* Content based on travel type */}
+          <div className="px-6 py-4">
+            {travel.type === 'flight' && travel.flightNumber ? (
+              <FlightCard
+                flightNumber={travel.flightNumber}
+                date={travel.date}
+                departureAirport={travel.departureAirport || travel.from}
+                departureTime={travel.departureTime}
+                arrivalAirport={travel.arrivalAirport || travel.to}
+                arrivalTime={travel.arrivalTime}
+                passengers={travel.passengers}
+                notes={travel.notes}
+                isMultiLeg={travel.isMultiLeg}
+                legs={travel.legs}
+              />
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <span className="font-semibold">
+                    {travel.type === 'flight' ? 'Flight Number:' : 
+                     travel.type === 'train' ? 'Train Service:' : 
+                     travel.type === 'taxi' ? 'Pickup:' : 
+                     'Details:'}
+                  </span>{' '}
+                  <span>
+                    {travel.flightNumber || travel.trainService || travel.from || 'N/A'}
+                  </span>
+                </div>
+                {travel.date && (
+                  <div>
+                    <span className="font-semibold">Date:</span> {travel.date}
+                  </div>
+                )}
+                {travel.departureTime && (
+                  <div>
+                    <span className="font-semibold">Departure:</span> {travel.from} at {travel.departureTime}
+                  </div>
+                )}
+                {travel.arrivalTime && (
+                  <div>
+                    <span className="font-semibold">Arrival:</span> {travel.to} at {travel.arrivalTime}
+                  </div>
+                )}
+                {travel.notes && (
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-amber-500">⚠️</span>
+                      <div>
+                        <div className="text-xs font-semibold text-amber-700 uppercase">Things to Remember</div>
+                        <div className="text-sm text-amber-800 mt-1">{travel.notes}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+```
+
+2. UPDATE: Add actual drag-and-drop functionality (optional but recommended)
+
+If you want functional drag-and-drop reordering, install react-beautiful-dnd:
+```bash
+npm install react-beautiful-dnd
+npm install --save-dev @types/react-beautiful-dnd
+```
+
+Then update the Additional Travel section:
+```tsx
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+
+// Add state for reordering
+const [additionalTravelItems, setAdditionalTravelItems] = useState(itinerary.additionalTravel || []);
+
+// Handle drag end
+const handleDragEnd = (result) => {
+  if (!result.destination) return;
+  
+  const items = Array.from(additionalTravelItems);
+  const [reorderedItem] = items.splice(result.source.index, 1);
+  items.splice(result.destination.index, 0, reorderedItem);
+  
+  setAdditionalTravelItems(items);
+  
+  // Optional: Save to database
+  // updateItineraryOrder(itinerary.id, items);
+};
+
+// In the JSX:
+<DragDropContext onDragEnd={handleDragEnd}>
+  <Droppable droppableId="additional-travel">
+    {(provided) => (
+      <div 
+        {...provided.droppableProps} 
+        ref={provided.innerRef}
+        className="space-y-4"
+      >
+        {additionalTravelItems.map((travel, index) => (
+          <Draggable 
+            key={`travel-${index}`} 
+            draggableId={`travel-${index}`} 
+            index={index}
+          >
+            {(provided, snapshot) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+                className={`bg-gray-100 rounded-lg shadow-sm border border-gray-200 overflow-hidden ${
+                  snapshot.isDragging ? 'shadow-xl ring-2 ring-black' : ''
+                }`}
+              >
+                {/* Header with drag handle */}
+                <div className="bg-white px-6 py-3 flex items-center justify-between border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    {/* Drag handle - use provided.dragHandleProps */}
+                    <div 
+                      {...provided.dragHandleProps}
+                      className="flex flex-col gap-1 cursor-move hover:opacity-60 transition-opacity"
+                    >
+                      <div className="flex gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                      </div>
+                      <div className="flex gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                      </div>
+                    </div>
+                    {/* Capitalize travel type */}
+                    <h3 className="font-semibold text-lg">
+                      {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+                    </h3>
+                  </div>
+                  <span className="text-sm text-gray-500">Visible</span>
+                </div>
+
+                {/* Rest of the content... */}
+                <div className="px-6 py-4">
+                  {/* Same content as before */}
+                </div>
+              </div>
+            )}
+          </Draggable>
+        ))}
+        {provided.placeholder}
+      </div>
+    )}
+  </Droppable>
+</DragDropContext>
+```
+
+3. ALTERNATIVE: Simple visual drag handle without functionality
+
+If you don't want full drag-and-drop yet, just add the visual drag handle:
+```tsx
+{/* Drag handle dots (visual only) */}
+<div className="flex flex-col gap-1 cursor-move opacity-40 hover:opacity-100 transition-opacity">
+  <div className="flex gap-1">
+    <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+    <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+  </div>
+  <div className="flex gap-1">
+    <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+    <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+  </div>
+</div>
+```
+
+4. APPLY TO ALL SECTIONS THAT NEED REORDERING:
+
+The same pattern should be applied to:
+- Accommodations (if multiple)
+- Activities (if multiple)
+- Dining (if multiple)
+- Additional Travel (already done above)
+
+Example for Activities section:
+```tsx
+<div className="flex items-center gap-3">
+  {/* Drag handle dots */}
+  <div className="flex flex-col gap-1 cursor-move">
+    <div className="flex gap-1">
+      <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+      <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+    </div>
+    <div className="flex gap-1">
+      <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+      <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+    </div>
+  </div>
+  <h3 className="font-semibold text-lg">Activity</h3>
+</div>
+```
+
+SUMMARY OF CHANGES:
+- "flight" → "Flight" (capitalize using .charAt(0).toUpperCase() + .slice(1))
+- Added 4-dot drag handle to left of travel type
+- Applied to all additional travel items (flight, train, taxi, transfer)
+- Optional: Full drag-and-drop reordering with react-beautiful-dnd
+- Consistent styling across all travel types
+
+TEST:
+1. View itinerary with additional travel items
+2. Check "flight" is capitalized to "Flight"
+3. Check all items have drag handle dots on the left
+4. (If drag-drop implemented) Try dragging items to reorder

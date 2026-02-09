@@ -1,0 +1,554 @@
+# ITINERARY PDF - COMPLETE REDESIGN WITH SIDEBAR
+
+## OBJECTIVE
+Redesign PDF layout with branded left sidebar containing key info, and ensure all content from web view appears in PDF including images and all fields.
+
+## ⚠️ CRITICAL INSTRUCTION
+Implement all changes without asking for confirmation. I will test the PDF at the end.
+
+---
+
+## 1. PDF LAYOUT - LEFT SIDEBAR DESIGN
+
+### Layout Structure
+
+```
+┌─────────────┬──────────────────────────────────────┐
+│             │                                      │
+│  BLACK      │  Main Content Area                   │
+│  SIDEBAR    │  (White Background)                  │
+│             │                                      │
+│  [Logo]     │  Test - Norway Itinerary             │
+│             │  Friday 18 July - Tuesday 22 July    │
+│             │  Norway                              │
+│  Trip Title │                                      │
+│             │  Travellers                          │
+│             │  ┌─────────────────────────────┐    │
+│             │  │ Test_Child                  │    │
+│             │  │ Child (Age: 8)              │    │
+│             │  └─────────────────────────────┘    │
+│             │                                      │
+│             │  Accommodation                       │
+│             │  ┌─────────────────────────────┐    │
+│  Assistant  │  │ Geilo Hotel                 │    │
+│  Name       │  │ [Photo]                     │    │
+│  Email      │  │ Address...                  │    │
+│             │  │ Booking Ref: ABC123         │    │
+│             │  │ 📍 View on Google Maps      │    │
+│  Page 1/8   │  │ 🔗 View Website             │    │
+│             │  │ Image: https://...          │    │
+└─────────────┴──────────────────────────────────────┘
+```
+
+### Sidebar Specifications
+
+**Dimensions:**
+- Width: 220px
+- Height: Full page
+- Background: Black (#000000)
+- Text Color: White (#FFFFFF)
+- Fixed position on every page
+
+**Padding & Spacing:**
+- Internal padding: 20px
+- Spacing between sections: 15-20px
+- Bottom padding: 30px (for page numbers)
+
+---
+
+## 2. SIDEBAR CONTENT (Top to Bottom)
+
+**Keep it simple - only 3 elements:**
+
+### 2.1 BlckBx Logo
+```
+Position: Top of sidebar
+Style: White version on black background
+Size: Full width (180px)
+Padding: 20px 20px 40px 20px
+```
+
+### 2.2 Trip Title
+```
+Position: Middle of sidebar
+Content: Itinerary title (e.g., "Test - Norway Itinerary")
+Font: 16px, bold, white
+Line height: 1.3
+Max width: 180px (wrap if needed)
+Text-align: left
+```
+
+### 2.3 Assistant Information
+```
+Position: Bottom of sidebar (above page number)
+Padding-bottom: 60px
+
+Heading: "Your Assistant"
+Font: 12px, bold, white
+Margin-bottom: 8px
+
+Name: 
+Font: 11px, white
+
+Email:
+Font: 10px, white, underlined
+Clickable link
+```
+
+### 2.4 Page Numbers
+```
+Position: Very bottom of sidebar
+Content: "Page X of 8"
+Font: 10px, white, semi-transparent (opacity: 0.7)
+Alignment: Center
+Padding-bottom: 15px
+```
+
+**Vertical spacing:**
+- Logo at top (padding: 20px)
+- Trip title below logo (margin-top: 20px)
+- Large gap in middle (flexible space)
+- Assistant info anchored near bottom (60px from bottom)
+- Page number at very bottom (15px from bottom)
+
+---
+
+## 3. MAIN CONTENT AREA
+
+### Layout
+```
+Position: Right of sidebar
+Left margin: 240px (220px sidebar + 20px gap)
+Right margin: 40px
+Top margin: 40px
+Bottom margin: 40px
+Background: White
+```
+
+### Content Sections
+
+All sections should include EVERYTHING from the web view:
+
+#### 3.1 Accommodation Section
+```
+For each accommodation:
+
+Hotel Name (heading)
+📍 Address
+📍 View on Google Maps (clickable blue link)
+
+Check-in Details:
+[Date and time]
+
+Booking Reference: [ref]
+Contact: [phone/email]
+🔗 View Website (clickable blue link)
+
+[Display Image]
+Image: https://example.com/image.jpg (clickable link below image)
+```
+
+#### 3.2 Activities Section
+```
+For each activity:
+
+Activity Name (heading)
+Description: [full description]
+Price: [price info]
+Contact: [contact details]
+📍 Address
+📍 View on Google Maps (clickable blue link)
+🔗 View Website (clickable blue link)
+
+[Display Image]
+Image: https://example.com/image.jpg (clickable link below image)
+```
+
+#### 3.3 Dining Section
+```
+For each restaurant:
+
+Restaurant Name (heading)
+Cuisine: [cuisine type]
+Price Range: [price range]
+Contact: [contact details]
+📍 Address
+📍 View on Google Maps (clickable blue link)
+🔗 View Website (clickable blue link)
+
+[Display Image]
+Image: https://example.com/image.jpg (clickable link below image)
+```
+
+#### 3.4 Outbound Travel Section
+```
+Flight
+Flight Number: [number]
+Date: [date]
+Departure: [airport] at [time]
+Arrival: [airport] at [time]
+Passengers/Seats: [list]
+
+Things to Remember:
+[text]
+
+Transfer to Accommodation
+Taxi Booked: [Yes/No]
+
+If Yes:
+Company: [name]
+Contact: [contact]
+Collection Time: [time]
+Pickup: [location]
+Payment: [Pre-paid / Need to pay]
+
+If No:
+Display: "No taxi booked"
+```
+
+#### 3.5 Additional Travel Section
+```
+Display travel type badge (Car/Flight/Ferry/Train)
+
+Show relevant fields based on type:
+- Flight: Same format as outbound flight
+- Train/Ferry: From, To, Date, Price, Contact, Booking Ref
+- Car: Vehicle details, registration, contact, booking details
+```
+
+#### 3.6 Return Travel Section
+```
+Same format as Outbound Travel:
+- Return Flight details
+- Transfer to Airport (taxi info if applicable)
+- Transfer Home (taxi info if applicable)
+```
+
+#### 3.7 Location Overview
+```
+Heading: "📍 Location Overview"
+Subheading: "All X locations from your itinerary"
+
+[Display map with all location markers]
+```
+
+---
+
+## 4. IMAGE HANDLING IN PDF
+
+### Critical Requirements
+
+**Every image from web view MUST appear in PDF:**
+1. All accommodation photos
+2. All activity photos
+3. All dining photos
+4. Location overview map
+
+**Image Display Format:**
+```
+[Image displayed at reasonable size - max width 400px]
+
+Below image:
+Image: https://example.com/hotel-photo.jpg
+^ This URL must be clickable and visible in PDF
+```
+
+**Image Quality:**
+- Maintain aspect ratio
+- Compress appropriately (balance quality vs file size)
+- Target PDF file size: Under 10MB
+
+**If image URL fails to load:**
+- Show placeholder with gray background
+- Still display the URL as text
+
+---
+
+## 5. STYLING & DESIGN
+
+### Sidebar Styling
+```css
+background: #000000
+color: #FFFFFF
+width: 220px
+padding: 20px
+font-family: Arial, sans-serif
+
+Headings:
+  font-weight: bold
+  margin-bottom: 8px
+
+Icons:
+  margin-right: 6px
+  
+Links (email):
+  color: #FFFFFF
+  text-decoration: underline
+  
+Dividers:
+  1px solid rgba(255,255,255,0.2)
+  margin: 15px 0
+```
+
+### Main Content Styling
+```css
+background: #FFFFFF
+padding: 40px
+font-family: Arial, sans-serif
+
+Section Headings:
+  font-size: 24px
+  font-weight: bold
+  color: #000000
+  margin-bottom: 20px
+  border-bottom: 2px solid #e0e0e0
+  padding-bottom: 10px
+
+Item Cards:
+  background: #f8f9fa
+  padding: 20px
+  margin-bottom: 20px
+  border-radius: 8px
+  border: 1px solid #e0e0e0
+
+Item Headings:
+  font-size: 18px
+  font-weight: bold
+  margin-bottom: 12px
+
+Labels:
+  font-weight: 600
+  color: #666666
+
+Links:
+  color: #2563eb
+  text-decoration: underline
+  
+Icons:
+  color: #666666
+  margin-right: 4px
+```
+
+---
+
+## 6. MISSING FIELDS - ENSURE ALL PRESENT
+
+### Accommodation Must Include:
+- ✓ Name
+- ✓ Address
+- ✓ Google Maps Link (clickable)
+- ✓ Check-in Details
+- ✓ Booking Reference
+- ✓ Contact Info
+- ✓ Website/Booking Link (clickable)
+- ✓ Images with URLs below
+
+### Activities Must Include:
+- ✓ Activity Name
+- ✓ Description
+- ✓ Price
+- ✓ Contact Details
+- ✓ Address
+- ✓ Google Maps Link (clickable)
+- ✓ Website/Booking Link (clickable)
+- ✓ Images with URLs below
+
+### Dining Must Include:
+- ✓ Restaurant Name
+- ✓ Cuisine Type
+- ✓ Price Range
+- ✓ Contact Details
+- ✓ Address
+- ✓ Google Maps Link (clickable)
+- ✓ Website/Booking Link (clickable)
+- ✓ Images with URLs below
+
+### Travel Sections Must Include:
+- ✓ All flight fields (number, date, times, passengers, things to remember)
+- ✓ Taxi booking details (if Yes: all 5 fields shown)
+- ✓ Additional travel with all type-specific fields
+
+---
+
+## 7. TECHNICAL IMPLEMENTATION
+
+### Using @react-pdf/renderer
+
+**Document Structure:**
+```tsx
+<Document>
+  <Page size="A4" style={styles.page}>
+    {/* Sidebar - fixed position */}
+    <View style={styles.sidebar} fixed>
+      {/* Logo at top */}
+      <Image src={logoWhite} style={styles.logo} />
+      
+      {/* Trip title */}
+      <Text style={styles.tripTitle}>{title}</Text>
+      
+      {/* Flexible spacer */}
+      <View style={{ flex: 1 }} />
+      
+      {/* Assistant info at bottom */}
+      <View style={styles.assistantSection}>
+        <Text style={styles.sectionHeading}>Your Assistant</Text>
+        <Text style={styles.assistantName}>{assistant.name}</Text>
+        <Link src={`mailto:${assistant.email}`} style={styles.assistantEmail}>
+          {assistant.email}
+        </Link>
+      </View>
+      
+      {/* Page number at very bottom */}
+      <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => 
+        `Page ${pageNumber} of ${totalPages}`
+      } fixed />
+    </View>
+    
+    {/* Main content area */}
+    <View style={styles.mainContent}>
+      {/* All sections here */}
+    </View>
+  </Page>
+</Document>
+```
+
+**Styles:**
+```tsx
+const styles = StyleSheet.create({
+  page: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+  },
+  sidebar: {
+    width: 220,
+    backgroundColor: '#000000',
+    padding: 20,
+    color: '#FFFFFF',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+  },
+  mainContent: {
+    marginLeft: 240,
+    marginRight: 40,
+    marginTop: 40,
+    marginBottom: 40,
+    flex: 1,
+  },
+  // ... all other styles
+});
+```
+
+**Image Handling:**
+```tsx
+// For each image
+<View>
+  <Image 
+    src={imageUrl} 
+    style={styles.itemImage}
+  />
+  <Link src={imageUrl} style={styles.imageUrl}>
+    Image: {imageUrl}
+  </Link>
+</View>
+```
+
+---
+
+## 8. PAGE BREAKS
+
+**Smart page breaks:**
+- Don't break accommodation/activity/dining items across pages
+- Each major section can start on new page if needed
+- Sidebar remains fixed on every page
+
+```tsx
+<View break={shouldBreak}>
+  {/* Section content */}
+</View>
+```
+
+---
+
+## 9. TESTING CHECKLIST
+
+### Sidebar Tests
+- [ ] Sidebar appears on every page
+- [ ] Logo visible in sidebar (white version)
+- [ ] Trip title displays correctly
+- [ ] Trip title wraps properly if long
+- [ ] Assistant info at bottom of sidebar
+- [ ] Assistant email is clickable
+- [ ] Page numbers at very bottom of sidebar
+- [ ] Proper spacing between elements
+- [ ] Black background with white text
+
+### Content Tests
+- [ ] All accommodation fields present
+- [ ] All accommodation images display
+- [ ] All accommodation image URLs clickable
+- [ ] All activity fields present
+- [ ] All activity images display
+- [ ] All dining fields present
+- [ ] All dining images display
+- [ ] All Google Maps links clickable
+- [ ] All website links clickable
+- [ ] Outbound travel complete with taxi info
+- [ ] Additional travel shows correct type
+- [ ] Return travel complete
+- [ ] Location overview map displays
+- [ ] Travellers section shows correctly in main content
+- [ ] Dates and location in main content header
+
+### Quality Tests
+- [ ] PDF file size under 10MB
+- [ ] All text readable and properly formatted
+- [ ] No content cutoff or overflow
+- [ ] Professional appearance
+- [ ] Proper page breaks
+
+---
+
+## 10. IMPLEMENTATION ORDER
+
+1. Set up @react-pdf/renderer document structure with sidebar
+2. Create sidebar component with all sections
+3. Style sidebar (black background, white text)
+4. Add main content area with proper margins
+5. Add all accommodation sections with images
+6. Add all activity sections with images
+7. Add all dining sections with images
+8. Add travel sections
+9. Add location overview
+10. Ensure all images load and display URLs
+11. Test page breaks
+12. Verify all links are clickable
+13. Check file size
+14. Test with different itineraries
+
+---
+
+## 11. FINAL NOTES
+
+**Key Success Criteria:**
+
+1. **Clean Branded Look**: Simple black sidebar with just logo, trip name, and assistant creates professional branding without clutter
+2. **All Information Present**: PDF matches web view exactly - no missing fields or images
+3. **Clickable Links**: All Google Maps, website, and image URLs are clickable
+4. **Readable**: Clear hierarchy, good contrast, proper spacing
+5. **Reasonable File Size**: Under 10MB even with multiple images
+6. **Consistent**: Sidebar appears identically on every page
+
+**Visual Impact:**
+The minimal black sidebar with white elements creates a clean, premium look. Just the essentials:
+- Logo for branding
+- Trip name for reference
+- Assistant contact for support
+- Page numbers for navigation
+
+**User Experience:**
+Clients can quickly identify the trip and find their assistant's contact info without visual clutter. The main content area has full focus with the sidebar providing subtle branding.
+
+**Design Philosophy:**
+Less is more - keep the sidebar simple and let the itinerary content shine in the main area. The black margin adds elegance without overwhelming the document.

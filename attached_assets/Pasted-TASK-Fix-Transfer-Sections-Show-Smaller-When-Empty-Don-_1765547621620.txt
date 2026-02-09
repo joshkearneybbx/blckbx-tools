@@ -1,0 +1,181 @@
+TASK: Fix Transfer Sections - Show Smaller When Empty, Don't Remove Completely
+
+PROBLEM: Transfer sections are being removed entirely when they have content. They should ALWAYS show, just be smaller/more compact when empty.
+
+CORRECT BEHAVIOR:
+- Transfer section exists? → Show full size with content
+- Transfer section empty/null? → Show smaller placeholder or compact label
+- Transfer section should NEVER be completely removed
+
+FIX:
+
+## FOR WEB VIEW:
+```tsx
+{/* Outbound Travel - Transfer to Airport */}
+<div className="mb-4">
+  <h4 className="font-semibold text-sm mb-2">Transfer to Airport</h4>
+  {itinerary.outboundTravel?.transferToAirport ? (
+    <p className="text-gray-700">{itinerary.outboundTravel.transferToAirport}</p>
+  ) : (
+    <p className="text-gray-400 text-sm italic">No transfer details</p>
+  )}
+</div>
+
+{/* Transfer to Accommodation */}
+<div className="mb-4">
+  <h4 className="font-semibold text-sm mb-2">Transfer to Accommodation</h4>
+  {itinerary.outboundTravel?.transferToAccommodation ? (
+    <p className="text-gray-700">{itinerary.outboundTravel.transferToAccommodation}</p>
+  ) : (
+    <p className="text-gray-400 text-sm italic">No transfer details</p>
+  )}
+</div>
+
+{/* Return Travel - Transfer to Airport */}
+<div className="mb-4">
+  <h4 className="font-semibold text-sm mb-2">Transfer to Airport</h4>
+  {itinerary.returnTravel?.transferToAirport ? (
+    <p className="text-gray-700">{itinerary.returnTravel.transferToAirport}</p>
+  ) : (
+    <p className="text-gray-400 text-sm italic">No transfer details</p>
+  )}
+</div>
+
+{/* Transfer Home */}
+<div className="mb-4">
+  <h4 className="font-semibold text-sm mb-2">Transfer Home</h4>
+  {itinerary.returnTravel?.transferHome ? (
+    <p className="text-gray-700">{itinerary.returnTravel.transferHome}</p>
+  ) : (
+    <p className="text-gray-400 text-sm italic">No transfer details</p>
+  )}
+</div>
+```
+
+## FOR PDF:
+```tsx
+{/* Outbound Travel */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Outbound Travel</Text>
+  
+  {/* Transfer to Airport - ALWAYS show, adjust size based on content */}
+  <View style={itinerary.outboundTravel?.transferToAirport 
+    ? styles.transferSectionFull 
+    : styles.transferSectionCompact
+  }>
+    <Text style={styles.transferLabel}>Transfer to Airport</Text>
+    {itinerary.outboundTravel?.transferToAirport ? (
+      <Text style={styles.transferText}>{itinerary.outboundTravel.transferToAirport}</Text>
+    ) : (
+      <Text style={styles.transferTextEmpty}>—</Text>
+    )}
+  </View>
+  
+  {/* Flight */}
+  {itinerary.outboundTravel?.flightNumber && (
+    <FlightCardPDF {...itinerary.outboundTravel} />
+  )}
+  
+  {/* Transfer to Accommodation - ALWAYS show */}
+  <View style={itinerary.outboundTravel?.transferToAccommodation 
+    ? styles.transferSectionFull 
+    : styles.transferSectionCompact
+  }>
+    <Text style={styles.transferLabel}>Transfer to Accommodation</Text>
+    {itinerary.outboundTravel?.transferToAccommodation ? (
+      <Text style={styles.transferText}>{itinerary.outboundTravel.transferToAccommodation}</Text>
+    ) : (
+      <Text style={styles.transferTextEmpty}>—</Text>
+    )}
+  </View>
+</View>
+
+{/* Return Travel - Same pattern */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Return Travel</Text>
+  
+  <View style={itinerary.returnTravel?.transferToAirport 
+    ? styles.transferSectionFull 
+    : styles.transferSectionCompact
+  }>
+    <Text style={styles.transferLabel}>Transfer to Airport</Text>
+    {itinerary.returnTravel?.transferToAirport ? (
+      <Text style={styles.transferText}>{itinerary.returnTravel.transferToAirport}</Text>
+    ) : (
+      <Text style={styles.transferTextEmpty}>—</Text>
+    )}
+  </View>
+  
+  {itinerary.returnTravel?.flightNumber && (
+    <FlightCardPDF {...itinerary.returnTravel} />
+  )}
+  
+  <View style={itinerary.returnTravel?.transferHome 
+    ? styles.transferSectionFull 
+    : styles.transferSectionCompact
+  }>
+    <Text style={styles.transferLabel}>Transfer Home</Text>
+    {itinerary.returnTravel?.transferHome ? (
+      <Text style={styles.transferText}>{itinerary.returnTravel.transferHome}</Text>
+    ) : (
+      <Text style={styles.transferTextEmpty}>—</Text>
+    )}
+  </View>
+</View>
+
+// PDF Styles
+transferSectionFull: {
+  marginVertical: 8,
+  padding: 10,
+  backgroundColor: '#F9FAFB',
+  borderRadius: 4,
+  borderLeft: '2 solid #000000',
+},
+transferSectionCompact: {
+  marginVertical: 4,  // Smaller margin
+  padding: 6,         // Less padding
+  backgroundColor: '#F9FAFB',
+  borderRadius: 4,
+  borderLeft: '1 solid #D1D5DB',  // Thinner, lighter border
+},
+transferLabel: {
+  fontSize: 9,
+  fontWeight: 'bold',
+  color: '#374151',
+  marginBottom: 2,
+},
+transferText: {
+  fontSize: 8,
+  color: '#6B7280',
+  lineHeight: 1.3,
+},
+transferTextEmpty: {
+  fontSize: 8,
+  color: '#D1D5DB',  // Very light gray
+  fontStyle: 'italic',
+},
+```
+
+## KEY CHANGES:
+
+1. **NEVER use conditional rendering** (`{field && <Component />}`) for transfer sections
+2. **ALWAYS show the section**, just change the styling
+3. **When empty**: Smaller padding, lighter border, show "—" or "No details"
+4. **When filled**: Normal padding, darker border, show content
+
+## VISUAL DIFFERENCE:
+
+**With Content (Full Size):**
+┌─────────────────────────────────┐
+│ Transfer to Airport             │
+│ Private car service picks up    │
+│ from hotel at 8:00 AM           │
+└─────────────────────────────────┘
+
+**Without Content (Compact):**
+┌──────────────────────┐
+│ Transfer to Airport  │
+│ —                    │
+└──────────────────────┘
+
+This way users can see all the transfer sections are there, but empty ones don't take up much space.

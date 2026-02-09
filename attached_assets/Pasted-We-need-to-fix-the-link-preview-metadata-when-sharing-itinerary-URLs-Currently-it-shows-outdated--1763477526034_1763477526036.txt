@@ -1,0 +1,63 @@
+We need to fix the link preview metadata when sharing itinerary URLs. Currently, it shows outdated "Algarve villa" text from an old PDF file.
+
+## Step 1: Delete Old PDF
+Delete the file: `attached_assets/Algarve Villa proposal_1762261878194.pdf`
+
+## Step 2: Install React Helmet (if not already installed)
+Run in terminal:
+```bash
+npm install react-helmet
+npm install --save-dev @types/react-helmet
+```
+
+## Step 3: Add Dynamic Meta Tags to Itinerary View Page
+Find the file that renders individual itinerary pages (likely `client/src/pages/ViewItinerary.tsx` or similar - search for the component that displays itineraries at the `/itinerary/[id]` route).
+
+At the top of that file, add the import:
+```tsx
+import { Helmet } from 'react-helmet';
+```
+
+Then inside the component's return statement, add this at the very top (before any other JSX):
+```tsx
+<Helmet>
+  <title>{itinerary?.title || 'Travel Itinerary'} - BlckBx</title>
+  <meta 
+    name="description" 
+    content={`View your personalized ${itinerary?.title || 'travel'} itinerary with accommodations, activities, dining, and travel arrangements.`} 
+  />
+  <meta property="og:title" content={`${itinerary?.title || 'Travel Itinerary'} - BlckBx`} />
+  <meta 
+    property="og:description" 
+    content={`View your personalized ${itinerary?.title || 'travel'} itinerary with detailed travel planning.`} 
+  />
+  <meta property="og:type" content="website" />
+</Helmet>
+```
+
+## Step 4: Update PDF Document Metadata
+In `client/src/components/pdf/ItineraryPDFTemplate.tsx`, find the `<Document>` tag (around line 418) and update it to include metadata:
+
+Change FROM:
+```tsx
+return (
+  <Document>
+```
+
+TO:
+```tsx
+return (
+  <Document
+    title={`${itinerary.title} - Travel Itinerary`}
+    subject={`Personalized travel itinerary for ${itinerary.title}`}
+    author="BlckBx"
+    keywords="travel, itinerary, vacation, holiday, planning"
+    creator="BlckBx Travel Planning"
+    producer="BlckBx"
+  >
+```
+
+This will ensure:
+1. Old cached PDF data is removed
+2. Each itinerary page has proper meta tags for social sharing
+3. Generated PDFs have correct metadata when downloaded/shared

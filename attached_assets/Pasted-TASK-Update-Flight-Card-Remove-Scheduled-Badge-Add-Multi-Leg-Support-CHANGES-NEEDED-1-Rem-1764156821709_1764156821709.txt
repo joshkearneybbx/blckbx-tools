@@ -1,0 +1,777 @@
+TASK: Update Flight Card - Remove Scheduled Badge + Add Multi-Leg Support
+
+CHANGES NEEDED:
+1. Remove the "Scheduled" badge from both web and PDF (misleading without live data)
+2. Add support for multi-leg/connecting flights (changeovers)
+
+1. UPDATE: client/src/components/FlightCard.tsx
+```tsx
+import React from 'react';
+
+interface FlightLeg {
+  departureAirport: string;
+  departureTime: string;
+  arrivalAirport: string;
+  arrivalTime: string;
+  flightNumber?: string; // Optional per-leg flight number for connections
+  layoverDuration?: string; // e.g. "2h 30m layover"
+}
+
+interface FlightCardProps {
+  flightNumber: string;
+  date: string;
+  departureAirport: string;
+  departureTime: string;
+  arrivalAirport: string;
+  arrivalTime: string;
+  passengers?: string;
+  notes?: string;
+  duration?: string;
+  // NEW: Multi-leg support
+  isMultiLeg?: boolean;
+  legs?: FlightLeg[];
+}
+
+export function FlightCard({
+  flightNumber,
+  date,
+  departureAirport,
+  departureTime,
+  arrivalAirport,
+  arrivalTime,
+  passengers,
+  notes,
+  duration,
+  isMultiLeg = false,
+  legs = []
+}: FlightCardProps) {
+  const cleanFlightNumber = flightNumber.replace(/\s/g, '').toUpperCase();
+  const flightTrackerUrl = `https://www.flightradar24.com/data/flights/${cleanFlightNumber.toLowerCase()}`;
+
+  const getAirportCode = (airport: string) => {
+    if (/^[A-Z]{3}$/i.test(airport.trim())) return airport.trim().toUpperCase();
+    return airport.substring(0, 3).toUpperCase();
+  };
+
+  // For single leg flights
+  const depCode = getAirportCode(departureAirport);
+  const arrCode = getAirportCode(arrivalAirport);
+
+  return (
+    <div className="flight-card bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden my-4">
+      {/* Header - NO MORE SCHEDULED BADGE */}
+      <div className="flight-card-header bg-black text-white px-6 py-4 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">✈️</span>
+          <span className="font-bold text-lg">{cleanFlightNumber}</span>
+        </div>
+        {/* Show connection info instead of scheduled badge */}
+        {isMultiLeg && legs.length > 0 && (
+          <div className="flex items-center gap-2 bg-gray-700 px-3 py-1 rounded-full text-sm">
+            <span>{legs.length} stops</span>
+          </div>
+        )}
+        {!isMultiLeg && (
+          <div className="flex items-center gap-2 bg-gray-700 px-3 py-1 rounded-full text-sm">
+            <span>Direct</span>
+          </div>
+        )}
+      </div>
+
+      {/* Single Leg Flight */}
+      {!isMultiLeg && (
+        <div className="flight-route px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              <div className="text-3xl font-bold text-gray-800">{depCode}</div>
+              <div className="text-xl font-semibold text-gray-900 mt-1">{departureTime}</div>
+              <div className="text-sm text-gray-500 mt-1 max-w-[120px] mx-auto truncate">{departureAirport}</div>
+            </div>
+
+            <div className="flex-1 flex flex-col items-center px-4">
+              <div className="text-xs text-gray-400 mb-2">{duration || 'Direct'}</div>
+              <div className="w-full flex items-center">
+                <div className="w-3 h-3 rounded-full bg-black"></div>
+                <div className="flex-1 h-0.5 bg-black relative">
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-black text-lg">
+                    ✈
+                  </div>
+                </div>
+                <div className="w-3 h-3 rounded-full bg-black"></div>
+              </div>
+              <div className="text-xs text-gray-400 mt-2">Non-stop</div>
+            </div>
+
+            <div className="text-center flex-1">
+              <div className="text-3xl font-bold text-gray-800">{arrCode}</div>
+              <div className="text-xl font-semibold text-gray-900 mt-1">{arrivalTime}</div>
+              <div className="text-sm text-gray-500 mt-1 max-w-[120px] mx-auto truncate">{arrivalAirport}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Leg Flight */}
+      {isMultiLeg && legs.length > 0 && (
+        <div className="flight-route-multi px-6 py-4">
+          {legs.map((leg, index) => (
+            <div key={index}>
+              {/* Leg */}
+              <div className="flex items-center justify-between py-4">
+                <div className="text-center flex-1">
+                  <div className="text-2xl font-bold text-gray-800">{getAirportCode(leg.departureAirport)}</div>
+                  <div className="text-lg font-semibold text-gray-900 mt-1">{leg.departureTime}</div>
+                  <div className="text-xs text-gray-500 mt-1 max-w-[100px] mx-auto truncate">{leg.departureAirport}</div>
+                </div>
+
+                <div className="flex-1 flex flex-col items-center px-2">
+                  {leg.flightNumber && (
+                    <div className="text-xs text-gray-500 mb-1">{leg.flightNumber}</div>
+                  )}
+                  <div className="w-full flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-black"></div>
+                    <div className="flex-1 h-0.5 bg-black relative">
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-black text-sm">
+                        ✈
+                      </div>
+                    </div>
+                    <div className="w-2 h-2 rounded-full bg-black"></div>
+                  </div>
+                </div>
+
+                <div className="text-center flex-1">
+                  <div className="text-2xl font-bold text-gray-800">{getAirportCode(leg.arrivalAirport)}</div>
+                  <div className="text-lg font-semibold text-gray-900 mt-1">{leg.arrivalTime}</div>
+                  <div className="text-xs text-gray-500 mt-1 max-w-[100px] mx-auto truncate">{leg.arrivalAirport}</div>
+                </div>
+              </div>
+
+              {/* Layover indicator (if not last leg) */}
+              {index < legs.length - 1 && (
+                <div className="flex items-center justify-center py-3 border-y border-dashed border-gray-200 bg-gray-50">
+                  <div className="flex items-center gap-2 text-amber-600">
+                    <span>🔄</span>
+                    <span className="text-sm font-medium">
+                      {leg.layoverDuration || 'Connection'} in {getAirportCode(leg.arrivalAirport)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Details Section */}
+      <div className="flight-details bg-gray-50 px-6 py-4 border-t border-gray-100">
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">📅</span>
+            <span className="text-gray-700">{date}</span>
+          </div>
+          {passengers && (
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400">👥</span>
+              <span className="text-gray-700">{passengers}</span>
+            </div>
+          )}
+        </div>
+
+        {notes && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500">⚠️</span>
+              <div>
+                <div className="text-xs font-semibold text-amber-700 uppercase">Things to Remember</div>
+                <div className="text-sm text-amber-800 mt-1">{notes}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flight-footer px-6 py-4 border-t border-gray-100">
+        
+          href={flightTrackerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors text-sm"
+        >
+          <span>✈️</span>
+          Track Flight {cleanFlightNumber}
+          <span className="text-xs">↗</span>
+        </a>
+        <span className="text-xs text-gray-400 ml-3">Opens FlightRadar24 in a new tab</span>
+      </div>
+    </div>
+  );
+}
+```
+
+2. UPDATE PDF COMPONENT: FlightCardPDF
+```tsx
+// Update flightCardStyles - remove scheduled badge, add multi-leg styles
+const flightCardStyles = {
+  flightCard: {
+    marginVertical: 10,
+    borderRadius: 8,
+    border: '1 solid #E5E7EB',
+    overflow: 'hidden',
+  },
+  flightCardHeader: {
+    backgroundColor: '#000000',
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  flightNumber: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  connectionBadge: {
+    backgroundColor: '#374151',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  connectionText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+  },
+  flightRoute: {
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  airportSection: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  airportCode: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  airportCodeSmall: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  flightTime: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 4,
+  },
+  flightTimeSmall: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 2,
+  },
+  airportName: {
+    fontSize: 9,
+    color: '#6B7280',
+    marginTop: 2,
+    textAlign: 'center',
+    maxWidth: 80,
+  },
+  flightPath: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  flightPathText: {
+    fontSize: 8,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  flightPathLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  pathDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#000000',
+  },
+  pathDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#000000',
+  },
+  pathLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#000000',
+  },
+  planeIcon: {
+    fontSize: 10,
+    marginHorizontal: 4,
+  },
+  // Layover styles
+  layoverBox: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F9FAFB',
+    borderTop: '1 dashed #D1D5DB',
+    borderBottom: '1 dashed #D1D5DB',
+    alignItems: 'center',
+  },
+  layoverText: {
+    fontSize: 9,
+    color: '#D97706',
+    fontWeight: 'bold',
+  },
+  flightDetails: {
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderTop: '1 solid #E5E7EB',
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailIcon: {
+    fontSize: 10,
+  },
+  detailText: {
+    fontSize: 10,
+    color: '#374151',
+  },
+  notesBox: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    border: '1 solid #FCD34D',
+  },
+  notesTitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#92400E',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  notesText: {
+    fontSize: 10,
+    color: '#92400E',
+  },
+  trackButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 10,
+  },
+  trackButtonText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+};
+
+interface FlightLeg {
+  departureAirport: string;
+  departureTime: string;
+  arrivalAirport: string;
+  arrivalTime: string;
+  flightNumber?: string;
+  layoverDuration?: string;
+}
+
+const FlightCardPDF = ({ 
+  flightNumber, 
+  date, 
+  departureAirport, 
+  departureTime, 
+  arrivalAirport, 
+  arrivalTime, 
+  passengers, 
+  notes,
+  isMultiLeg = false,
+  legs = []
+}: {
+  flightNumber: string;
+  date: string;
+  departureAirport: string;
+  departureTime: string;
+  arrivalAirport: string;
+  arrivalTime: string;
+  passengers?: string;
+  notes?: string;
+  isMultiLeg?: boolean;
+  legs?: FlightLeg[];
+}) => {
+  const cleanFlightNumber = flightNumber?.replace(/\s/g, '').toUpperCase() || '';
+  const flightTrackerUrl = `https://www.flightradar24.com/data/flights/${cleanFlightNumber.toLowerCase()}`;
+  
+  const getAirportCode = (airport: string) => {
+    if (!airport) return '---';
+    if (/^[A-Z]{3}$/i.test(airport.trim())) return airport.trim().toUpperCase();
+    return airport.substring(0, 3).toUpperCase();
+  };
+
+  const depCode = getAirportCode(departureAirport);
+  const arrCode = getAirportCode(arrivalAirport);
+
+  return (
+    <View style={flightCardStyles.flightCard}>
+      {/* Header - NO SCHEDULED BADGE */}
+      <View style={flightCardStyles.flightCardHeader}>
+        <Text style={flightCardStyles.flightNumber}>✈ {cleanFlightNumber}</Text>
+        <View style={flightCardStyles.connectionBadge}>
+          <Text style={flightCardStyles.connectionText}>
+            {isMultiLeg && legs.length > 0 ? `${legs.length} stops` : 'Direct'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Single Leg Flight */}
+      {!isMultiLeg && (
+        <View style={flightCardStyles.flightRoute}>
+          <View style={flightCardStyles.airportSection}>
+            <Text style={flightCardStyles.airportCode}>{depCode}</Text>
+            <Text style={flightCardStyles.flightTime}>{departureTime}</Text>
+            <Text style={flightCardStyles.airportName}>{departureAirport}</Text>
+          </View>
+
+          <View style={flightCardStyles.flightPath}>
+            <Text style={flightCardStyles.flightPathText}>Direct</Text>
+            <View style={flightCardStyles.flightPathLine}>
+              <View style={flightCardStyles.pathDot} />
+              <View style={flightCardStyles.pathLine} />
+              <Text style={flightCardStyles.planeIcon}>✈</Text>
+              <View style={flightCardStyles.pathLine} />
+              <View style={flightCardStyles.pathDot} />
+            </View>
+            <Text style={flightCardStyles.flightPathText}>Non-stop</Text>
+          </View>
+
+          <View style={flightCardStyles.airportSection}>
+            <Text style={flightCardStyles.airportCode}>{arrCode}</Text>
+            <Text style={flightCardStyles.flightTime}>{arrivalTime}</Text>
+            <Text style={flightCardStyles.airportName}>{arrivalAirport}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Multi-Leg Flight */}
+      {isMultiLeg && legs.length > 0 && (
+        <View>
+          {legs.map((leg, index) => (
+            <View key={index}>
+              <View style={flightCardStyles.flightRoute}>
+                <View style={flightCardStyles.airportSection}>
+                  <Text style={flightCardStyles.airportCodeSmall}>{getAirportCode(leg.departureAirport)}</Text>
+                  <Text style={flightCardStyles.flightTimeSmall}>{leg.departureTime}</Text>
+                  <Text style={flightCardStyles.airportName}>{leg.departureAirport}</Text>
+                </View>
+
+                <View style={flightCardStyles.flightPath}>
+                  {leg.flightNumber && (
+                    <Text style={flightCardStyles.flightPathText}>{leg.flightNumber}</Text>
+                  )}
+                  <View style={flightCardStyles.flightPathLine}>
+                    <View style={flightCardStyles.pathDotSmall} />
+                    <View style={flightCardStyles.pathLine} />
+                    <Text style={flightCardStyles.planeIcon}>✈</Text>
+                    <View style={flightCardStyles.pathLine} />
+                    <View style={flightCardStyles.pathDotSmall} />
+                  </View>
+                </View>
+
+                <View style={flightCardStyles.airportSection}>
+                  <Text style={flightCardStyles.airportCodeSmall}>{getAirportCode(leg.arrivalAirport)}</Text>
+                  <Text style={flightCardStyles.flightTimeSmall}>{leg.arrivalTime}</Text>
+                  <Text style={flightCardStyles.airportName}>{leg.arrivalAirport}</Text>
+                </View>
+              </View>
+
+              {/* Layover indicator */}
+              {index < legs.length - 1 && (
+                <View style={flightCardStyles.layoverBox}>
+                  <Text style={flightCardStyles.layoverText}>
+                    🔄 {leg.layoverDuration || 'Connection'} in {getAirportCode(leg.arrivalAirport)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Details */}
+      <View style={flightCardStyles.flightDetails}>
+        <View style={flightCardStyles.detailsRow}>
+          <View style={flightCardStyles.detailItem}>
+            <Text style={flightCardStyles.detailIcon}>📅</Text>
+            <Text style={flightCardStyles.detailText}>{date}</Text>
+          </View>
+          {passengers && (
+            <View style={flightCardStyles.detailItem}>
+              <Text style={flightCardStyles.detailIcon}>👥</Text>
+              <Text style={flightCardStyles.detailText}>{passengers}</Text>
+            </View>
+          )}
+        </View>
+
+        {notes && (
+          <View style={flightCardStyles.notesBox}>
+            <Text style={flightCardStyles.notesTitle}>Things to Remember</Text>
+            <Text style={flightCardStyles.notesText}>{notes}</Text>
+          </View>
+        )}
+
+        <Link src={flightTrackerUrl} style={flightCardStyles.trackButton}>
+          <Text style={flightCardStyles.trackButtonText}>✈ Track Flight {cleanFlightNumber} ↗</Text>
+        </Link>
+      </View>
+    </View>
+  );
+};
+```
+
+3. UPDATE DATABASE SCHEMA: Add multi-leg support
+
+Add to your travel-related tables (outbound_travel, return_travel, additional_travel):
+```sql
+ALTER TABLE outbound_travel ADD COLUMN is_multi_leg BOOLEAN DEFAULT false;
+ALTER TABLE outbound_travel ADD COLUMN legs JSONB DEFAULT '[]';
+
+ALTER TABLE return_travel ADD COLUMN is_multi_leg BOOLEAN DEFAULT false;
+ALTER TABLE return_travel ADD COLUMN legs JSONB DEFAULT '[]';
+
+-- If additional_travel is a separate table
+ALTER TABLE additional_travel ADD COLUMN is_multi_leg BOOLEAN DEFAULT false;
+ALTER TABLE additional_travel ADD COLUMN legs JSONB DEFAULT '[]';
+```
+
+The `legs` JSONB field stores an array like:
+```json
+[
+  {
+    "departureAirport": "London Heathrow",
+    "departureTime": "10:30am",
+    "arrivalAirport": "Amsterdam Schiphol",
+    "arrivalTime": "12:45pm",
+    "flightNumber": "BA432",
+    "layoverDuration": "2h 15m"
+  },
+  {
+    "departureAirport": "Amsterdam Schiphol",
+    "departureTime": "3:00pm",
+    "arrivalAirport": "Berlin Brandenburg",
+    "arrivalTime": "4:15pm",
+    "flightNumber": "KL1832"
+  }
+]
+```
+
+4. UPDATE WIZARD FORM: Add multi-leg toggle and leg inputs
+
+In your outbound/return travel form sections, add:
+```tsx
+// State for multi-leg
+const [isMultiLeg, setIsMultiLeg] = useState(false);
+const [legs, setLegs] = useState<FlightLeg[]>([]);
+
+// Toggle for multi-leg
+<div className="mb-4">
+  <label className="flex items-center gap-2 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={isMultiLeg}
+      onChange={(e) => {
+        setIsMultiLeg(e.target.checked);
+        if (e.target.checked && legs.length === 0) {
+          // Initialize with 2 legs
+          setLegs([
+            { departureAirport: '', departureTime: '', arrivalAirport: '', arrivalTime: '', layoverDuration: '' },
+            { departureAirport: '', departureTime: '', arrivalAirport: '', arrivalTime: '' }
+          ]);
+        }
+      }}
+      className="w-4 h-4"
+    />
+    <span className="text-sm font-medium">This is a connecting/multi-stop flight</span>
+  </label>
+</div>
+
+// If multi-leg, show leg inputs
+{isMultiLeg && (
+  <div className="space-y-6 border-l-4 border-black pl-4">
+    {legs.map((leg, index) => (
+      <div key={index} className="bg-gray-50 p-4 rounded-lg">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="font-semibold">Flight Leg {index + 1}</h4>
+          {legs.length > 2 && (
+            <button
+              type="button"
+              onClick={() => setLegs(legs.filter((_, i) => i !== index))}
+              className="text-red-500 text-sm hover:underline"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Departure Airport</label>
+            <input
+              type="text"
+              value={leg.departureAirport}
+              onChange={(e) => {
+                const newLegs = [...legs];
+                newLegs[index].departureAirport = e.target.value;
+                setLegs(newLegs);
+              }}
+              className="w-full border rounded px-3 py-2"
+              placeholder="e.g. London Heathrow"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Departure Time</label>
+            <input
+              type="text"
+              value={leg.departureTime}
+              onChange={(e) => {
+                const newLegs = [...legs];
+                newLegs[index].departureTime = e.target.value;
+                setLegs(newLegs);
+              }}
+              className="w-full border rounded px-3 py-2"
+              placeholder="e.g. 10:30am"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Arrival Airport</label>
+            <input
+              type="text"
+              value={leg.arrivalAirport}
+              onChange={(e) => {
+                const newLegs = [...legs];
+                newLegs[index].arrivalAirport = e.target.value;
+                setLegs(newLegs);
+              }}
+              className="w-full border rounded px-3 py-2"
+              placeholder="e.g. Amsterdam Schiphol"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Arrival Time</label>
+            <input
+              type="text"
+              value={leg.arrivalTime}
+              onChange={(e) => {
+                const newLegs = [...legs];
+                newLegs[index].arrivalTime = e.target.value;
+                setLegs(newLegs);
+              }}
+              className="w-full border rounded px-3 py-2"
+              placeholder="e.g. 12:45pm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Flight Number (optional)</label>
+            <input
+              type="text"
+              value={leg.flightNumber || ''}
+              onChange={(e) => {
+                const newLegs = [...legs];
+                newLegs[index].flightNumber = e.target.value;
+                setLegs(newLegs);
+              }}
+              className="w-full border rounded px-3 py-2"
+              placeholder="e.g. BA432"
+            />
+          </div>
+          {index < legs.length - 1 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Layover Duration</label>
+              <input
+                type="text"
+                value={leg.layoverDuration || ''}
+                onChange={(e) => {
+                  const newLegs = [...legs];
+                  newLegs[index].layoverDuration = e.target.value;
+                  setLegs(newLegs);
+                }}
+                className="w-full border rounded px-3 py-2"
+                placeholder="e.g. 2h 15m"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    ))}
+    
+    <button
+      type="button"
+      onClick={() => setLegs([...legs, { departureAirport: '', departureTime: '', arrivalAirport: '', arrivalTime: '' }])}
+      className="text-sm text-black font-medium hover:underline"
+    >
+      + Add Another Leg
+    </button>
+  </div>
+)}
+```
+
+5. USAGE IN ViewItinerary AND PDF:
+```tsx
+// Web view
+<FlightCard
+  flightNumber={itinerary.outboundTravel.flightNumber}
+  date={itinerary.outboundTravel.date}
+  departureAirport={itinerary.outboundTravel.departureAirport}
+  departureTime={itinerary.outboundTravel.departureTime}
+  arrivalAirport={itinerary.outboundTravel.arrivalAirport}
+  arrivalTime={itinerary.outboundTravel.arrivalTime}
+  passengers={itinerary.outboundTravel.passengers}
+  notes={itinerary.outboundTravel.notes}
+  isMultiLeg={itinerary.outboundTravel.isMultiLeg}
+  legs={itinerary.outboundTravel.legs}
+/>
+
+// PDF
+<FlightCardPDF
+  flightNumber={itinerary.outboundTravel.flightNumber}
+  date={itinerary.outboundTravel.date}
+  departureAirport={itinerary.outboundTravel.departureAirport}
+  departureTime={itinerary.outboundTravel.departureTime}
+  arrivalAirport={itinerary.outboundTravel.arrivalAirport}
+  arrivalTime={itinerary.outboundTravel.arrivalTime}
+  passengers={itinerary.outboundTravel.passengers}
+  notes={itinerary.outboundTravel.notes}
+  isMultiLeg={itinerary.outboundTravel.isMultiLeg}
+  legs={itinerary.outboundTravel.legs}
+/>
+```
+
+SUMMARY:
+- Removed misleading "Scheduled" badge, replaced with "Direct" or "X stops"
+- Added multi-leg flight support with visual layover indicators
+- Form includes toggle for connecting flights with dynamic leg inputs
+- Works in web view, PDF, and for outbound/return/additional travel
+- Database stores legs as JSONB array
+
+TEST:
+1. Create a direct flight - should show "Direct" badge and single route
+2. Create a connecting flight with 2 legs - should show "2 stops" and both legs with layover
+3. Add a 3rd leg - should display all 3 with layovers between each
+4. Check PDF matches web view design

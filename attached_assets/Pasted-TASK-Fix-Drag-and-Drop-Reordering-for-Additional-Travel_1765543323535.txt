@@ -1,0 +1,260 @@
+TASK: Fix Drag-and-Drop Reordering for Additional Travel using @dnd-kit
+
+PROBLEM: Drag handles show cursor but items don't actually move when dragged.
+
+SOLUTION: The app uses @dnd-kit/sortable (not react-beautiful-dnd). Here's the correct implementation:
+
+1. VERIFY @dnd-kit is installed:
+```bash
+npm list @dnd-kit/core @dnd-kit/sortable
+```
+
+If not installed:
+```bash
+npm install @dnd-kit/core @dnd-kit/sortable
+```
+
+2. UPDATE ViewItinerary.tsx (or the file displaying Additional Travel):
+```tsx
+import { useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Create a SortableItem component for each travel item
+function SortableTravelItem({ travel, index }: { travel: any; index: number }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `travel-${index}` });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-gray-100 rounded-lg p-6 shadow-sm ${
+        isDragging ? 'shadow-2xl ring-2 ring-black z-50' : ''
+      }`}
+    >
+      {/* Header with drag handle */}
+      <div className="flex items-center gap-3 mb-4">
+        {/* Drag handle - attach listeners and attributes here */}
+        <div
+          {...listeners}
+          {...attributes}
+          className="flex flex-col gap-1 cursor-grab active:cursor-grabbing hover:opacity-70 transition-opacity"
+        >
+          <div className="flex gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+          </div>
+          <div className="flex gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+          </div>
+        </div>
+
+        {/* Capitalize travel type */}
+        <h3 className="font-semibold text-xl">
+          {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+        </h3>
+
+        {/* Visible toggle */}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-sm text-gray-600">Visible</span>
+          <div className="w-12 h-6 bg-purple-600 rounded-full"></div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="space-y-2 text-sm">
+        {travel.type === 'flight' && (
+          <>
+            <div>
+              <span className="font-semibold">Flight Number:</span> {travel.flightNumber}
+            </div>
+            <div>
+              <span className="font-semibold">Date:</span> {travel.date}
+            </div>
+            <div>
+              <span className="font-semibold">Departure:</span>{' '}
+              {travel.departureAirport || travel.from} at {travel.departureTime}
+            </div>
+            <div>
+              <span className="font-semibold">Arrival:</span>{' '}
+              {travel.arrivalAirport || travel.to} at {travel.arrivalTime}
+            </div>
+          </>
+        )}
+        
+        {travel.type === 'train' && (
+          <>
+            <div>
+              <span className="font-semibold">Train Service:</span> {travel.trainService}
+            </div>
+            <div>
+              <span className="font-semibold">From:</span> {travel.from} at {travel.departureTime}
+            </div>
+            <div>
+              <span className="font-semibold">To:</span> {travel.to} at {travel.arrivalTime}
+            </div>
+          </>
+        )}
+        
+        {(travel.type === 'taxi' || travel.type === 'transfer') && (
+          <>
+            <div>
+              <span className="font-semibold">From:</span> {travel.from}
+            </div>
+            <div>
+              <span className="font-semibold">To:</span> {travel.to}
+            </div>
+            <div>
+              <span className="font-semibold">Time:</span> {travel.departureTime}
+            </div>
+          </>
+        )}
+        
+        {travel.notes && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500">⚠️</span>
+              <div>
+                <div className="text-xs font-semibold text-amber-700 uppercase">
+                  Things to Remember
+                </div>
+                <div className="text-sm text-amber-800 mt-1">{travel.notes}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Inside your ViewItinerary component:
+function ViewItinerary() {
+  // State for additional travel items
+  const [additionalTravelItems, setAdditionalTravelItems] = useState(
+    itinerary.additionalTravel || []
+  );
+
+  // Set up sensors for drag detection
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setAdditionalTravelItems((items) => {
+        const oldIndex = items.findIndex((_, i) => `travel-${i}` === active.id);
+        const newIndex = items.findIndex((_, i) => `travel-${i}` === over.id);
+        
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        
+        // Optional: Save to database
+        // saveAdditionalTravelOrder(itinerary.id, newOrder);
+        
+        return newOrder;
+      });
+    }
+  };
+
+  return (
+    <div>
+      {/* ... other sections ... */}
+
+      {/* Additional Travel Section */}
+      {additionalTravelItems && additionalTravelItems.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">Additional Travel</h2>
+          
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={additionalTravelItems.map((_, i) => `travel-${i}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-4">
+                {additionalTravelItems.map((travel, index) => (
+                  <SortableTravelItem
+                    key={`travel-${index}`}
+                    travel={travel}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </section>
+      )}
+
+      {/* ... other sections ... */}
+    </div>
+  );
+}
+```
+
+3. KEY DIFFERENCES from react-beautiful-dnd:
+
+- Uses `@dnd-kit/core` and `@dnd-kit/sortable`
+- `useSortable` hook instead of Draggable component
+- `{...listeners}` and `{...attributes}` instead of dragHandleProps
+- `arrayMove` utility for reordering
+- `CSS.Transform.toString()` for transform styles
+- Sensors for detecting drag gestures
+
+4. HOW IT WORKS:
+
+- Each item gets a unique ID: `travel-0`, `travel-1`, etc.
+- `useSortable` hook provides drag functionality
+- `{...listeners}` makes the dots draggable
+- `arrayMove` reorders the array when drag ends
+- Visual feedback via `isDragging` state
+
+5. MAKE SURE drag handles are ONLY on Additional Travel:
+
+Other sections should NOT have the SortableTravelItem wrapper or drag handles.
+
+TEST:
+1. Go to itinerary with multiple additional travel items
+2. Click and hold the 4 dots
+3. Drag up or down - item should move smoothly
+4. Drop - order should update
+5. Verify drag handles only appear on Additional Travel, not other sections
+
+This should work exactly like it did before! The key is using @dnd-kit, not react-beautiful-dnd.

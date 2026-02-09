@@ -1,0 +1,206 @@
+1. FIX: Flight Card Emoji Encoding (PRIORITY)
+Problem: Emojis render as garbled characters in PDF:
+
+=Å18th July → broken 📅 calendar emoji
+=Test Adult 1 → broken 👥 passenger emoji
+Track Flight TEST123 — → broken → arrow emoji
+
+Solution: Replace ALL emojis with plain text labels in the PDF flight card component:
+tsx// BEFORE (broken)
+<Text>📅 {date}</Text>
+<Text>👥 {passengers}</Text>
+<Text>Track Flight {flightNumber} →</Text>
+
+// AFTER (fixed)
+<Text>Date: {date}</Text>
+<Text>Passengers: {passengers}</Text>
+<Text>Track Flight {flightNumber}</Text>
+Update the FlightCardPDF component or equivalent in the PDF template:
+tsx// In flightDetails section, replace emoji icons with text labels
+<View style={flightCardStyles.detailsRow}>
+  <View style={flightCardStyles.detailItem}>
+    <Text style={flightCardStyles.detailLabel}>Date:</Text>
+    <Text style={flightCardStyles.detailText}>{date}</Text>
+  </View>
+  {passengers && (
+    <View style={flightCardStyles.detailItem}>
+      <Text style={flightCardStyles.detailLabel}>Passengers:</Text>
+      <Text style={flightCardStyles.detailText}>{passengers}</Text>
+    </View>
+  )}
+</View>
+
+// Track button - remove arrow emoji
+<Link src={flightTrackerUrl} style={flightCardStyles.trackButton}>
+  <Text style={flightCardStyles.trackButtonText}>Track Flight {cleanFlightNumber}</Text>
+</Link>
+Add label style:
+tsxdetailLabel: {
+  fontSize: 10,
+  color: '#6B7280',
+  marginRight: 4,
+},
+
+2. FIX: Weather Emoji Not Rendering
+Problem: Sun emoji ☀️ shows on web but broken/missing in PDF
+Solution: Remove weather emoji from PDF, show text only:
+tsx// Find where weather is rendered in PDF and change from:
+<Text>{weatherEmoji} {weatherForecast}</Text>
+
+// To just:
+<Text>Weather Forecast: {weatherForecast}</Text>
+// OR
+<Text>{weatherForecast}</Text>
+
+3. FIX: Price Font Size Inconsistent
+Problem: Prices should all be font size 32, purple color, top-right position
+Reference: The £8 on Activities card is correct - match this everywhere
+Solution: Update price styles in PDF template:
+tsx// Add/update price style
+priceText: {
+  fontSize: 32,
+  color: '#6B1488', // Purple
+  fontWeight: 'bold',
+},
+
+// Ensure price container positions it top-right
+priceContainer: {
+  position: 'absolute',
+  top: 12,
+  right: 12,
+},
+Apply to ALL price displays (Activities, Dining sections).
+
+4. FIX: Headings Need Garamond Font
+Problem: Section headings should use Garamond font family
+Solution: Register Garamond font and apply to headings:
+tsximport { Font } from '@react-pdf/renderer';
+
+// Register Garamond font (use a web-safe source)
+Font.register({
+  family: 'Garamond',
+  fonts: [
+    {
+      src: 'https://fonts.gstatic.com/s/ebgaramond/v26/SlGDmQSNjdsmc35JDF1K5E55YMjF_7DPuGi-6_RUA4V-e6yHgQ.woff2',
+      fontWeight: 'normal',
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/ebgaramond/v26/SlGDmQSNjdsmc35JDF1K5E55YMjF_7DPuGi-2_VUA4V-e6yHgQ.woff2',
+      fontWeight: 'bold',
+    },
+  ],
+});
+
+// Update heading styles
+sectionHeading: {
+  fontFamily: 'Garamond',
+  fontSize: 28,
+  fontWeight: 'bold',
+  color: '#1F2937',
+  marginBottom: 16,
+},
+Headings to update:
+
+Travel Information
+Outbound Travel
+Accommodation
+Activities & Experiences
+Dining Recommendations
+Additional Travel
+Return Travel
+Helpful Information
+
+
+5. FIX: Images Not Full Width
+Problem: Images should fill 100% horizontal width of card container
+Solution: Update image styles:
+tsx// Update image style for Activities, Dining, Accommodation
+cardImage: {
+  width: '100%',
+  height: 200, // or appropriate height
+  objectFit: 'cover',
+  borderRadius: 8,
+  marginTop: 12,
+},
+Ensure the Image component uses this style:
+tsx<Image 
+  src={imageUrl} 
+  style={styles.cardImage}
+/>
+
+6. FIX: Links Misaligned
+Problem: "View on Google Maps" and "View Website" links appear misaligned
+Solution: Ensure consistent left alignment with proper spacing:
+tsxlinksContainer: {
+  marginTop: 12,
+  gap: 6,
+},
+linkRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+linkText: {
+  fontSize: 11,
+  color: '#3B82F6',
+  textDecoration: 'underline',
+},
+tsx<View style={styles.linksContainer}>
+  {googleMapsUrl && (
+    <View style={styles.linkRow}>
+      <Link src={googleMapsUrl}>
+        <Text style={styles.linkText}>View on Google Maps</Text>
+      </Link>
+    </View>
+  )}
+  {websiteUrl && (
+    <View style={styles.linkRow}>
+      <Link src={websiteUrl}>
+        <Text style={styles.linkText}>View Website</Text>
+      </Link>
+    </View>
+  )}
+</View>
+
+7. FIX: Flight Card Layout - Text Overlapping
+Problem: Text elements overlap, spacing is off, button looks messy
+Solution: Review and fix spacing/padding:
+tsx// Ensure proper padding in flight details section
+flightDetails: {
+  backgroundColor: '#F9FAFB',
+  padding: 16, // Increase from 12
+  borderTop: '1 solid #E5E7EB',
+},
+
+// Add gap between detail items
+detailsRow: {
+  flexDirection: 'row',
+  gap: 24, // Ensure adequate spacing
+  flexWrap: 'wrap',
+},
+
+// Fix track button styling
+trackButton: {
+  backgroundColor: '#6B1488', // Purple to match design
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 8,
+  alignSelf: 'flex-start',
+  marginTop: 12,
+},
+trackButtonText: {
+  color: '#FFFFFF',
+  fontSize: 11,
+  fontWeight: 'bold',
+},
+
+SUMMARY CHECKLIST:
+
+ Replace all emojis in flight cards with text labels (Date:, Passengers:)
+ Remove weather emoji in PDF - text only
+ Set all prices to fontSize: 32, color: purple (#6B1488)
+ Register and apply Garamond font to all section headings
+ Set all card images to width: '100%'
+ Fix link container alignment and spacing
+ Fix flight card padding/spacing to prevent overlap
+ Remove arrow from Track Flight button

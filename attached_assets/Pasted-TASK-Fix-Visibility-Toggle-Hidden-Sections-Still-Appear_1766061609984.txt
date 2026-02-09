@@ -1,0 +1,238 @@
+TASK: Fix Visibility Toggle - Hidden Sections Still Appearing in Published View and PDF
+
+PROBLEM: On the Preview & Arrange page, when users toggle sections OFF (set to not visible), those sections still appear in the published view and PDF.
+
+SOLUTION: Store visibility state in database and respect it when rendering
+
+## 1. UPDATE DATABASE SCHEMA
+
+Add visibility column to relevant tables:
+```sql
+-- For section-level visibility
+ALTER TABLE accommodations ADD COLUMN visible BOOLEAN DEFAULT true;
+ALTER TABLE activities ADD COLUMN visible BOOLEAN DEFAULT true;
+ALTER TABLE dining ADD COLUMN visible BOOLEAN DEFAULT true;
+ALTER TABLE additional_travel ADD COLUMN visible BOOLEAN DEFAULT true;
+
+-- OR if you have a sections table
+ALTER TABLE itinerary_sections ADD COLUMN visible BOOLEAN DEFAULT true;
+```
+
+## 2. UPDATE PREVIEW PAGE - Save Visibility State
+```tsx
+// In PreviewArrange component
+const [sectionVisibility, setSectionVisibility] = useState({
+  accommodations: itinerary.accommodations?.map(a => ({ id: a.id, visible: a.visible ?? true })) || [],
+  activities: itinerary.activities?.map(a => ({ id: a.id, visible: a.visible ?? true })) || [],
+  dining: itinerary.dining?.map(d => ({ id: d.id, visible: d.visible ?? true })) || [],
+  additionalTravel: itinerary.additionalTravel?.map(t => ({ id: t.id, visible: t.visible ?? true })) || [],
+});
+
+// Toggle handler
+const handleToggleVisibility = async (section: string, itemId: number) => {
+  // Update local state
+  setSectionVisibility(prev => ({
+    ...prev,
+    [section]: prev[section].map(item => 
+      item.id === itemId ? { ...item, visible: !item.visible } : item
+    )
+  }));
+  
+  // Save to database immediately
+  await fetch(`/api/itineraries/${itinerary.id}/${section}/${itemId}/visibility`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      visible: !sectionVisibility[section].find(i => i.id === itemId)?.visible 
+    })
+  });
+};
+
+// In JSX
+<button
+  onClick={() => handleToggleVisibility('accommodations', accommodation.id)}
+  className="flex items-center gap-2"
+>
+  <span className="text-sm text-gray-600">Visible</span>
+  <div className={`w-12 h-6 rounded-full transition-colors ${
+    sectionVisibility.accommodations.find(a => a.id === accommodation.id)?.visible 
+      ? 'bg-purple-600' 
+      : 'bg-gray-300'
+  }`}>
+    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+      sectionVisibility.accommodations.find(a => a.id === accommodation.id)?.visible 
+        ? 'translate-x-6' 
+        : 'translate-x-1'
+    }`}></div>
+  </div>
+</button>
+```
+
+## 3. UPDATE BACKEND API - Add Visibility Endpoint
+```javascript
+// server/routes.js or similar
+
+// Update visibility for accommodation
+app.put('/api/itineraries/:id/accommodations/:itemId/visibility', async (req, res) => {
+  const { id, itemId } = req.params;
+  const { visible } = req.body;
+  
+  await db.query(
+    'UPDATE accommodations SET visible = $1 WHERE id = $2 AND itinerary_id = $3',
+    [visible, itemId, id]
+  );
+  
+  res.json({ success: true });
+});
+
+// Update visibility for activities
+app.put('/api/itineraries/:id/activities/:itemId/visibility', async (req, res) => {
+  const { id, itemId } = req.params;
+  const { visible } = req.body;
+  
+  await db.query(
+    'UPDATE activities SET visible = $1 WHERE id = $2 AND itinerary_id = $3',
+    [visible, itemId, id]
+  );
+  
+  res.json({ success: true });
+});
+
+// Update visibility for dining
+app.put('/api/itineraries/:id/dining/:itemId/visibility', async (req, res) => {
+  const { id, itemId } = req.params;
+  const { visible } = req.body;
+  
+  await db.query(
+    'UPDATE dining SET visible = $1 WHERE id = $2 AND itinerary_id = $3',
+    [visible, itemId, id]
+  );
+  
+  res.json({ success: true });
+});
+
+// Update visibility for additional travel
+app.put('/api/itineraries/:id/additional_travel/:itemId/visibility', async (req, res) => {
+  const { id, itemId } = req.params;
+  const { visible } = req.body;
+  
+  await db.query(
+    'UPDATE additional_travel SET visible = $1 WHERE id = $2 AND itinerary_id = $3',
+    [visible, itemId, id]
+  );
+  
+  res.json({ success: true });
+});
+```
+
+## 4. UPDATE PUBLISHED VIEW - Filter by Visibility
+```tsx
+// In ViewItinerary component (published view)
+{itinerary.accommodations?.filter(a => a.visible !== false).map((accommodation, index) => (
+  <div key={index}>
+    {/* Accommodation content */}
+  </div>
+))}
+
+{itinerary.activities?.filter(a => a.visible !== false).map((activity, index) => (
+  <div key={index}>
+    {/* Activity content */}
+  </div>
+))}
+
+{itinerary.dining?.filter(d => d.visible !== false).map((restaurant, index) => (
+  <div key={index}>
+    {/* Dining content */}
+  </div>
+))}
+
+{itinerary.additionalTravel?.filter(t => t.visible !== false).map((travel, index) => (
+  <div key={index}>
+    {/* Travel content */}
+  </div>
+))}
+```
+
+## 5. UPDATE PDF TEMPLATE - Filter by Visibility
+```tsx
+// In ItineraryPDFTemplate
+{/* Accommodations */}
+{itinerary.accommodations?.filter(a => a.visible !== false).length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Accommodation</Text>
+    {itinerary.accommodations.filter(a => a.visible !== false).map((accommodation, index) => (
+      <View key={index}>
+        {/* Accommodation content */}
+      </View>
+    ))}
+  </View>
+)}
+
+{/* Activities */}
+{itinerary.activities?.filter(a => a.visible !== false).length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Activities</Text>
+    {itinerary.activities.filter(a => a.visible !== false).map((activity, index) => (
+      <View key={index}>
+        {/* Activity content */}
+      </View>
+    ))}
+  </View>
+)}
+
+{/* Dining */}
+{itinerary.dining?.filter(d => d.visible !== false).length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Dining</Text>
+    {itinerary.dining.filter(d => d.visible !== false).map((restaurant, index) => (
+      <View key={index}>
+        {/* Dining content */}
+      </View>
+    ))}
+  </View>
+)}
+
+{/* Additional Travel */}
+{itinerary.additionalTravel?.filter(t => t.visible !== false).length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Additional Travel</Text>
+    {itinerary.additionalTravel.filter(t => t.visible !== false).map((travel, index) => (
+      <View key={index}>
+        {/* Travel content */}
+      </View>
+    ))}
+  </View>
+)}
+```
+
+## 6. HANDLE EMPTY SECTIONS
+
+If ALL items in a section are hidden, don't show the section header:
+```tsx
+{/* Only show section if it has visible items */}
+{itinerary.accommodations?.some(a => a.visible !== false) && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Accommodation</Text>
+    {itinerary.accommodations.filter(a => a.visible !== false).map(...)}
+  </View>
+)}
+```
+
+## SUMMARY OF CHANGES:
+
+1. Add `visible` column to database tables (default: true)
+2. Save visibility state when toggle is clicked on Preview page
+3. Filter items by `visible !== false` in published view
+4. Filter items by `visible !== false` in PDF template
+5. Don't show section headers if all items are hidden
+
+## TESTING:
+
+1. Go to Preview & Arrange page
+2. Toggle OFF an accommodation - switch should turn gray
+3. Click "Publish"
+4. View published itinerary - accommodation should NOT appear
+5. Download PDF - accommodation should NOT appear in PDF
+6. Toggle back ON - should reappear in view and PDF
+
+The key is: **visibility state must be stored in database and filtered when rendering**.

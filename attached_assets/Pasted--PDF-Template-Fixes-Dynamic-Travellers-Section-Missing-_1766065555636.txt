@@ -1,0 +1,66 @@
+# PDF Template Fixes: Dynamic Travellers Section & Missing Weather
+
+**Continuing from:** https://claude.ai/chat/de4a6057-96b4-4ef4-94c0-98e15dc56f72
+
+**Live URL:** https://08488a0d-eae7-401f-bd28-ca576ea9f962-00-8dusfmg12bew.worf.replit.dev/itinerary/portugal-HRGx
+
+**File:** `client/src/components/pdf/ItineraryPDFTemplate.tsx`
+
+---
+
+## Issue 1: Travellers Section Needs Dynamic Text Sizing
+
+The Travellers section on Page 1 of the PDF needs to scale dynamically based on the number of travellers, ensuring all travellers fit on Page 1 without overflow.
+
+### Requirements
+
+- Calculate the number of travellers (adults + children)
+- Dynamically reduce font size and spacing based on traveller count:
+  - 1-4 travellers: Standard size (e.g. 14pt)
+  - 5-8 travellers: Medium size (e.g. 12pt)
+  - 9-12 travellers: Small size (e.g. 10pt)
+  - 13+ travellers: Compact size (e.g. 8pt) with tighter line spacing
+- Ensure the entire travellers section stays within Page 1 bounds
+- Consider reducing padding/margins proportionally as well
+
+### Example approach
+
+```tsx
+const getTravellerFontSize = (count: number) => {
+  if (count <= 4) return 14;
+  if (count <= 8) return 12;
+  if (count <= 12) return 10;
+  return 8;
+};
+
+const getTravellerSpacing = (count: number) => {
+  if (count <= 4) return 8;
+  if (count <= 8) return 6;
+  if (count <= 12) return 4;
+  return 2;
+};
+```
+
+---
+
+## Issue 2: Weather Information Not Showing on PDF
+
+Weather data is not appearing anywhere on the PDF export, even though it should be available from the itinerary data.
+
+### Requirements
+
+1. **Debug:** Log the weather data being passed to the PDF template to confirm it exists
+2. **Check:** Verify weather data is being fetched and included in the PDF data payload
+3. **Display:** Show weather information in the appropriate section (Overview/Page 1 or per-day sections)
+4. **Format:** Weather should show temperature, conditions, and appropriate indicator
+   - Note: Emojis have been problematic in PDF - use text fallbacks like "Sunny", "Rainy", "Cloudy" instead of emoji characters
+
+### Questions to investigate
+
+- Where is weather data stored in the itinerary object?
+- Is it being passed to `ItineraryPDFTemplate.tsx`?
+- Is there a weather component in the PDF template that's not rendering?
+
+---
+
+Please fix both issues and confirm the weather data structure so we can display it correctly.

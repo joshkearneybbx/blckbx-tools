@@ -1,0 +1,86 @@
+TASK: Fix Additional Travel - Capitalize "flight" to "Flight" and Add Drag Handles
+
+PROBLEM: Additional travel items are still showing lowercase "flight" and have no drag handles.
+
+EXACT FIX NEEDED:
+
+1. FIND the Additional Travel section in your ViewItinerary component (or similar publish/view mode file)
+
+Look for code that displays additional travel items. It probably looks something like:
+```tsx
+{itinerary.additionalTravel?.map((travel, index) => (
+  <div key={index}>
+    <h3>{travel.type}</h3>
+    // ... rest of content
+  </div>
+))}
+```
+
+2. REPLACE with this EXACT structure:
+```tsx
+{itinerary.additionalTravel && itinerary.additionalTravel.length > 0 && (
+  <section className="mb-8">
+    <h2 className="text-2xl font-bold mb-4">Additional Travel</h2>
+    <div className="space-y-4">
+      {itinerary.additionalTravel.map((travel, index) => (
+        <div 
+          key={index}
+          className="bg-gray-100 rounded-lg p-6 shadow-sm"
+        >
+          {/* Header with drag handle and capitalized type */}
+          <div className="flex items-center gap-3 mb-4">
+            {/* Drag handle - 4 dots in 2x2 grid */}
+            <div className="flex flex-col gap-1">
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+              </div>
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
+              </div>
+            </div>
+            
+            {/* CAPITALIZE the travel type */}
+            <h3 className="font-semibold text-xl">
+              {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+            </h3>
+            
+            {/* Visible toggle on the right */}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-sm text-gray-600">Visible</span>
+              <div className="w-12 h-6 bg-purple-600 rounded-full"></div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-semibold">Flight Number:</span> {travel.flightNumber}
+            </div>
+            <div>
+              <span className="font-semibold">Date:</span> {travel.date}
+            </div>
+            <div>
+              <span className="font-semibold">Departure:</span> {travel.departureAirport || travel.from} at {travel.departureTime}
+            </div>
+            <div>
+              <span className="font-semibold">Arrival:</span> {travel.arrivalAirport || travel.to} at {travel.arrivalTime}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+```
+
+3. KEY CHANGES:
+   - `travel.type` → `travel.type.charAt(0).toUpperCase() + travel.type.slice(1)`
+     This capitalizes the first letter: "flight" → "Flight", "train" → "Train", etc.
+   
+   - Added drag handle div with 4 dots (2x2 grid) at the start of each item
+   
+   - Moved "Visible" toggle to the right side using `ml-auto`
+
+4. VISUAL STRUCTURE:

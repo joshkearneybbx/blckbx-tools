@@ -1,0 +1,91 @@
+# URGENT: User Draft Data Disappeared After Republishing
+
+A user had a saved draft itinerary that has disappeared from the site after republishing. This happened after the recent changes to add multiple taxis/trains to Transfer sections.
+
+---
+
+## Immediate Investigation Required
+
+### 1. Check if the data still exists in the database
+
+Run a direct database query to see if the itinerary and its related data still exist:
+
+```sql
+-- Find the user's itinerary (replace with actual identifier)
+SELECT * FROM itineraries WHERE id = [ITINERARY_ID] OR custom_url_slug = '[SLUG]';
+
+-- Check related tables
+SELECT * FROM travel_details WHERE itinerary_id = [ID];
+SELECT * FROM accommodations WHERE itinerary_id = [ID];
+SELECT * FROM activities WHERE itinerary_id = [ID];
+SELECT * FROM travellers WHERE itinerary_id = [ID];
+```
+
+### 2. Check for recent database migrations
+
+Look at what migrations ran recently:
+
+```bash
+# Check migration history
+ls -la server/migrations/
+# Or check drizzle migrations
+ls -la drizzle/
+```
+
+Did any migration ALTER or DROP tables related to transfers/travel_details?
+
+### 3. Check the transfer data structure change
+
+When adding multiple taxis/trains, how was the schema changed?
+
+**Before (likely):**
+```ts
+transferToAirport: { type: 'taxi', details: '...' }
+```
+
+**After (possibly):**
+```ts
+transferToAirport: [{ type: 'taxi', details: '...' }, { type: 'taxi', details: '...' }]
+```
+
+If the structure changed from object → array, old data won't parse correctly.
+
+### 4. Check the fetch/load logic
+
+In the code that loads itineraries, is it handling both old (single) and new (array) data formats?
+
+```tsx
+// Does the code handle both formats?
+const transfers = Array.isArray(data.transferToAirport) 
+  ? data.transferToAirport 
+  : [data.transferToAirport]; // Convert old format
+```
+
+---
+
+## Recovery Options
+
+### If data exists but isn't displaying:
+- Fix the data parsing to handle both old and new formats
+- Add a migration to convert old format to new format
+
+### If data was deleted by migration:
+- Check if there are database backups
+- Check Replit's history/snapshots to restore
+
+---
+
+## IMPORTANT
+
+1. **DO NOT run any more migrations** until we understand what happened
+2. **DO NOT make schema changes** until the issue is identified
+3. Report back exactly what you find in the database queries
+
+---
+
+## Prevention for future
+
+Once fixed, ensure:
+- Migrations preserve existing data
+- Schema changes include data transformation
+- Republish merges data rather than overwrites

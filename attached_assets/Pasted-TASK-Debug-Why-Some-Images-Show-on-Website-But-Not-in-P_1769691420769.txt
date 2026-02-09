@@ -1,0 +1,243 @@
+TASK: Debug Why Some Images Show on Website But Not in PDF
+
+PROBLEM: Some images display correctly on the published website but are missing in the generated PDF.
+
+DEBUGGING STEPS:
+
+## 1. CHECK BROWSER CONSOLE
+
+Open DevTools (F12) when viewing the published page:
+- Are there any image errors in Console?
+- Check Network tab - do all images load successfully on the website?
+- Look for CORS errors or 403 Forbidden responses
+
+## 2. IDENTIFY WHICH IMAGES ARE FAILING
+
+Create a test checklist:
+- [ ] Accommodation images - showing in PDF?
+- [ ] Activity images - showing in PDF?
+- [ ] Dining images - showing in PDF?
+- [ ] Additional Travel images - showing in PDF?
+
+Note exactly WHICH section has missing images.
+
+## 3. CHECK IMAGE PREPROCESSING HOOK
+
+Look for `useImagePreprocessor` hook in the codebase:
+```bash
+# Search for the hook
+grep -r "useImagePreprocessor" client/src/
+```
+
+This hook should be converting all external images to data URIs BEFORE PDF generation. Make sure:
+1. It's being called in ViewItinerary
+2. It processes ALL sections (accommodations, activities, dining, additionalTravel)
+3. The processed itinerary is passed to the PDF template
+
+## 4. VERIFY PDF IS USING PREPROCESSED DATA
+```tsx
+// In ViewItinerary.tsx - should look like this:
+import { useImagePreprocessor } from '../hooks/useImagePreprocessor';
+
+const { processedItinerary, isLoading } = useImagePreprocessor(itinerary);
+
+const handleDownloadPDF = async () => {
+  if (isLoading) {
+    alert('Please wait while images are being processed...');
+    return;
+  }
+  
+  // CRITICAL: Use processedItinerary, NOT itinerary
+  const blob = await pdf(
+    <ItineraryPDFTemplate itinerary={processedItinerary} />
+  ).toBlob();
+  
+  saveAs(blob, `itinerary-${itinerary.id}.pdf`);
+};
+```
+
+If the PDF is using `itinerary` instead of `processedItinerary`, images won't be preprocessed!
+
+## 5. CHECK IMAGE URL FORMAT IN DATABASE
+
+Run this query to see actual image URLs:
+```sql
+-- Check all image URLs
+SELECT 'accommodation' as type, id, title, images FROM accommodations WHERE itinerary_id = X
+UNION ALL
+SELECT 'activity' as type, id, name, images FROM activities WHERE itinerary_id = X
+UNION ALL
+SELECT 'dining' as type, id, name, images FROM dining WHERE itinerary_id = X
+UNION ALL
+SELECT 'additional_travel' as type, id, type, NULL FROM additional_travel WHERE itinerary_id = X;
+```
+
+Look for:
+- Are images stored as JSON arrays? `["url1", "url2"]`
+- Are they plain strings? `"url1"`
+- Are they using hotlink-protected domains? (news sites, personal blogs)
+
+## 6. VERIFY IMAGE SOURCES ARE ALLOWED
+
+From previous work, these sources work:
+✅ `lh3.googleusercontent.com` (Google Maps)
+✅ `images.unsplash.com`
+✅ `images.pexels.com`
+✅ `dynamic-media-cdn.tripadvisor.com`
+✅ `upload.wikimedia.org`
+
+These sources are blocked:
+❌ News sites (dailyrecord.co.uk, etc.)
+❌ Restaurant/hotel websites
+❌ Personal blogs
+
+## 7. CHECK IF WEBP IMAGES ARE BEING CONVERTED
+
+The useImagePreprocessor hook should convert WebP to JPG. Check the hook:
+```tsx
+async function convertWebPToJPG(webpBlob: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(webpBlob);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to convert to JPG'));
+        },
+        'image/jpeg',
+        0.92
+      );
+    };
+    img.onerror = () => reject(new Error('Failed to load WebP image'));
+    img.src = objectUrl;
+  });
+}
+```
+
+If this function is missing or failing, WebP images won't work in PDF.
+
+## 8. ADD LOGGING TO FIND THE ISSUE
+
+Temporarily add console logs:
+```tsx
+// In useImagePreprocessor hook
+console.log('Starting image preprocessing...');
+console.log('Accommodation images:', itinerary.accommodations?.map(a => a.images));
+console.log('Activity images:', itinerary.activities?.map(a => a.images));
+console.log('Dining images:', itinerary.dining?.map(d => d.images));
+
+// After preprocessing
+console.log('Processed accommodation images:', processedItinerary.accommodations?.map(a => a.images));
+console.log('Processed activity images:', processedItinerary.activities?.map(a => a.images));
+console.log('Processed dining images:', processedItinerary.dining?.map(d => d.images));
+```
+
+Look for:
+- Which sections have null/undefined images?
+- Which images fail to convert?
+- Are data URIs being created?
+
+## 9. COMMON FIXES
+
+### Fix 1: Ensure ALL sections are preprocessed
+```tsx
+// In useImagePreprocessor hook - make sure ALL sections are included
+const imageUrls: string[] = [];
+
+// Accommodations
+itinerary.accommodations?.forEach((acc: any) => {
+  if (acc.images) {
+    const imgs = Array.isArray(acc.images) ? acc.images : [acc.images];
+    imageUrls.push(...imgs.filter(url => url && url.startsWith('http')));
+  }
+});
+
+// Activities
+itinerary.activities?.forEach((act: any) => {
+  if (act.images) {
+    const imgs = Array.isArray(act.images) ? act.images : [act.images];
+    imageUrls.push(...imgs.filter(url => url && url.startsWith('http')));
+  }
+});
+
+// Dining
+itinerary.dining?.forEach((din: any) => {
+  if (din.images) {
+    const imgs = Array.isArray(din.images) ? din.images : [din.images];
+    imageUrls.push(...imgs.filter(url => url && url.startsWith('http')));
+  }
+});
+
+// Additional Travel
+itinerary.additionalTravel?.forEach((travel: any) => {
+  if (travel.images) {
+    const imgs = Array.isArray(travel.images) ? travel.images : [travel.images];
+    imageUrls.push(...imgs.filter(url => url && url.startsWith('http')));
+  }
+});
+```
+
+### Fix 2: Handle array vs single string
+```tsx
+// In PDF template
+const getImageUrl = (images: any) => {
+  if (!images) return null;
+  if (Array.isArray(images)) return images[0];
+  return images;
+};
+
+// Use it:
+{accommodation.images && (
+  <Image src={getImageUrl(accommodation.images)} style={styles.image} />
+)}
+```
+
+### Fix 3: Check if image proxy is working
+```tsx
+// In useImagePreprocessor, add error handling
+try {
+  const proxyUrl = `${window.location.origin}/api/proxy-image/${btoa(url)}.jpg`;
+  const response = await fetch(proxyUrl);
+  
+  if (!response.ok) {
+    console.error(`Failed to fetch image via proxy: ${url}`, response.status);
+    continue; // Skip this image
+  }
+  
+  const blob = await response.blob();
+  // ... convert to data URI
+} catch (error) {
+  console.error(`Error preprocessing image: ${url}`, error);
+  continue;
+}
+```
+
+## 10. COMPLETE REPLIT PROMPT
+
+If you can't debug it yourself, use this prompt in Replit:
+
+"Images are showing on the published website but not in the PDF. 
+
+Debug the issue:
+1. Check if useImagePreprocessor hook exists and is being used
+2. Verify PDF generation uses processedItinerary not raw itinerary
+3. Add console logging to see which images fail preprocessing
+4. Check if dining/activity/accommodation images are all being collected
+5. Verify image proxy at /api/proxy-image is working for all image URLs
+6. Ensure WebP images are being converted to JPG
+7. Check if images field is array vs string and handle both
+
+The preprocessing should convert all external images to data URIs before PDF generation. Something in this pipeline is failing for specific sections."
+
+TEST AFTER FIX:
+1. View published page - all images should load
+2. Open browser console - no image errors
+3. Download PDF - all images should appear
+4. Check all sections have images (accommodation, activities, dining, additional travel)

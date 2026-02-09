@@ -1,0 +1,148 @@
+Problem Summary:
+1. Blank page appearing when sections have no data (e.g., Additional Travel)
+2. Need individual Google Maps links for each location
+3. Need "Notes" field for activities/restaurants/accommodations
+4. PDF left sidebar too wide
+5. PDF logo too large
+
+---
+
+## FIX 1: Remove Blank Pages - Conditional Section Rendering
+
+Update the PDF template to only render sections if they contain data:
+
+// Accommodations
+{accommodations && accommodations.length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Accommodation</Text>
+    {/* accommodation content */}
+  </View>
+)}
+
+// Activities
+{activities && activities.length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Activities & Experiences</Text>
+    {/* activities content */}
+  </View>
+)}
+
+// Dining
+{dining && dining.length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Dining Recommendations</Text>
+    {/* dining content */}
+  </View>
+)}
+
+// Additional Travel - THIS IS CAUSING THE BLANK PAGE
+{additionalTravel && additionalTravel.length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Additional Travel</Text>
+    {/* additional travel content */}
+  </View>
+)}
+
+// Return Travel
+{returnTravel && Object.keys(returnTravel).length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Return Travel</Text>
+    {/* return travel content */}
+  </View>
+)}
+
+// Helpful Information
+{helpfulInfo && Object.keys(helpfulInfo).length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Helpful Information</Text>
+    {/* helpful info content */}
+  </View>
+)}
+
+---
+
+## FIX 2: Add Individual Google Maps Links
+
+Add "View on Google Maps" link to each accommodation, activity, and restaurant in BOTH the web view AND PDF:
+
+For each item that has an address, add:
+
+<Link 
+  src={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`}
+  style={styles.mapLink}
+>
+  📍 View on Google Maps
+</Link>
+
+Style it as a clickable blue link with a small map icon.
+Keep the overall map view at the bottom of the itinerary as well.
+
+---
+
+## FIX 3: Add Notes Field to Activities/Restaurants/Accommodations
+
+Add a "notes" field for custom information like "Tickets only available in person" or "Arrive 30 mins early".
+
+### Database Changes:
+Add "notes" TEXT column to:
+- activities table
+- dining table
+- accommodations table
+
+### Form Changes (Wizard):
+In the activity/dining/accommodation forms, add a textarea:
+
+<div>
+  <label>Notes (optional)</label>
+  <textarea
+    placeholder="e.g., Arrive 30 mins early, tickets only at door, dress code required, etc."
+    rows="3"
+    value={formData.notes}
+    onChange={(e) => setFormData({...formData, notes: e.target.value})}
+  />
+</div>
+
+### Display Changes:
+In both web view and PDF, show notes if they exist:
+
+{item.notes && (
+  <View style={styles.notesSection}>
+    <Text style={styles.notesLabel}>Notes:</Text>
+    <Text style={styles.notesText}>{item.notes}</Text>
+  </View>
+)}
+
+---
+
+## FIX 4: Narrow PDF Left Sidebar
+
+Reduce the width of the black sidebar on the left:
+
+In PDF template styles, update:
+
+sidebar: {
+  width: 150,  // Reduce from current width (~200px)
+  backgroundColor: '#000000',
+  padding: 20,
+}
+
+Also adjust main content area to match:
+
+mainContent: {
+  flex: 1,
+  paddingLeft: 170, // Adjust to match new sidebar width + spacing
+}
+
+---
+
+## FIX 5: Reduce Logo Size in PDF
+
+Make the logo smaller in the left sidebar:
+
+In PDF template styles, update:
+
+logo: {
+  width: 80,   // Reduce from current size (probably 100-120)
+  height: 60,  // Maintain aspect ratio
+  marginBottom: 30,
+}

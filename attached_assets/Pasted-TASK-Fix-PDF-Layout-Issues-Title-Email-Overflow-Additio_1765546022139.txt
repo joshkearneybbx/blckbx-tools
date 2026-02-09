@@ -1,0 +1,259 @@
+TASK: Fix PDF Layout Issues - Title/Email Overflow, Additional Travel Flight Format, Transfer Sections, and Reordering
+
+MULTIPLE ISSUES TO FIX:
+
+## 1. TITLE AND EMAIL OVERFLOW IN BLACK SIDEBAR
+
+PROBLEM: Title and email address are wrapping to new lines and getting cut off in the black sidebar.
+
+FIX: Add text truncation and smaller font sizes for the sidebar
+```tsx
+// In your PDF styles
+sidebar: {
+  width: 120,
+  backgroundColor: '#000000',
+  padding: 20,
+},
+sidebarTitle: {
+  color: '#FFFFFF',
+  fontSize: 11,  // Reduce from 12-14
+  fontWeight: 'bold',
+  marginBottom: 8,
+  wordWrap: 'break-word',  // Allow word breaking
+  maxWidth: 80,  // Constrain width
+},
+sidebarEmail: {
+  color: '#FFFFFF',
+  fontSize: 8,  // Reduce from 9-10
+  marginBottom: 4,
+  wordWrap: 'break-word',
+  maxWidth: 80,
+},
+
+// In JSX
+<View style={styles.sidebar}>
+  <Image style={styles.logo} src={logoUrl} />
+  <Text style={styles.sidebarTitle}>{itinerary.title}</Text>
+  <Text style={styles.sidebarEmail}>{consultant.email}</Text>
+  {/* ... rest of sidebar */}
+</View>
+```
+
+## 2. ADDITIONAL TRAVEL FLIGHTS - USE FLIGHTCARDPDF FORMAT
+
+PROBLEM: Additional Travel flights display as plain text, not the nice visual FlightCard format like Outbound/Return.
+
+FIX: Use the FlightCardPDF component for Additional Travel flights
+```tsx
+{/* In your PDF template - Additional Travel section */}
+{itinerary.additionalTravel && itinerary.additionalTravel.length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Additional Travel</Text>
+    
+    {itinerary.additionalTravel.map((travel, index) => (
+      <View key={index}>
+        {travel.type === 'flight' && travel.flightNumber ? (
+          // USE THE SAME FlightCardPDF COMPONENT AS OUTBOUND/RETURN
+          <FlightCardPDF
+            flightNumber={travel.flightNumber}
+            date={travel.date}
+            departureAirport={travel.departureAirport || travel.from}
+            departureTime={travel.departureTime}
+            arrivalAirport={travel.arrivalAirport || travel.to}
+            arrivalTime={travel.arrivalTime}
+            passengers={travel.passengers}
+            notes={travel.notes}
+            isMultiLeg={travel.isMultiLeg}
+            legs={travel.legs}
+          />
+        ) : (
+          // Keep plain format for train/taxi/transfer
+          <View style={styles.travelItem}>
+            <Text style={styles.travelType}>
+              {travel.type.charAt(0).toUpperCase() + travel.type.slice(1)}
+            </Text>
+            <Text style={styles.travelDetail}>From: {travel.from}</Text>
+            <Text style={styles.travelDetail}>To: {travel.to}</Text>
+            <Text style={styles.travelDetail}>Time: {travel.departureTime}</Text>
+            {travel.notes && (
+              <View style={styles.notesBox}>
+                <Text style={styles.notesText}>{travel.notes}</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    ))}
+  </View>
+)}
+```
+
+## 3. TRANSFER SECTIONS - MAKE OPTIONAL AND SMALLER
+
+PROBLEM: "Transfer to Airport", "Transfer from Airport", "Transfer Home" sections are too large and can't be hidden/removed.
+
+FIX: Only show if transfer details exist, and make them more compact
+```tsx
+{/* Outbound Travel - Only show transfer if it exists */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Outbound Travel</Text>
+  
+  {/* Transfer to Airport - ONLY if it exists */}
+  {itinerary.outboundTravel?.transferToAirport && (
+    <View style={styles.transferSection}>
+      <Text style={styles.transferLabel}>Transfer to Airport</Text>
+      <Text style={styles.transferText}>{itinerary.outboundTravel.transferToAirport}</Text>
+    </View>
+  )}
+  
+  {/* Flight */}
+  {itinerary.outboundTravel?.flightNumber && (
+    <FlightCardPDF {...itinerary.outboundTravel} />
+  )}
+  
+  {/* Transfer to Accommodation - ONLY if it exists */}
+  {itinerary.outboundTravel?.transferToAccommodation && (
+    <View style={styles.transferSection}>
+      <Text style={styles.transferLabel}>Transfer to Accommodation</Text>
+      <Text style={styles.transferText}>{itinerary.outboundTravel.transferToAccommodation}</Text>
+    </View>
+  )}
+</View>
+
+{/* Return Travel - Same pattern */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Return Travel</Text>
+  
+  {itinerary.returnTravel?.transferToAirport && (
+    <View style={styles.transferSection}>
+      <Text style={styles.transferLabel}>Transfer to Airport</Text>
+      <Text style={styles.transferText}>{itinerary.returnTravel.transferToAirport}</Text>
+    </View>
+  )}
+  
+  {itinerary.returnTravel?.flightNumber && (
+    <FlightCardPDF {...itinerary.returnTravel} />
+  )}
+  
+  {itinerary.returnTravel?.transferHome && (
+    <View style={styles.transferSection}>
+      <Text style={styles.transferLabel}>Transfer Home</Text>
+      <Text style={styles.transferText}>{itinerary.returnTravel.transferHome}</Text>
+    </View>
+  )}
+</View>
+
+// Add compact transfer styles
+transferSection: {
+  marginVertical: 6,
+  padding: 8,
+  backgroundColor: '#F9FAFB',
+  borderRadius: 4,
+  borderLeft: '2 solid #000000',
+},
+transferLabel: {
+  fontSize: 9,
+  fontWeight: 'bold',
+  color: '#374151',
+  marginBottom: 2,
+},
+transferText: {
+  fontSize: 8,
+  color: '#6B7280',
+},
+```
+
+## 4. REORDERED ADDITIONAL TRAVEL NOT SHOWING IN PDF
+
+PROBLEM: User reordered Additional Travel items on Preview page, but PDF shows original order.
+
+FIX: Ensure PDF uses the reordered additionalTravel array from database
+```tsx
+// When generating PDF, make sure to fetch the latest order
+const handleDownload = async () => {
+  // Fetch fresh itinerary data with correct order
+  const response = await fetch(`/api/itineraries/${itinerary.id}`);
+  const freshItinerary = await response.json();
+  
+  // Generate PDF with fresh data
+  const blob = await pdf(
+    <ItineraryPDFTemplate itinerary={freshItinerary} />
+  ).toBlob();
+  
+  saveAs(blob, `itinerary-${itinerary.id}.pdf`);
+};
+
+// OR if order is stored in display_order field:
+// Sort additionalTravel by display_order before passing to PDF
+const sortedAdditionalTravel = [...itinerary.additionalTravel].sort(
+  (a, b) => (a.display_order || 0) - (b.display_order || 0)
+);
+
+<ItineraryPDFTemplate 
+  itinerary={{
+    ...itinerary,
+    additionalTravel: sortedAdditionalTravel
+  }} 
+/>
+```
+
+## 5. DUPLICATE ACCOMMODATION DELETION
+
+PROBLEM: User deleted duplicate accommodation but it still shows.
+
+FIX: Ensure database DELETE is working and PDF refreshes
+```tsx
+// In your delete accommodation function
+const deleteAccommodation = async (itineraryId, accommodationId) => {
+  await fetch(`/api/itineraries/${itineraryId}/accommodations/${accommodationId}`, {
+    method: 'DELETE',
+  });
+  
+  // Refresh itinerary data
+  const response = await fetch(`/api/itineraries/${itineraryId}`);
+  const updatedItinerary = await response.json();
+  setItinerary(updatedItinerary);
+};
+
+// Make sure PDF generation fetches FRESH data, not cached data
+```
+
+## COMPLETE CHECKLIST:
+
+- [ ] Title in sidebar: max 80px width, fontSize 11, wordWrap enabled
+- [ ] Email in sidebar: max 80px width, fontSize 8, wordWrap enabled
+- [ ] Additional Travel flights use FlightCardPDF component
+- [ ] Additional Travel flights have "Track Flight" link
+- [ ] Transfer sections only show if data exists
+- [ ] Transfer sections are compact (small padding, small font)
+- [ ] Additional Travel order in PDF matches Preview page order
+- [ ] PDF generation fetches fresh data from database
+- [ ] Deleted accommodations don't appear in PDF
+- [ ] All reordering persists to database and reflects in PDF
+
+## TESTING:
+
+1. **Title/Email overflow:**
+   - Create itinerary with long title: "Amazing Luxury European Adventure Through Multiple Countries"
+   - Create itinerary with long email: "travelconsultant@verylongcompanyname.com"
+   - Generate PDF - should fit in sidebar without overflow
+
+2. **Additional Travel flight format:**
+   - Add 2-3 additional flights
+   - Generate PDF
+   - Additional flights should look identical to outbound/return flights
+   - Should have "Track Flight" clickable link
+
+3. **Transfer sections:**
+   - Create itinerary WITH transfers - should show compact
+   - Create itinerary WITHOUT transfers - should not show at all
+
+4. **Reordering:**
+   - Reorder additional travel items on Preview page
+   - Click "Publish" or "Download PDF"
+   - PDF should show NEW order, not original order
+
+5. **Deletion:**
+   - Add duplicate accommodation
+   - Delete it on Preview page
+   - Generate PDF - should only show 1 accommodation

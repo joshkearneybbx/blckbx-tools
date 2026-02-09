@@ -1,0 +1,649 @@
+# ITINERARY APP - MAJOR RESTRUCTURE
+
+## OBJECTIVE
+Complete restructure of itinerary fields, forms, and display to match new specifications.
+
+## ⚠️ CRITICAL INSTRUCTION
+Implement ALL changes systematically. Do NOT ask for permission between sections. I will test everything at the end.
+
+---
+
+## PAGE 1: BASIC INFORMATION & TRAVELLERS
+
+### Travel Details
+- Title (required)
+- Dates (required)
+- Location (required)
+- Weather (optional)
+- Weather URL (optional)
+
+### Assistant Information (NOT "Consultant")
+- Name (required)
+- Email (required)
+- Remove: Website field
+
+### Travellers (NOT "Clients")
+- Change all references from "Clients" to "Travellers"
+- Change "Add Client" button to "Add Traveller"
+- Remove: Passport Number field
+
+**Traveller Fields:**
+```typescript
+Traveller {
+  id: string
+  itineraryId: string
+  name: string (required)
+  type: "adult" | "child" (required)
+  ageAtTravel: number (required if type === "child", hidden if type === "adult")
+  displayOrder: number
+}
+```
+
+**Form Structure:**
+- Type dropdown: Adult / Child
+- Name field
+- If Child selected: Show "Age at time of travel" number field
+- If Adult selected: Hide age field
+
+---
+
+## PAGE 2: OUTBOUND TRAVEL
+
+### Transfer to Airport
+
+**Replace "Type" dropdown with:**
+"Taxi Booked?" dropdown: Yes / No
+
+**If "Yes":**
+- Company
+- Contact Details
+- Collection Time
+- Pickup Location
+- Payment Status (dropdown: "Pre-paid" | "Need to pay")
+
+**If "No":**
+- Display: "No taxi booked" (in view)
+- Store: taxiBooked: false
+
+**Database Schema:**
+```typescript
+OutboundTravel {
+  id: string
+  itineraryId: string
+  // Transfer to Airport
+  transferToAirportTaxiBooked: boolean
+  transferToAirportCompany: string (optional, if taxiBooked)
+  transferToAirportContact: string (optional)
+  transferToAirportCollectionTime: string (optional)
+  transferToAirportPickupLocation: string (optional)
+  transferToAirportPaymentStatus: string (optional) // "Pre-paid" | "Need to pay"
+  // Flight details below...
+}
+```
+
+### Outbound Flight
+
+**New Field Order:**
+- Flight Number
+- Date (new field - date picker)
+- Departure Airport
+- Arrival Airport
+- Departure Time
+- Arrival Time
+- Passengers and Seats (text area for all passenger/seat info)
+- Things to Remember (text area)
+
+**Display Format:**
+```
+Flight: BA123
+Date: Friday 18th July 2025
+Departure: LGW 7:05am → Arrival: OSL 10:10am
+Passengers & Seats: ...
+Things to Remember: ...
+```
+
+### Transfer to Accommodation
+
+**Same as Transfer to Airport:**
+
+"Taxi Booked?" dropdown: Yes / No
+
+**If "Yes":**
+- Company
+- Contact Details
+- Collection Time
+- Pickup Location
+- Payment Status (dropdown: "Pre-paid" | "Need to pay")
+
+**If "No":**
+- Display: "No taxi booked"
+
+---
+
+## PAGE 3: ACCOMMODATION
+
+**Updated Fields:**
+- Name (required)
+- Address (required)
+- Google Maps Link (required)
+- Check-in Details (text area)
+- Booking Reference (new field)
+- Website/Booking Link (URL field)
+- Contact Info (new field - phone/email)
+- Images (array of URLs)
+
+**Database Schema:**
+```typescript
+Accommodation {
+  id: string
+  itineraryId: string
+  name: string
+  address: string
+  googleMapsLink: string
+  checkInDetails: string
+  bookingReference: string
+  websiteUrl: string
+  contactInfo: string
+  images: string[] // Array of image URLs
+  displayOrder: number
+}
+```
+
+**Display Format:**
+```
+Hotel Name
+Address: 123 Main St, City, Country
+📍 View on Google Maps
+Check-in: Saturday 19th July, 3:00 PM
+Booking Reference: ABC123
+Contact: +47 123 456 78
+🔗 View Website
+
+[Images displayed in grid]
+Image URLs: https://... (clickable links)
+```
+
+---
+
+## PAGE 4: ACTIVITIES
+
+**Updated Fields:**
+- Activity Name (required)
+- Description (text area)
+- Price (text field - e.g., "£50/person" or "Free")
+- Contact Details (new field)
+- Address (new field)
+- Google Maps Link (new field)
+- Images (array of URLs)
+- Website/Booking Link (URL field)
+
+**Database Schema:**
+```typescript
+Activity {
+  id: string
+  itineraryId: string
+  name: string
+  description: string
+  price: string
+  contactDetails: string
+  address: string
+  googleMapsLink: string
+  websiteUrl: string
+  images: string[]
+  displayOrder: number
+}
+```
+
+**Display Format:**
+```
+Activity Name
+Description...
+Price: £50/person
+Contact: ...
+Address: ...
+📍 View on Google Maps
+🔗 View Website
+
+[Images displayed in grid]
+Image URLs: https://... (clickable links)
+```
+
+---
+
+## PAGE 5: DINING
+
+**Updated Fields:**
+- Restaurant Name (required)
+- Cuisine Type (new field - e.g., "Italian", "Seafood")
+- Price Range (e.g., "££", "$$$", "Budget-friendly")
+- Contact Details (new field)
+- Address (new field)
+- Google Maps Link (new field)
+- Images (array of URLs)
+- Website/Booking Link (URL field)
+
+**Database Schema:**
+```typescript
+Dining {
+  id: string
+  itineraryId: string
+  name: string
+  cuisineType: string
+  priceRange: string
+  contactDetails: string
+  address: string
+  googleMapsLink: string
+  websiteUrl: string
+  images: string[]
+  displayOrder: number
+}
+```
+
+**Display Format:**
+```
+Restaurant Name
+Cuisine: Italian
+Price: ££
+Contact: +47 123 456 78
+Address: ...
+📍 View on Google Maps
+🔗 View Website
+
+[Images displayed in grid]
+Image URLs: https://... (clickable links)
+```
+
+---
+
+## PAGE 6: ADDITIONAL TRAVEL
+
+**Major Change:** Add travel type dropdown with different forms for each type.
+
+### Travel Type Dropdown
+- Car
+- Flight
+- Ferry
+- Train
+
+### Car Option
+
+**Fields:**
+- Vehicle Details (e.g., "Toyota Corolla, Automatic")
+- Vehicle Registration (e.g., "AB12 CDE")
+- Contact Details
+- Booking Details (text area)
+
+**Database Schema:**
+```typescript
+AdditionalTravel {
+  id: string
+  itineraryId: string
+  travelType: "car" | "flight" | "ferry" | "train"
+  
+  // Car fields
+  vehicleDetails: string (if car)
+  vehicleRegistration: string (if car)
+  carContactDetails: string (if car)
+  carBookingDetails: string (if car)
+  
+  // Flight fields (below)
+  // Ferry fields (below)
+  // Train fields (below)
+  
+  displayOrder: number
+}
+```
+
+### Flight Option
+
+**Same format as Outbound Flight:**
+- Flight Number
+- Date
+- Departure Airport
+- Arrival Airport
+- Departure Time
+- Arrival Time
+- Passengers and Seats
+- Things to Remember
+
+**Additional fields in schema:**
+```typescript
+  flightNumber: string (if flight)
+  flightDate: string (if flight)
+  flightDepartureAirport: string (if flight)
+  flightArrivalAirport: string (if flight)
+  flightDepartureTime: string (if flight)
+  flightArrivalTime: string (if flight)
+  flightPassengersSeats: string (if flight)
+  flightThingsToRemember: string (if flight)
+```
+
+### Ferry Option
+
+**Fields:**
+- Departing From
+- Destination
+- Date
+- Price
+- Contact Details
+- Additional Notes (text area)
+- Booking Reference
+
+**Additional fields in schema:**
+```typescript
+  ferryDepartingFrom: string (if ferry)
+  ferryDestination: string (if ferry)
+  ferryDate: string (if ferry)
+  ferryPrice: string (if ferry)
+  ferryContactDetails: string (if ferry)
+  ferryAdditionalNotes: string (if ferry)
+  ferryBookingReference: string (if ferry)
+```
+
+### Train Option
+
+**Fields:**
+- Departing From
+- Destination
+- Date
+- Price
+- Contact Details
+- Additional Notes (text area)
+- Booking Reference
+
+**Additional fields in schema:**
+```typescript
+  trainDepartingFrom: string (if train)
+  trainDestination: string (if train)
+  trainDate: string (if train)
+  trainPrice: string (if train)
+  trainContactDetails: string (if train)
+  trainAdditionalNotes: string (if train)
+  trainBookingReference: string (if train)
+```
+
+**Display Format:**
+Show only the fields relevant to the selected travel type.
+
+---
+
+## PAGE 7: RETURN TRAVEL
+
+### Transfer to Airport
+
+**Same format as Outbound Transfer to Airport:**
+
+"Taxi Booked?" dropdown: Yes / No
+
+**If "Yes":**
+- Company
+- Contact Details
+- Collection Time
+- Pickup Location
+- Payment Status (dropdown: "Pre-paid" | "Need to pay")
+
+**If "No":**
+- Display: "No taxi booked"
+
+### Return Flight
+
+**Same format as Outbound Flight:**
+- Flight Number
+- Date
+- Departure Airport
+- Arrival Airport
+- Departure Time
+- Arrival Time
+- Passengers and Seats
+- Things to Remember
+
+### Transfer Home
+
+**Same format as Transfer to Airport:**
+
+"Taxi Booked?" dropdown: Yes / No
+
+**If "Yes":**
+- Company
+- Contact Details
+- Collection Time
+- Pickup Location
+- Payment Status (dropdown: "Pre-paid" | "Need to pay")
+
+**If "No":**
+- Display: "No taxi booked"
+
+**Database Schema:**
+```typescript
+ReturnTravel {
+  id: string
+  itineraryId: string
+  
+  // Transfer to Airport
+  transferToAirportTaxiBooked: boolean
+  transferToAirportCompany: string
+  transferToAirportContact: string
+  transferToAirportCollectionTime: string
+  transferToAirportPickupLocation: string
+  transferToAirportPaymentStatus: string
+  
+  // Return Flight
+  flightNumber: string
+  flightDate: string
+  departureAirport: string
+  arrivalAirport: string
+  departureTime: string
+  arrivalTime: string
+  passengersSeats: string
+  thingsToRemember: string
+  
+  // Transfer Home
+  transferHomeTaxiBooked: boolean
+  transferHomeCompany: string
+  transferHomeContact: string
+  transferHomeCollectionTime: string
+  transferHomePickupLocation: string
+  transferHomePaymentStatus: string
+}
+```
+
+---
+
+## PAGE 8: HELPFUL INFORMATION
+
+**Keep existing fields but REMOVE:**
+- ❌ Hotel/Accommodation Contact
+- ❌ Card Cancellation Number
+
+**Keep these fields:**
+- Local Emergency Number
+- Nearest British Embassy/Consulate
+- Travel Insurance Contact Info
+- Airline/Travel Provider Customer Service
+- Local Medical Clinic or Hospital
+- Transport Contacts
+
+---
+
+## REMOVE PAGES 9 & 10
+
+**Delete:**
+- Additional Notes page
+- Custom Sections page (Page 10)
+
+Keep only pages 1-8 as specified above.
+
+---
+
+## IMAGE URL DISPLAY REQUIREMENT
+
+**CRITICAL:** All image URLs must be displayed as clickable links in both web view and PDF.
+
+**Implementation:**
+
+When displaying images:
+```tsx
+<div className="images-section">
+  {images.map((url, index) => (
+    <div key={index}>
+      <img src={url} alt={`Image ${index + 1}`} />
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        {url}
+      </a>
+    </div>
+  ))}
+</div>
+```
+
+**In PDF:**
+- Show image thumbnail
+- Below each image, show the full URL as a clickable link
+- Format: `Image URL: https://example.com/image.jpg`
+
+---
+
+## DATABASE MIGRATION
+
+**Steps:**
+1. Create migration script to update all schemas
+2. Add new fields to existing tables
+3. Remove deprecated fields
+4. Update all API endpoints to handle new fields
+5. Test data integrity
+
+**Critical changes:**
+- Rename all "Client" references to "Traveller"
+- Update Traveller schema (remove passport, add type/age)
+- Update all travel sections with new taxi booking structure
+- Update Accommodation/Activity/Dining with new fields
+- Update AdditionalTravel to support 4 travel types
+- Remove Custom Sections functionality
+
+---
+
+## FORM UPDATES
+
+Update all wizard pages:
+
+**Page 1:**
+- Update Traveller form with type dropdown and conditional age field
+- Update Assistant Information (remove website)
+
+**Page 2:**
+- Replace transfer type with "Taxi Booked?" conditional forms
+- Update flight form with new field order
+
+**Page 3:**
+- Add new Accommodation fields
+
+**Page 4:**
+- Add new Activity fields
+
+**Page 5:**
+- Add new Dining fields
+
+**Page 6:**
+- Complete redesign with travel type dropdown
+- Create 4 different forms (Car/Flight/Ferry/Train)
+- Conditional rendering based on selection
+
+**Page 7:**
+- Update Return Travel with new structure
+
+**Page 8:**
+- Remove two fields from Helpful Information
+
+**Remove:**
+- Additional Notes wizard page
+- Custom Sections wizard page
+
+---
+
+## PDF UPDATES
+
+**Ensure PDF includes:**
+1. All new fields in correct order
+2. Image URLs as clickable links below images
+3. Proper conditional rendering (show "No taxi booked" when applicable)
+4. Proper formatting for flight info (Departure → Arrival on same line)
+5. BlckBx logo on every page
+6. Page numbers
+7. Assistant Information (not Consultant)
+
+---
+
+## DISPLAY VIEW UPDATES
+
+**Update ViewItinerary.tsx to:**
+- Show all new fields
+- Render conditionally (taxi booked vs not booked)
+- Display images with URLs below
+- Handle 4 different Additional Travel types
+- Use new terminology (Travellers, Assistant)
+
+---
+
+## VALIDATION
+
+**Required fields:**
+- Title
+- Assistant Name & Email
+- At least 1 Traveller (with name and type)
+- If Child: Age is required
+
+**All other fields optional**
+
+---
+
+## TESTING CHECKLIST
+
+- [ ] Create itinerary with Adult travellers
+- [ ] Create itinerary with Child travellers (age shown)
+- [ ] Test "Taxi Booked: Yes" with all details
+- [ ] Test "Taxi Booked: No" displays correctly
+- [ ] Test all 4 Additional Travel types (Car/Flight/Ferry/Train)
+- [ ] Verify new Accommodation fields save and display
+- [ ] Verify new Activity fields save and display
+- [ ] Verify new Dining fields save and display
+- [ ] Verify image URLs display as clickable links
+- [ ] Test PDF export with all new changes
+- [ ] Verify removed fields don't appear
+- [ ] Test edit functionality with new structure
+- [ ] Verify Preview & Arrange works with new fields
+
+---
+
+## IMPLEMENTATION ORDER
+
+1. Update database schemas (Traveller, OutboundTravel, ReturnTravel, Accommodation, Activity, Dining, AdditionalTravel, HelpfulInformation)
+2. Update API endpoints to handle new schemas
+3. Update Page 1 form (Travellers & Assistant)
+4. Update Page 2 form (Outbound Travel with taxi booking)
+5. Update Page 3 form (Accommodation with new fields)
+6. Update Page 4 form (Activities with new fields)
+7. Update Page 5 form (Dining with new fields)
+8. Update Page 6 form (Additional Travel with 4 types)
+9. Update Page 7 form (Return Travel)
+10. Update Page 8 form (Helpful Info - remove 2 fields)
+11. Remove Pages 9 & 10
+12. Update display components for all sections
+13. Update PDF generation with all changes
+14. Add image URL display throughout
+15. Test all functionality
+16. Run migration on existing data
+
+---
+
+## NOTES
+
+This is a major restructure. Take time to implement carefully and systematically. Update one page at a time, test it, then move to the next.
+
+**Key terminology changes:**
+- "Consultant" → "Assistant"
+- "Client" → "Traveller"
+- "Booking URL" → "Website/Booking Link"
+
+**All conditional logic must work properly:**
+- Adult vs Child traveller
+- Taxi Booked Yes vs No
+- 4 different Additional Travel types

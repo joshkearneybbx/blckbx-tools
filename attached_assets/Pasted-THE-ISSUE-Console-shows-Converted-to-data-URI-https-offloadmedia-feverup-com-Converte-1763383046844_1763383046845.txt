@@ -1,0 +1,128 @@
+THE ISSUE:
+Console shows:
+✅ Converted to data URI: https://offloadmedia.feverup.com/... ✅
+✅ Converted to data URI: https://haussmann.galerieslafayette.com/... ✅
+❌ Base64 image invalid format: webp (4 times)
+@react-pdf/renderer does NOT support WebP format. It only supports: JPG, PNG, GIF.
+
+THE SOLUTION:
+Convert WebP images to JPG using Canvas before creating data URIs.
+Update useImagePreprocessor Hook
+In client/src/hooks/useImagePreprocessor.ts, replace the image processing part with:
+typescript// Fetch and convert all images to data URIs
+const dataUris = await Promise.all(
+  uniqueUrls.map(async (url) => {
+    // Check cache first
+    if (cache[url]) {
+      console.log(`✅ Using cached image: ${url.substring(0, 50)}...`);
+      return { url, dataUri: cache[url] };
+    }
+
+    try {
+      // Use proxy to fetch image
+      const proxyUrl = `${window.location.origin}/api/proxy-image/${btoa(url)}.jpg`;
+      const response = await fetch(proxyUrl);
+
+      if (!response.ok) {
+        console.error(`❌ Failed to fetch ${url}:`, response.status);
+        return { url, dataUri: null };
+      }
+
+      // Get the blob
+      const blob = await response.blob();
+      
+      // Check if it's WebP - if so, convert to JPG
+      let finalBlob = blob;
+      if (blob.type === 'image/webp') {
+        console.log(`🔄 Converting WebP to JPG: ${url.substring(0, 50)}...`);
+        finalBlob = await convertWebPToJPG(blob);
+      }
+
+      // Convert to data URI
+      const dataUri = await blobToDataUri(finalBlob);
+
+      // Cache it
+      cache[url] = dataUri;
+
+      console.log(`✅ Converted to data URI: ${url.substring(0, 50)}...`);
+      return { url, dataUri };
+    } catch (error) {
+      console.error(`❌ Error processing ${url}:`, error);
+      return { url, dataUri: null };
+    }
+  })
+);
+Add WebP Conversion Function
+Add this function to the same file:
+typescript// Convert WebP to JPG using Canvas
+async function convertWebPToJPG(webpBlob: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    // Create image element
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(webpBlob);
+
+    img.onload = () => {
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Draw image on canvas
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+
+      // Convert to JPG blob
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to convert to JPG'));
+          }
+        },
+        'image/jpeg',
+        0.92 // JPG quality (92%)
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load WebP image'));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+HOW IT WORKS:
+
+Fetch image through proxy
+Check if it's WebP format (blob.type === 'image/webp')
+If WebP:
+
+Load into an Image element
+Draw on a Canvas
+Export as JPG blob (quality 92%)
+
+
+Convert final blob (JPG or original PNG/GIF) to data URI
+Pass to PDF template
+
+
+EXPECTED RESULT:
+After implementing, console should show:
+📸 Pre-processing 5 images...
+✅ Converted to data URI: https://lh3.googleusercontent.com/... (already JPG)
+✅ Converted to data URI: https://cf.bstatic.com/... (already JPG)
+🔄 Converting WebP to JPG: https://offloadmedia.feverup.com/...
+✅ Converted to data URI: https://offloadmedia.feverup.com/... (converted)
+🔄 Converting WebP to JPG: https://haussmann.galerieslafayette.com/...
+✅ Converted to data URI: https://haussmann.galerieslafayette.com/... (converted)
+✅ All images pre-processed successfully!
+PDF downloads with ALL 5 images ✅
+No "Base64 image invalid format: webp" errors ✅
