@@ -19,6 +19,7 @@ export interface TransferSegment {
   dropoffLocation: string;
   company?: string;
   contact?: string;
+  vehicleRegistration?: string;
   bookingReference?: string;
   price?: string;
   notes?: string;

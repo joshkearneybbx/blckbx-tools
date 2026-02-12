@@ -23,6 +23,16 @@ function isDataUrl(url: string): boolean {
   return url.startsWith('data:image/');
 }
 
+function isUnsupportedDataUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.startsWith('data:image/avif') ||
+    lower.startsWith('data:image/webp') ||
+    lower.startsWith('data:image/svg') ||
+    lower.startsWith('data:image/gif')
+  );
+}
+
 /**
  * Check if a URL is a local asset (starts with /)
  */
@@ -53,9 +63,11 @@ export function getProxiedImageUrl(originalUrl: string): string {
 
   // Base64 data URIs - check for WebP which is not supported by react-pdf
   if (isDataUrl(url)) {
-    // Reject WebP data URIs - react-pdf doesn't support them
-    if (url.includes('image/webp') || url.includes('webp')) {
-      console.warn('[ImageProxy] WebP data URI rejected (not supported by react-pdf):', url.substring(0, 50));
+    // Reject unsupported data URIs for react-pdf
+    if (isUnsupportedDataUrl(url)) {
+      if (import.meta.env.DEV) {
+        console.warn('[ImageProxy] Unsupported data URI rejected for PDF:', url.substring(0, 50));
+      }
       return '';
     }
     return url;

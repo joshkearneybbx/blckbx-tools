@@ -24,7 +24,12 @@ import {
   createEmptyJourneyTravel,
   getTransferSectionLabel,
 } from "@/lib/travel-types";
-import { segmentsToOutbound, segmentsToReturn } from "@/lib/travel-migration";
+import {
+  outboundToSegments,
+  returnToSegments,
+  segmentsToOutbound,
+  segmentsToReturn,
+} from "@/lib/travel-migration";
 import {
   TransfersSection,
   MainTransportForm,
@@ -35,9 +40,25 @@ import {
 type Props = {
   data: WizardData;
   updateData: (updates: Partial<WizardData>) => void;
+  isEditMode?: boolean;
+  isLoadingEdit?: boolean;
 };
 
-export default function Page3Travel({ data, updateData }: Props) {
+const debugLog = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
+export default function Page3Travel({
+  data,
+  updateData,
+  isEditMode = false,
+  isLoadingEdit = false,
+}: Props) {
+  const isTransferType = (type: string): type is TransferSegment['type'] =>
+    ['taxi', 'private_car', 'shuttle', 'bus', 'train', 'other'].includes(type);
+
   const safeDestinations = data.destinations || [];
 
   // State for the three tabs using the new JourneyTravel structure
@@ -58,8 +79,20 @@ export default function Page3Travel({ data, updateData }: Props) {
   // Initialize from wizard data when it becomes available
   // This handles both initial mount AND when data arrives from PocketBase in edit mode
   useEffect(() => {
-    const hasOutboundData = data.outboundJourney && data.outboundJourney.length > 0;
-    const hasReturnData = data.returnJourney && data.returnJourney.length > 0;
+    // In edit mode, wait until parent has finished fetching DB data
+    // so we do not sync empty defaults back into parent state.
+    if (isEditMode && isLoadingEdit) return;
+
+    const outboundSegments =
+      data.outboundJourney && data.outboundJourney.length > 0
+        ? data.outboundJourney
+        : outboundToSegments(data.outboundTravel);
+    const returnSegments =
+      data.returnJourney && data.returnJourney.length > 0
+        ? data.returnJourney
+        : returnToSegments(data.returnTravel);
+    const hasOutboundData = outboundSegments.length > 0;
+    const hasReturnData = returnSegments.length > 0;
     const hasAdditionalData = data.additionalTravel && Array.isArray(data.additionalTravel) && data.additionalTravel.length > 0;
 
     // If we've already loaded real data, don't overwrite user edits
@@ -67,23 +100,23 @@ export default function Page3Travel({ data, updateData }: Props) {
 
     // If data is available, load it
     if (hasOutboundData || hasReturnData || hasAdditionalData) {
-      console.log('=== LOADING TRAVEL DATA INTO FORM ===');
-      console.log('outboundJourney:', data.outboundJourney);
-      console.log('returnJourney:', data.returnJourney);
-      console.log('additionalTravel:', data.additionalTravel);
+      debugLog('=== LOADING TRAVEL DATA INTO FORM ===');
+      debugLog('outboundJourney:', data.outboundJourney);
+      debugLog('returnJourney:', data.returnJourney);
+      debugLog('additionalTravel:', data.additionalTravel);
 
       hasLoadedData.current = true;
       initialized.current = true;
 
       if (hasOutboundData) {
-        const converted = convertSegmentsToJourney(data.outboundJourney!);
-        console.log('Converted outbound:', converted);
+        const converted = convertSegmentsToJourney(outboundSegments);
+        debugLog('Converted outbound:', converted);
         setOutbound(converted);
       }
 
       if (hasReturnData) {
-        const converted = convertSegmentsToJourney(data.returnJourney!);
-        console.log('Converted return:', converted);
+        const converted = convertSegmentsToJourney(returnSegments);
+        debugLog('Converted return:', converted);
         setReturnTravel(converted);
       }
 
@@ -100,7 +133,7 @@ export default function Page3Travel({ data, updateData }: Props) {
       // No data to load, mark as initialized so sync effects can run
       initialized.current = true;
     }
-  }, [data.outboundJourney, data.returnJourney, data.additionalTravel]);
+  }, [data.outboundJourney, data.returnJourney, data.additionalTravel, data.outboundTravel, data.returnTravel, isEditMode, isLoadingEdit]);
 
   // Sync outbound changes back to wizard data
   useEffect(() => {
@@ -110,9 +143,9 @@ export default function Page3Travel({ data, updateData }: Props) {
     // Update legacy format for PocketBase saving (synchronously)
     const legacy = segmentsToOutbound(segments);
 
-    console.log('=== OUTBOUND SYNC ===');
-    console.log('Segments:', segments);
-    console.log('Legacy format:', legacy);
+    debugLog('=== OUTBOUND SYNC ===');
+    debugLog('Segments:', segments);
+    debugLog('Legacy format:', legacy);
 
     // Update both formats together
     updateData({
@@ -129,9 +162,9 @@ export default function Page3Travel({ data, updateData }: Props) {
     // Update legacy format for PocketBase saving (synchronously)
     const legacy = segmentsToReturn(segments);
 
-    console.log('=== RETURN SYNC ===');
-    console.log('Segments:', segments);
-    console.log('Legacy format:', legacy);
+    debugLog('=== RETURN SYNC ===');
+    debugLog('Segments:', segments);
+    debugLog('Legacy format:', legacy);
 
     // Update both formats together
     updateData({
@@ -148,9 +181,9 @@ export default function Page3Travel({ data, updateData }: Props) {
 
   // Convert segment array to JourneyTravel structure
   const convertSegmentsToJourney = (segments: any[]): JourneyTravel => {
-    console.log('=== convertSegmentsToJourney INPUT ===');
-    console.log('Input segments count:', segments?.length);
-    console.log('Input segments:', JSON.stringify(segments, null, 2));
+    debugLog('=== convertSegmentsToJourney INPUT ===');
+    debugLog('Input segments count:', segments?.length);
+    debugLog('Input segments:', JSON.stringify(segments, null, 2));
 
     const result: JourneyTravel = {
       transfersTo: [],
@@ -158,20 +191,26 @@ export default function Page3Travel({ data, updateData }: Props) {
       transfersFrom: [],
     };
 
-    // Find all main transport segments (flight, train, bus, ferry)
     const mainTypes = ['flight', 'train', 'bus', 'ferry', 'other'];
-    const mainSegments = segments.filter((s) => mainTypes.includes(s.type) && s.type !== 'taxi');
+    const explicitMainSegments = segments.filter((s) => s.role === 'main');
+    const flightSegments = segments.filter((s) => s.type === 'flight');
+    const mainSegments =
+      explicitMainSegments.length > 0
+        ? explicitMainSegments
+        : (flightSegments.length > 0
+          ? flightSegments
+          : segments.filter((s) => mainTypes.includes(s.type) && !['taxi', 'private_car', 'shuttle'].includes(s.type)));
 
-    console.log('Main segments found:', mainSegments.length);
-    console.log('Main segments:', JSON.stringify(mainSegments, null, 2));
+    debugLog('Main segments found:', mainSegments.length);
+    debugLog('Main segments:', JSON.stringify(mainSegments, null, 2));
 
     if (mainSegments.length > 0) {
       const firstMain = mainSegments[0];
       const isMultiLeg = mainSegments.length > 1;
       const isFlight = firstMain.type === 'flight';
 
-      console.log('isMultiLeg detected:', isMultiLeg);
-      console.log('isFlight:', isFlight);
+      debugLog('isMultiLeg detected:', isMultiLeg);
+      debugLog('isFlight:', isFlight);
 
       // Build legs from all main segments of the same type
       const legs = mainSegments
@@ -190,7 +229,7 @@ export default function Page3Travel({ data, updateData }: Props) {
           arrivalTime: seg.arrivalTime || '',
         }));
 
-      console.log('Built legs:', JSON.stringify(legs, null, 2));
+      debugLog('Built legs:', JSON.stringify(legs, null, 2));
 
       result.mainTransport = {
         id: firstMain.id || generateId(),
@@ -198,11 +237,13 @@ export default function Page3Travel({ data, updateData }: Props) {
         date: firstMain.date || '',
         isConnecting: isMultiLeg,
         legs: legs,
+        passengersAndSeats: firstMain.confirmationNumber,
         bookingReference: firstMain.bookingReference,
+        contact: firstMain.contactDetails,
         notes: firstMain.notes,
       };
 
-      console.log('Result mainTransport:', JSON.stringify(result.mainTransport, null, 2));
+      debugLog('Result mainTransport:', JSON.stringify(result.mainTransport, null, 2));
     } else {
       result.mainTransport = createEmptyMainTransport();
     }
@@ -212,10 +253,12 @@ export default function Page3Travel({ data, updateData }: Props) {
     const firstMainIndex = mainSegments.length > 0 ? segments.indexOf(mainSegments[0]) : -1;
     const lastMainIndex = mainSegments.length > 0 ? segments.indexOf(mainSegments[mainSegments.length - 1]) : -1;
 
-    // Get transfer-type segments (taxi or train segments that aren't part of the main transport)
+    // Get transfer-type segments that aren't part of main transport
     const transferSegments = segments.filter((s) => {
-      if (s.type === 'taxi') return true;
-      // Train could be a transfer or main transport - check if it's in mainSegments
+      if (s.role === 'transfer') return true;
+      if (s.role === 'main') return false;
+      if (['taxi', 'private_car', 'shuttle', 'bus', 'other'].includes(s.type)) return true;
+      // Train could be a transfer or main transport
       if (s.type === 'train' && !mainSegments.includes(s)) return true;
       return false;
     });
@@ -224,12 +267,13 @@ export default function Page3Travel({ data, updateData }: Props) {
       const transfer: TransferSegment = {
         id: seg.id || generateId(),
         order: idx,
-        type: seg.type === 'train' ? 'train' : 'taxi',
+        type: isTransferType(seg.type) ? seg.type : 'taxi',
         pickupLocation: seg.fromLocation || '',
         pickupTime: seg.departureTime || '',
         dropoffLocation: seg.toLocation || '',
         company: seg.company,
         contact: seg.contactDetails,
+        vehicleRegistration: seg.confirmationNumber,
         bookingReference: seg.bookingReference,
         notes: seg.notes,
       };
@@ -256,13 +300,15 @@ export default function Page3Travel({ data, updateData }: Props) {
       .forEach((transfer) => {
         segments.push({
           id: transfer.id,
-          type: transfer.type === 'train' ? 'train' : 'taxi',
+          role: 'transfer',
+          type: transfer.type,
           fromLocation: transfer.pickupLocation,
           toLocation: transfer.dropoffLocation,
           date: journey.mainTransport?.date || '',
           departureTime: transfer.pickupTime,
           company: transfer.company,
           contactDetails: transfer.contact,
+          confirmationNumber: transfer.vehicleRegistration,
           bookingReference: transfer.bookingReference,
           notes: transfer.notes,
         });
@@ -278,6 +324,7 @@ export default function Page3Travel({ data, updateData }: Props) {
       mt.legs.forEach((leg, idx) => {
         segments.push({
           id: leg.id || generateId(),
+          role: 'main',
           type: mt.type,
           date: mt.date,
           fromLocation: isFlight ? leg.departureAirport : leg.departureStation,
@@ -288,7 +335,9 @@ export default function Page3Travel({ data, updateData }: Props) {
           airline: leg.airline,
           company: leg.company,
           // Only include booking/notes on first leg to avoid duplication
+          confirmationNumber: idx === 0 ? mt.passengersAndSeats : undefined,
           bookingReference: idx === 0 ? mt.bookingReference : undefined,
+          contactDetails: idx === 0 ? mt.contact : undefined,
           notes: idx === 0 ? mt.notes : undefined,
         });
       });
@@ -300,13 +349,15 @@ export default function Page3Travel({ data, updateData }: Props) {
       .forEach((transfer) => {
         segments.push({
           id: transfer.id,
-          type: transfer.type === 'train' ? 'train' : 'taxi',
+          role: 'transfer',
+          type: transfer.type,
           fromLocation: transfer.pickupLocation,
           toLocation: transfer.dropoffLocation,
           date: journey.mainTransport?.date || '',
           departureTime: transfer.pickupTime,
           company: transfer.company,
           contactDetails: transfer.contact,
+          confirmationNumber: transfer.vehicleRegistration,
           bookingReference: transfer.bookingReference,
           notes: transfer.notes,
         });

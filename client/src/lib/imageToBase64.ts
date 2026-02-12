@@ -6,6 +6,7 @@
  */
 
 const PROXY_BASE_URL = 'https://n8n.blckbx.co.uk/webhook/image-proxy';
+const unsupportedPdfFormats = ['.avif', '.webp', '.svg', '.gif'];
 
 /**
  * Cache for converted images to avoid refetching
@@ -26,6 +27,14 @@ export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
   const trimmedUrl = url.trim();
 
   if (trimmedUrl === '') {
+    return null;
+  }
+
+  const lower = trimmedUrl.toLowerCase();
+  const isUnsupported = unsupportedPdfFormats.some(
+    (fmt) => lower.endsWith(fmt) || lower.includes(`${fmt}?`) || lower.includes(`${fmt}#`)
+  );
+  if (isUnsupported || lower.startsWith('data:image/avif') || lower.startsWith('data:image/webp') || lower.startsWith('data:image/svg') || lower.startsWith('data:image/gif')) {
     return null;
   }
 
@@ -50,7 +59,9 @@ export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
   }
 
   try {
-    console.log('[ImageToBase64] Converting:', trimmedUrl.substring(0, 60));
+    if (import.meta.env.DEV) {
+      console.log('[ImageToBase64] Converting:', trimmedUrl.substring(0, 60));
+    }
 
     // Try fetching through the proxy first
     const proxyUrl = `${PROXY_BASE_URL}?url=${encodeURIComponent(trimmedUrl)}`;
@@ -62,12 +73,16 @@ export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
     });
 
     if (!response.ok) {
-      console.warn('[ImageToBase64] Proxy fetch failed:', response.status, trimmedUrl);
+      if (import.meta.env.DEV) {
+        console.warn('[ImageToBase64] Proxy fetch failed:', response.status, trimmedUrl);
+      }
 
       // If proxy fails, try direct fetch (might work for CORS-friendly images)
       const directResponse = await fetch(trimmedUrl);
       if (!directResponse.ok) {
-        console.warn('[ImageToBase64] Direct fetch also failed:', directResponse.status);
+        if (import.meta.env.DEV) {
+          console.warn('[ImageToBase64] Direct fetch also failed:', directResponse.status);
+        }
         return null;
       }
 
@@ -83,7 +98,9 @@ export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
 
     return base64;
   } catch (error) {
-    console.warn('[ImageToBase64] Failed to convert image:', trimmedUrl, error);
+    if (import.meta.env.DEV) {
+      console.warn('[ImageToBase64] Failed to convert image:', trimmedUrl, error);
+    }
     return null;
   }
 };
@@ -108,7 +125,9 @@ async function blobToBase64(blob: Promise<Blob>, originalUrl: string): Promise<s
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        console.log('[ImageToBase64] Converted successfully:', originalUrl.substring(0, 60), '→', result.substring(0, 50) + '...');
+        if (import.meta.env.DEV) {
+          console.log('[ImageToBase64] Converted successfully:', originalUrl.substring(0, 60), '→', result.substring(0, 50) + '...');
+        }
         resolve(result);
       };
       reader.onerror = () => {
@@ -193,30 +212,35 @@ export const preprocessImagesForPDF = async <T extends { primaryImage?: string; 
     return [];
   }
 
-  console.log(`[ImageToBase64] Processing ${items.length} items...`);
+  if (import.meta.env.DEV) {
+    console.log(`[ImageToBase64] Processing ${items.length} items...`);
+  }
 
   const processed = await Promise.all(
     items.map(async (item) => {
       const updates: Partial<T> = {};
 
-      // Convert primary image
-      if (item.primaryImage) {
-        const base64 = await imageUrlToBase64(item.primaryImage);
+      const candidateImages = [item.primaryImage, ...(item.images || [])]
+        .filter((img): img is string => !!img && typeof img === 'string');
+
+      const supportedImage = candidateImages.find((img) => {
+        const lower = img.toLowerCase();
+        return !unsupportedPdfFormats.some(
+          (fmt) => lower.endsWith(fmt) || lower.includes(`${fmt}?`) || lower.includes(`${fmt}#`)
+        ) && !lower.startsWith('data:image/avif') && !lower.startsWith('data:image/webp') && !lower.startsWith('data:image/svg') && !lower.startsWith('data:image/gif');
+      });
+
+      // Convert first supported image
+      if (supportedImage) {
+        const base64 = await imageUrlToBase64(supportedImage);
         if (base64 === 'SKIP_WEBP') {
           // WebP data URIs are not supported by react-pdf, remove the image
-          console.warn('[ImageToBase64] Removing WebP data URI from item:', item.name || 'unnamed');
+          if (import.meta.env.DEV) {
+            console.warn('[ImageToBase64] Removing unsupported data URI from item:', (item as any).name || 'unnamed');
+          }
           updates.primaryImage = '';
-        } else if (base64 && base64 !== item.primaryImage) {
+        } else if (base64 && base64 !== supportedImage) {
           updates.primaryImage = base64;
-        }
-      }
-
-      // Also convert first image in array if it exists and primaryImage doesn't
-      if (!updates.primaryImage && item.images && item.images.length > 0) {
-        const base64 = await imageUrlToBase64(item.images[0]);
-        if (base64 === 'SKIP_WEBP') {
-          // WebP data URIs are not supported, skip this image
-          updates.primaryImage = '';
         } else if (base64) {
           updates.primaryImage = base64;
         }
@@ -231,7 +255,9 @@ export const preprocessImagesForPDF = async <T extends { primaryImage?: string; 
     item.primaryImage?.startsWith('data:') && items[i].primaryImage && !items[i].primaryImage.startsWith('data:')
   ).length;
 
-  console.log(`[ImageToBase64] Processed ${items.length} items, ${successCount} converted to base64`);
+  if (import.meta.env.DEV) {
+    console.log(`[ImageToBase64] Processed ${items.length} items, ${successCount} converted to base64`);
+  }
 
   return processed;
 };

@@ -34,6 +34,12 @@ import {
   HotelIcon,
 } from './PDFIcons';
 
+const debugLog = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
 Font.register({
   family: "Noto Serif",
   fonts: [
@@ -113,6 +119,14 @@ const unsupportedImageFormats = ['.avif', '.webp', '.svg', '.gif'];
 const isSupportedPdfImage = (url: string): boolean => {
   if (!url) return false;
   const lower = url.toLowerCase();
+  if (
+    lower.startsWith('data:image/avif') ||
+    lower.startsWith('data:image/webp') ||
+    lower.startsWith('data:image/svg') ||
+    lower.startsWith('data:image/gif')
+  ) {
+    return false;
+  }
   return !unsupportedImageFormats.some(
     (fmt) =>
       lower.endsWith(fmt) ||
@@ -883,12 +897,16 @@ const TravelSegmentCard = ({
           </View>
 
           {/* Booking details compact row */}
-          {(segment.bookingReference || segment.airline || segment.confirmationNumber) && (
+          {(segment.bookingReference || segment.airline || segment.confirmationNumber || segment.company || segment.contactDetails) && (
             <Text style={styles.bookingDetailsInline}>
               {segment.airline ? `Airline: ${segment.airline}` : ''}
               {segment.airline && segment.bookingReference ? ' • ' : ''}
               {segment.bookingReference ? `Booking Ref: ${segment.bookingReference}` : ''}
-              {(segment.airline || segment.bookingReference) && segment.confirmationNumber ? ' • ' : ''}
+              {(segment.airline || segment.bookingReference) && segment.company ? ' • ' : ''}
+              {segment.company ? `Company: ${segment.company}` : ''}
+              {(segment.airline || segment.bookingReference || segment.company) && segment.contactDetails ? ' • ' : ''}
+              {segment.contactDetails ? `Contact: ${segment.contactDetails}` : ''}
+              {(segment.airline || segment.bookingReference || segment.company || segment.contactDetails) && segment.confirmationNumber ? ' • ' : ''}
               {segment.confirmationNumber ? `Confirmation: ${segment.confirmationNumber}` : ''}
             </Text>
           )}
@@ -912,6 +930,7 @@ const TravelSegmentCard = ({
       case 'bus': return <BusIcon {...iconProps} />;
       case 'ferry': return <FerryIcon {...iconProps} />;
       case 'taxi':
+      case 'private_car':
       case 'private_transfer':
       case 'shuttle':
       case 'car_rental':
@@ -926,6 +945,7 @@ const TravelSegmentCard = ({
       case 'bus': return 'Bus';
       case 'ferry': return 'Ferry';
       case 'taxi': return 'Taxi';
+      case 'private_car': return 'Private Car';
       case 'private_transfer': return 'Private Transfer';
       case 'shuttle': return 'Shuttle';
       case 'car_rental': return 'Car Rental';
@@ -1282,11 +1302,11 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
   } = data;
 
   // Debug: Log PDF travel data
-  console.log('=== PDF TRAVEL DATA ===');
-  console.log('outboundJourney segments:', outboundJourney?.length, outboundJourney);
-  console.log('returnJourney segments:', returnJourney?.length, returnJourney);
-  console.log('interDestinationTravel:', interDestinationTravel?.length, interDestinationTravel);
-  console.log('additionalTravel segments:', additionalTravel?.length, additionalTravel);
+  debugLog('=== PDF TRAVEL DATA ===');
+  debugLog('outboundJourney segments:', outboundJourney?.length, outboundJourney);
+  debugLog('returnJourney segments:', returnJourney?.length, returnJourney);
+  debugLog('interDestinationTravel:', interDestinationTravel?.length, interDestinationTravel);
+  debugLog('additionalTravel segments:', additionalTravel?.length, additionalTravel);
 
   // Filter out hidden items
   const accommodations = allAccommodations?.filter(item => item.visible !== 0) || [];
@@ -1419,37 +1439,57 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
   const parseAdditionalTravelItem = (item: any, fallbackId: string): TravelSegment[] => {
     if (!item) return [];
 
-    const type = item.type || item.travelType || 'flight';
-    if (item.isConnecting && Array.isArray(item.legs) && item.legs.length > 0) {
-      return item.legs.map((leg: any, idx: number): TravelSegment => ({
+    const details = (() => {
+      if (!item?.travelDetails) return null;
+      try {
+        return typeof item.travelDetails === 'string'
+          ? JSON.parse(item.travelDetails)
+          : item.travelDetails;
+      } catch {
+        return null;
+      }
+    })();
+
+    const type = item.type || item.travelType || details?.travelType || 'flight';
+    const legs = item.legs || details?.legs || item.flightLegs;
+    const isConnecting = item.isConnecting || item.isMultiLeg || details?.isConnecting || details?.isMultiLeg || item.flightIsMultiLeg;
+    const airline = item.airline || details?.airline || '';
+    const bookingReference = item.bookingReference || details?.bookingReference || item.trainBookingReference || item.ferryBookingReference || '';
+    const company = item.company || details?.company || '';
+    const contactDetails = item.contactDetails || item.contact || details?.contactDetails || details?.contact || '';
+
+    if (isConnecting && Array.isArray(legs) && legs.length > 0) {
+      return legs.map((leg: any, idx: number): TravelSegment => ({
         id: `${item.id || fallbackId}-leg-${idx}`,
         type,
-        fromLocation: leg.departureAirport || leg.departureStation || item.fromLocation || '',
-        toLocation: leg.arrivalAirport || leg.arrivalStation || item.toLocation || '',
-        date: item.date || item.flightDate || '',
+        fromLocation: leg.departureAirport || leg.departureStation || details?.fromLocation || item.fromLocation || '',
+        toLocation: leg.arrivalAirport || leg.arrivalStation || details?.toLocation || item.toLocation || '',
+        date: leg.date || item.date || details?.date || item.flightDate || '',
         departureTime: leg.departureTime || item.departureTime || '',
         arrivalTime: leg.arrivalTime || item.arrivalTime || '',
         flightNumber: leg.flightNumber || item.flightNumber || '',
-        airline: leg.airline || item.airline || '',
-        company: leg.company || item.company || '',
-        bookingReference: item.bookingReference || '',
-        notes: item.notes || '',
+        airline: leg.airline || airline,
+        company: leg.company || company,
+        bookingReference,
+        contactDetails,
+        notes: leg.notes || item.notes || details?.notes || '',
       })).filter(hasSegmentContent);
     }
 
     const segment: TravelSegment = {
       id: item.id || fallbackId,
       type,
-      fromLocation: item.fromLocation || item.flightDepartureAirport || item.trainDepartingFrom || item.ferryDepartingFrom || '',
-      toLocation: item.toLocation || item.flightArrivalAirport || item.trainDestination || item.ferryDestination || '',
-      date: item.date || item.flightDate || item.trainDate || item.ferryDate || '',
-      departureTime: item.departureTime || item.flightDepartureTime || '',
-      arrivalTime: item.arrivalTime || item.flightArrivalTime || '',
-      flightNumber: item.flightNumber || '',
-      airline: item.airline || '',
-      company: item.company || '',
-      bookingReference: item.bookingReference || item.trainBookingReference || item.ferryBookingReference || '',
-      notes: item.notes || item.flightThingsToRemember || item.trainAdditionalNotes || item.ferryAdditionalNotes || '',
+      fromLocation: item.fromLocation || details?.fromLocation || item.flightDepartureAirport || item.trainDepartingFrom || item.ferryDepartingFrom || '',
+      toLocation: item.toLocation || details?.toLocation || item.flightArrivalAirport || item.trainDestination || item.ferryDestination || '',
+      date: item.date || details?.date || item.flightDate || item.trainDate || item.ferryDate || '',
+      departureTime: item.departureTime || details?.departureTime || item.flightDepartureTime || '',
+      arrivalTime: item.arrivalTime || details?.arrivalTime || item.flightArrivalTime || '',
+      flightNumber: item.flightNumber || details?.flightNumber || '',
+      airline,
+      company,
+      bookingReference,
+      contactDetails,
+      notes: item.notes || details?.notes || item.flightThingsToRemember || item.trainAdditionalNotes || item.ferryAdditionalNotes || '',
     };
 
     return hasSegmentContent(segment) ? [segment] : [];

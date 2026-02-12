@@ -90,6 +90,14 @@ function SortableTravelItem({
                     departureTime={leg.departureTime || ''}
                     arrivalAirport={leg.arrivalAirport || ''}
                     arrivalTime={leg.arrivalTime || ''}
+                    airline={leg.airline || airline || ''}
+                    bookingReference={bookingReference || ''}
+                    company={leg.company || company || ''}
+                    contactDetails={travel.contactDetails || travel.contact || ''}
+                    isConnecting
+                    legNumber={idx + 1}
+                    totalLegs={legs.length}
+                    notes={notes || undefined}
                   />
                   {idx < legs.length - 1 && leg.layoverDuration && (
                     <div className="px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm flex items-center gap-2">
@@ -110,6 +118,11 @@ function SortableTravelItem({
             departureTime={departureTime || ''}
             arrivalAirport={toLocation || ''}
             arrivalTime={arrivalTime || ''}
+            airline={airline || ''}
+            bookingReference={bookingReference || ''}
+            company={company || ''}
+            contactDetails={travel.contactDetails || travel.contact || ''}
+            notes={notes || undefined}
           />
         );
       }
@@ -438,6 +451,7 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
       case 'bus': return <Bus className={iconClass} />;
       case 'ferry': return <Sailboat className={iconClass} />;
       case 'taxi': return <Car className={iconClass} />;
+      case 'private_car': return <Car className={iconClass} />;
       case 'car_rental': return <Car className={iconClass} />;
       default: return <Car className={iconClass} />;
     }
@@ -450,6 +464,7 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
       case 'bus': return 'Bus';
       case 'ferry': return 'Ferry';
       case 'taxi': return 'Taxi';
+      case 'private_car': return 'Private Car';
       case 'private_transfer': return 'Private Transfer';
       case 'shuttle': return 'Shuttle';
       case 'car_rental': return 'Car Rental';
@@ -468,6 +483,10 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
         arrivalTime={segment.arrivalTime || ''}
         passengers={travellers?.map(t => t.name).join(', ') || undefined}
         notes={segment.notes || undefined}
+        airline={segment.airline || ''}
+        bookingReference={segment.bookingReference || ''}
+        company={segment.company || ''}
+        contactDetails={segment.contactDetails || ''}
       />
     );
   }
@@ -510,6 +529,11 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
         {segment.bookingReference && (
           <div>
             <span className="text-muted-foreground">Booking Ref:</span> {segment.bookingReference}
+          </div>
+        )}
+        {segment.contactDetails && (
+          <div>
+            <span className="text-muted-foreground">Contact:</span> {segment.contactDetails}
           </div>
         )}
       </div>
@@ -1107,37 +1131,57 @@ export default function ViewItinerary() {
   const parseAdditionalTravelItem = (item: any, fallbackId: string): TravelSegment[] => {
     if (!item) return [];
 
-    const type = item.type || item.travelType || 'flight';
-    if (item.isConnecting && Array.isArray(item.legs) && item.legs.length > 0) {
-      return item.legs.map((leg: any, idx: number): TravelSegment => ({
+    const details = (() => {
+      if (!item?.travelDetails) return null;
+      try {
+        return typeof item.travelDetails === 'string'
+          ? JSON.parse(item.travelDetails)
+          : item.travelDetails;
+      } catch {
+        return null;
+      }
+    })();
+
+    const type = item.type || item.travelType || details?.travelType || 'flight';
+    const legs = item.legs || details?.legs || item.flightLegs;
+    const isConnecting = item.isConnecting || item.isMultiLeg || details?.isConnecting || details?.isMultiLeg || item.flightIsMultiLeg;
+    const airline = item.airline || details?.airline || '';
+    const bookingReference = item.bookingReference || details?.bookingReference || item.trainBookingReference || item.ferryBookingReference || '';
+    const company = item.company || details?.company || '';
+    const contactDetails = item.contactDetails || item.contact || details?.contactDetails || details?.contact || '';
+
+    if (isConnecting && Array.isArray(legs) && legs.length > 0) {
+      return legs.map((leg: any, idx: number): TravelSegment => ({
         id: `${item.id || fallbackId}-leg-${idx}`,
         type,
-        fromLocation: leg.departureAirport || leg.departureStation || item.fromLocation || '',
-        toLocation: leg.arrivalAirport || leg.arrivalStation || item.toLocation || '',
-        date: item.date || item.flightDate || '',
+        fromLocation: leg.departureAirport || leg.departureStation || details?.fromLocation || item.fromLocation || '',
+        toLocation: leg.arrivalAirport || leg.arrivalStation || details?.toLocation || item.toLocation || '',
+        date: leg.date || item.date || details?.date || item.flightDate || '',
         departureTime: leg.departureTime || item.departureTime || '',
         arrivalTime: leg.arrivalTime || item.arrivalTime || '',
         flightNumber: leg.flightNumber || item.flightNumber || '',
-        airline: leg.airline || item.airline || '',
-        company: leg.company || item.company || '',
-        bookingReference: item.bookingReference || '',
-        notes: item.notes || '',
+        airline: leg.airline || airline,
+        company: leg.company || company,
+        bookingReference,
+        contactDetails,
+        notes: leg.notes || item.notes || details?.notes || '',
       })).filter(hasSegmentContent);
     }
 
     const segment: TravelSegment = {
       id: item.id || fallbackId,
       type,
-      fromLocation: item.fromLocation || item.flightDepartureAirport || item.trainDepartingFrom || item.ferryDepartingFrom || '',
-      toLocation: item.toLocation || item.flightArrivalAirport || item.trainDestination || item.ferryDestination || '',
-      date: item.date || item.flightDate || item.trainDate || item.ferryDate || '',
-      departureTime: item.departureTime || item.flightDepartureTime || '',
-      arrivalTime: item.arrivalTime || item.flightArrivalTime || '',
-      flightNumber: item.flightNumber || '',
-      airline: item.airline || '',
-      company: item.company || '',
-      bookingReference: item.bookingReference || item.trainBookingReference || item.ferryBookingReference || '',
-      notes: item.notes || item.flightThingsToRemember || item.trainAdditionalNotes || item.ferryAdditionalNotes || '',
+      fromLocation: item.fromLocation || details?.fromLocation || item.flightDepartureAirport || item.trainDepartingFrom || item.ferryDepartingFrom || '',
+      toLocation: item.toLocation || details?.toLocation || item.flightArrivalAirport || item.trainDestination || item.ferryDestination || '',
+      date: item.date || details?.date || item.flightDate || item.trainDate || item.ferryDate || '',
+      departureTime: item.departureTime || details?.departureTime || item.flightDepartureTime || '',
+      arrivalTime: item.arrivalTime || details?.arrivalTime || item.flightArrivalTime || '',
+      flightNumber: item.flightNumber || details?.flightNumber || '',
+      airline,
+      company,
+      bookingReference,
+      contactDetails,
+      notes: item.notes || details?.notes || item.flightThingsToRemember || item.trainAdditionalNotes || item.ferryAdditionalNotes || '',
     };
 
     return hasSegmentContent(segment) ? [segment] : [];
@@ -1280,7 +1324,9 @@ export default function ViewItinerary() {
         departureTime: leg.departureTime || '',
         arrivalTime: leg.arrivalTime || '',
         flightNumber: leg.flightNumber || '',
-        airline: leg.airline || '',
+        airline: leg.airline || returnTravel.airline || '',
+        bookingReference: returnTravel.bookingReference || '',
+        contactDetails: returnTravel.contact || '',
         notes: returnTravel.thingsToRemember || '',
       }));
     }
@@ -1296,6 +1342,9 @@ export default function ViewItinerary() {
       departureTime: returnTravel.departureTime || '',
       arrivalTime: returnTravel.arrivalTime || '',
       flightNumber: returnTravel.flightNumber || '',
+      airline: returnTravel.airline || '',
+      bookingReference: returnTravel.bookingReference || '',
+      contactDetails: returnTravel.contact || '',
       notes: returnTravel.thingsToRemember || '',
     }];
   })();

@@ -22,6 +22,13 @@ interface FlightCardProps {
   duration?: string;
   isMultiLeg?: boolean;
   legs?: FlightLeg[];
+  airline?: string;
+  bookingReference?: string;
+  company?: string;
+  contactDetails?: string;
+  isConnecting?: boolean;
+  legNumber?: number;
+  totalLegs?: number;
 }
 
 export function FlightCard({
@@ -35,7 +42,14 @@ export function FlightCard({
   notes,
   duration,
   isMultiLeg = false,
-  legs = []
+  legs = [],
+  airline,
+  bookingReference,
+  company,
+  contactDetails,
+  isConnecting = false,
+  legNumber,
+  totalLegs,
 }: FlightCardProps) {
   const cleanFlightNumber = flightNumber.replace(/\s/g, '').toUpperCase();
   const flightTrackerUrl = `https://www.flightradar24.com/data/flights/${cleanFlightNumber.toLowerCase()}`;
@@ -48,6 +62,9 @@ export function FlightCard({
 
   const depCode = getAirportCode(departureAirport);
   const arrCode = getAirportCode(arrivalAirport);
+  const routeLabel = isConnecting
+    ? (legNumber && totalLegs ? `Leg ${legNumber} of ${totalLegs}` : 'Connecting')
+    : (duration || 'Direct');
 
   return (
     <div className="flight-card bg-white rounded-[12px] shadow-sm overflow-hidden my-4 animate-slide-up" data-testid="flight-card">
@@ -70,7 +87,7 @@ export function FlightCard({
             </div>
 
             <div className="flex-1 flex flex-col items-center px-4">
-              <div className="text-xs text-foreground-subtle mb-2">{duration || 'Direct'}</div>
+              <div className="text-xs text-foreground-subtle mb-2">{routeLabel}</div>
               <div className="w-full flex items-center gap-1">
                 <div className="w-3 h-3 rounded-full bg-[hsl(var(--base-black))] dark:bg-white"></div>
                 <div className="flex-1 h-0.5 bg-[hsl(var(--base-black))] dark:bg-white"></div>
@@ -78,7 +95,9 @@ export function FlightCard({
                 <div className="flex-1 h-0.5 bg-[hsl(var(--base-black))] dark:bg-white"></div>
                 <div className="w-3 h-3 rounded-full bg-[hsl(var(--base-black))] dark:bg-white"></div>
               </div>
-              <div className="text-xs text-foreground-subtle mt-2">Non-stop</div>
+              {!isConnecting && (
+                <div className="text-xs text-foreground-subtle mt-2">Non-stop</div>
+              )}
             </div>
 
             <div className="text-center flex-1">
@@ -153,6 +172,15 @@ export function FlightCard({
             </div>
           )}
         </div>
+
+        {(airline || bookingReference || company || contactDetails) && (
+          <div className="mt-3 text-sm text-foreground-subtle">
+            {airline && <div>Airline: {airline}</div>}
+            {bookingReference && <div>Booking Ref: {bookingReference}</div>}
+            {company && <div>Company: {company}</div>}
+            {contactDetails && <div>Contact: {contactDetails}</div>}
+          </div>
+        )}
 
         {notes && (
           <div className="mt-3 p-3 rounded-lg bg-[hsl(var(--warning-light))]">

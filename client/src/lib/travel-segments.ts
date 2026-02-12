@@ -7,6 +7,7 @@
 
 export interface TravelSegment {
   id: string;
+  role?: 'main' | 'transfer' | 'additional';
   type: SegmentType;
   fromLocation: string;
   toLocation: string;

@@ -43,8 +43,10 @@ export type FlightLeg = {
 
 export type TaxiTransfer = {
   id: string;
+  transferType?: 'taxi' | 'private_car' | 'shuttle' | 'bus' | 'other';
   company?: string;
   contact?: string;
+  vehicleRegistration?: string;
   collectionTime?: string;
   pickupLocation?: string;
   dropoffLocation?: string;
@@ -128,6 +130,9 @@ export type WizardData = {
     arrivalAirport: string;
     departureTime: string;
     arrivalTime: string;
+    airline: string;
+    bookingReference: string;
+    contact: string;
     passengersSeats: string;
     thingsToRemember: string;
     isMultiLeg: number;
@@ -282,6 +287,9 @@ export type WizardData = {
     arrivalAirport: string;
     departureTime: string;
     arrivalTime: string;
+    airline: string;
+    bookingReference: string;
+    contact: string;
     passengersSeats: string;
     thingsToRemember: string;
     isMultiLeg: number;
@@ -360,6 +368,66 @@ const getValidEmail = (email: string | undefined | null): string => {
   return isValidEmail(email) ? email?.trim() || '' : '';
 };
 
+const parseJsonArray = (value: any): any[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const inferTransferDetailsType = (details: any[]): "none" | "taxi" | "train" => {
+  if (!Array.isArray(details) || details.length === 0) return "none";
+  const first = details.find(Boolean) || {};
+  if (
+    first.departingStation ||
+    first.arrivalStation ||
+    first.provider ||
+    first.bookingRef
+  ) {
+    return "train";
+  }
+  return "taxi";
+};
+
+const isTrainTransferDetail = (detail: any): boolean => {
+  if (!detail) return false;
+  const transferType = String(detail.transferType || '').toLowerCase();
+  return (
+    transferType === 'train' ||
+    !!detail.departingStation ||
+    !!detail.arrivalStation ||
+    !!detail.provider ||
+    !!detail.bookingRef
+  );
+};
+
+const splitTransferDetails = (details: any[]): { road: any[]; rail: any[] } => {
+  const safe = Array.isArray(details) ? details.filter(Boolean) : [];
+  return {
+    road: safe.filter((d) => !isTrainTransferDetail(d)),
+    rail: safe.filter((d) => isTrainTransferDetail(d)),
+  };
+};
+
+const mergeUniqueTransfers = (primary: any[], fallback: any[]): any[] => {
+  const result: any[] = [];
+  const seen = new Set<string>();
+  [...(Array.isArray(primary) ? primary : []), ...(Array.isArray(fallback) ? fallback : [])].forEach((item) => {
+    const key = JSON.stringify(item || {});
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(item);
+  });
+  return result;
+};
+
 const initialData: WizardData = {
   title: "",
   assistantName: "",
@@ -392,6 +460,9 @@ const initialData: WizardData = {
     arrivalAirport: "",
     departureTime: "",
     arrivalTime: "",
+    airline: "",
+    bookingReference: "",
+    contact: "",
     passengersSeats: "",
     thingsToRemember: "",
     isMultiLeg: 0,
@@ -443,6 +514,9 @@ const initialData: WizardData = {
     arrivalAirport: "",
     departureTime: "",
     arrivalTime: "",
+    airline: "",
+    bookingReference: "",
+    contact: "",
     passengersSeats: "",
     thingsToRemember: "",
     isMultiLeg: 0,
@@ -493,6 +567,11 @@ const PAGE_TITLES = [
 
 const DRAFT_KEY = 'itinerary-draft';
 const AUTO_SAVE_DELAY = 3000; // 3 seconds
+const debugLog = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
 
 // Generate a unique URL slug from a project name
 function generateSlug(name: string): string {
@@ -517,16 +596,52 @@ function generateSlug(name: string): string {
 
 function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
   if (!data) return initialData.outboundTravel;
+
+  const detailsToAirport = parseJsonArray(data.transferToAirportDetails);
+  const detailsToAccom = parseJsonArray(data.transferToAccomDetails);
+  const legs = parseJsonArray(data.legs);
+  const splitToAirport = splitTransferDetails(detailsToAirport);
+  const splitToAccom = splitTransferDetails(detailsToAccom);
   
   // Migrate legacy taxiBooked flag to new type field
   let transferToAirportType = data.transferToAirportType || "none";
-  if (!data.transferToAirportType && data.transferToAirportTaxiBooked === 1) {
+  if ((data.transferToAirportType === undefined || data.transferToAirportType === "none") && data.transferToAirportTaxiBooked === 1) {
     transferToAirportType = "taxi";
   }
+  if (transferToAirportType === "none") {
+    if ((Array.isArray(data.transferToAirportTrains) && data.transferToAirportTrains.length > 0) || splitToAirport.rail.length > 0) {
+      transferToAirportType = "train";
+    } else if ((Array.isArray(data.transferToAirportTaxis) && data.transferToAirportTaxis.length > 0) || splitToAirport.road.length > 0 || inferTransferDetailsType(detailsToAirport) === "taxi") {
+      transferToAirportType = "taxi";
+    }
+  }
   let transferToAccomType = data.transferToAccomType || "none";
-  if (!data.transferToAccomType && data.transferToAccomTaxiBooked === 1) {
+  if ((data.transferToAccomType === undefined || data.transferToAccomType === "none") && data.transferToAccomTaxiBooked === 1) {
     transferToAccomType = "taxi";
   }
+  if (transferToAccomType === "none") {
+    if ((Array.isArray(data.transferToAccomTrains) && data.transferToAccomTrains.length > 0) || splitToAccom.rail.length > 0) {
+      transferToAccomType = "train";
+    } else if ((Array.isArray(data.transferToAccomTaxis) && data.transferToAccomTaxis.length > 0) || splitToAccom.road.length > 0 || inferTransferDetailsType(detailsToAccom) === "taxi") {
+      transferToAccomType = "taxi";
+    }
+  }
+  const transferToAirportTaxis = mergeUniqueTransfers(
+    Array.isArray(data.transferToAirportTaxis) ? data.transferToAirportTaxis : [],
+    splitToAirport.road
+  );
+  const transferToAirportTrains = mergeUniqueTransfers(
+    Array.isArray(data.transferToAirportTrains) ? data.transferToAirportTrains : [],
+    splitToAirport.rail
+  );
+  const transferToAccomTaxis = mergeUniqueTransfers(
+    Array.isArray(data.transferToAccomTaxis) ? data.transferToAccomTaxis : [],
+    splitToAccom.road
+  );
+  const transferToAccomTrains = mergeUniqueTransfers(
+    Array.isArray(data.transferToAccomTrains) ? data.transferToAccomTrains : [],
+    splitToAccom.rail
+  );
   
   return {
     transferToAirportType,
@@ -543,18 +658,21 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
     transferToAirportTrainBookingRef: data.transferToAirportTrainBookingRef || "",
     transferToAirportTrainPaymentStatus: data.transferToAirportTrainPaymentStatus || "",
     transferToAirportTrainNotes: data.transferToAirportTrainNotes || "",
-    transferToAirportTaxis: Array.isArray(data.transferToAirportTaxis) ? data.transferToAirportTaxis : [],
-    transferToAirportTrains: Array.isArray(data.transferToAirportTrains) ? data.transferToAirportTrains : [],
+    transferToAirportTaxis,
+    transferToAirportTrains,
     flightNumber: data.flightNumber || "",
     flightDate: data.flightDate || "",
     departureAirport: data.departureAirport || "",
     arrivalAirport: data.arrivalAirport || "",
     departureTime: data.departureTime || "",
     arrivalTime: data.arrivalTime || "",
+    airline: data.airline || "",
+    bookingReference: data.bookingReference || "",
+    contact: data.contact || "",
     passengersSeats: data.passengersSeats || "",
     thingsToRemember: data.thingsToRemember || "",
     isMultiLeg: data.isMultiLeg ?? 0,
-    legs: Array.isArray(data.legs) ? data.legs : [],
+    legs,
     transferToAccomType,
     transferToAccomTaxiBooked: data.transferToAccomTaxiBooked ?? 0,
     transferToAccomCompany: data.transferToAccomCompany || "",
@@ -569,24 +687,60 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
     transferToAccomTrainBookingRef: data.transferToAccomTrainBookingRef || "",
     transferToAccomTrainPaymentStatus: data.transferToAccomTrainPaymentStatus || "",
     transferToAccomTrainNotes: data.transferToAccomTrainNotes || "",
-    transferToAccomTaxis: Array.isArray(data.transferToAccomTaxis) ? data.transferToAccomTaxis : [],
-    transferToAccomTrains: Array.isArray(data.transferToAccomTrains) ? data.transferToAccomTrains : [],
+    transferToAccomTaxis,
+    transferToAccomTrains,
     additionalSegments: Array.isArray(data.additionalSegments) ? data.additionalSegments : [],
   };
 }
 
 function mapReturnFromDb(data: any): WizardData['returnTravel'] {
   if (!data) return initialData.returnTravel;
+
+  const detailsToAirport = parseJsonArray(data.transferToAirportDetails);
+  const detailsHome = parseJsonArray(data.transferHomeDetails);
+  const legs = parseJsonArray(data.legs);
+  const splitToAirport = splitTransferDetails(detailsToAirport);
+  const splitHome = splitTransferDetails(detailsHome);
   
   // Migrate legacy taxiBooked flag to new type field
   let transferToAirportType = data.transferToAirportType || "none";
-  if (!data.transferToAirportType && data.transferToAirportTaxiBooked === 1) {
+  if ((data.transferToAirportType === undefined || data.transferToAirportType === "none") && data.transferToAirportTaxiBooked === 1) {
     transferToAirportType = "taxi";
   }
+  if (transferToAirportType === "none") {
+    if ((Array.isArray(data.transferToAirportTrains) && data.transferToAirportTrains.length > 0) || splitToAirport.rail.length > 0) {
+      transferToAirportType = "train";
+    } else if ((Array.isArray(data.transferToAirportTaxis) && data.transferToAirportTaxis.length > 0) || splitToAirport.road.length > 0 || inferTransferDetailsType(detailsToAirport) === "taxi") {
+      transferToAirportType = "taxi";
+    }
+  }
   let transferHomeType = data.transferHomeType || "none";
-  if (!data.transferHomeType && data.transferHomeTaxiBooked === 1) {
+  if ((data.transferHomeType === undefined || data.transferHomeType === "none") && data.transferHomeTaxiBooked === 1) {
     transferHomeType = "taxi";
   }
+  if (transferHomeType === "none") {
+    if ((Array.isArray(data.transferHomeTrains) && data.transferHomeTrains.length > 0) || splitHome.rail.length > 0) {
+      transferHomeType = "train";
+    } else if ((Array.isArray(data.transferHomeTaxis) && data.transferHomeTaxis.length > 0) || splitHome.road.length > 0 || inferTransferDetailsType(detailsHome) === "taxi") {
+      transferHomeType = "taxi";
+    }
+  }
+  const transferToAirportTaxis = mergeUniqueTransfers(
+    Array.isArray(data.transferToAirportTaxis) ? data.transferToAirportTaxis : [],
+    splitToAirport.road
+  );
+  const transferToAirportTrains = mergeUniqueTransfers(
+    Array.isArray(data.transferToAirportTrains) ? data.transferToAirportTrains : [],
+    splitToAirport.rail
+  );
+  const transferHomeTaxis = mergeUniqueTransfers(
+    Array.isArray(data.transferHomeTaxis) ? data.transferHomeTaxis : [],
+    splitHome.road
+  );
+  const transferHomeTrains = mergeUniqueTransfers(
+    Array.isArray(data.transferHomeTrains) ? data.transferHomeTrains : [],
+    splitHome.rail
+  );
   
   return {
     transferToAirportType,
@@ -603,18 +757,21 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
     transferToAirportTrainBookingRef: data.transferToAirportTrainBookingRef || "",
     transferToAirportTrainPaymentStatus: data.transferToAirportTrainPaymentStatus || "",
     transferToAirportTrainNotes: data.transferToAirportTrainNotes || "",
-    transferToAirportTaxis: Array.isArray(data.transferToAirportTaxis) ? data.transferToAirportTaxis : [],
-    transferToAirportTrains: Array.isArray(data.transferToAirportTrains) ? data.transferToAirportTrains : [],
+    transferToAirportTaxis,
+    transferToAirportTrains,
     flightNumber: data.flightNumber || "",
     flightDate: data.flightDate || "",
     departureAirport: data.departureAirport || "",
     arrivalAirport: data.arrivalAirport || "",
     departureTime: data.departureTime || "",
     arrivalTime: data.arrivalTime || "",
+    airline: data.airline || "",
+    bookingReference: data.bookingReference || "",
+    contact: data.contact || "",
     passengersSeats: data.passengersSeats || "",
     thingsToRemember: data.thingsToRemember || "",
     isMultiLeg: data.isMultiLeg ?? 0,
-    legs: Array.isArray(data.legs) ? data.legs : [],
+    legs,
     transferHomeType,
     transferHomeTaxiBooked: data.transferHomeTaxiBooked ?? 0,
     transferHomeCompany: data.transferHomeCompany || "",
@@ -629,8 +786,8 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
     transferHomeTrainBookingRef: data.transferHomeTrainBookingRef || "",
     transferHomeTrainPaymentStatus: data.transferHomeTrainPaymentStatus || "",
     transferHomeTrainNotes: data.transferHomeTrainNotes || "",
-    transferHomeTaxis: Array.isArray(data.transferHomeTaxis) ? data.transferHomeTaxis : [],
-    transferHomeTrains: Array.isArray(data.transferHomeTrains) ? data.transferHomeTrains : [],
+    transferHomeTaxis,
+    transferHomeTrains,
     additionalSegments: Array.isArray(data.additionalSegments) ? data.additionalSegments : [],
   };
 }
@@ -743,7 +900,7 @@ export default function CreateItinerary() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const type = (params.get('type') as 'itinerary' | 'list') || 'itinerary';
-      console.log("📍 Initial projectType from URL:", type, "URL:", window.location.search);
+      debugLog("📍 Initial projectType from URL:", type, "URL:", window.location.search);
       return type;
     }
     return 'itinerary';
@@ -751,7 +908,7 @@ export default function CreateItinerary() {
 
   // Log when projectType changes (for debugging)
   useEffect(() => {
-    console.log("📍 Current projectType:", projectType);
+    debugLog("📍 Current projectType:", projectType);
   }, [projectType]);
 
   const [currentPage, setCurrentPage] = useState(0);
@@ -762,6 +919,8 @@ export default function CreateItinerary() {
   const [isLoadingEdit, setIsLoadingEdit] = useState(!!isEditMode);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPdfPreviewRequested, setIsPdfPreviewRequested] = useState(false);
+  const [pdfPreviewSnapshot, setPdfPreviewSnapshot] = useState<FullItinerary | null>(null);
   const { toast } = useToast();
 
   const totalPages = 9;
@@ -1016,7 +1175,10 @@ export default function CreateItinerary() {
   }, [wizardData]);
 
   // Pre-process images for PDF (convert external URLs to data URIs)
-  const { processedItinerary: processedPreviewData, isLoading: isProcessingImages } = useImagePreprocessor(previewData);
+  const { processedItinerary: processedPreviewData, isLoading: isProcessingImages } = useImagePreprocessor(
+    pdfPreviewSnapshot,
+    { enabled: isPdfPreviewRequested && !!pdfPreviewSnapshot }
+  );
 
   // Determine if sidebar should be shown (desktop only, after Page 1 is complete or in edit mode)
   const shouldShowSidebar = (isEditMode || pageCompletion[0] === "complete") && window.innerWidth >= 1024;
@@ -1027,11 +1189,11 @@ export default function CreateItinerary() {
       const fetchItinerary = async () => {
         try {
           setIsLoadingEdit(true);
-          console.log("Fetching project for edit:", editId);
+          debugLog("Fetching project for edit:", editId);
 
           // Fetch the project
           const project = await pb.collection('blckbx_projects').getOne(editId);
-          console.log("Fetched project:", project);
+          debugLog("Fetched project:", project);
 
           // Fetch all related data in parallel
           const [destinations, travellers, accommodations, activities, dining, bars, additionalTravel, outboundTravel, returnTravel, helpfulInfo] = await Promise.all([
@@ -1048,17 +1210,17 @@ export default function CreateItinerary() {
           ]);
 
           // DEBUG: Log raw PocketBase records for travel data
-          console.log('=== LOADING OUTBOUND TRAVEL FOR EDIT ===');
-          console.log('Raw PocketBase record:', JSON.stringify(outboundTravel, null, 2));
-          console.log('isMultiLeg from PocketBase:', outboundTravel?.isMultiLeg);
-          console.log('legs from PocketBase:', JSON.stringify(outboundTravel?.legs, null, 2));
-          console.log('legs count:', outboundTravel?.legs?.length);
+          debugLog('=== LOADING OUTBOUND TRAVEL FOR EDIT ===');
+          debugLog('Raw PocketBase record:', JSON.stringify(outboundTravel, null, 2));
+          debugLog('isMultiLeg from PocketBase:', outboundTravel?.isMultiLeg);
+          debugLog('legs from PocketBase:', JSON.stringify(outboundTravel?.legs, null, 2));
+          debugLog('legs count:', outboundTravel?.legs?.length);
 
-          console.log('=== LOADING RETURN TRAVEL FOR EDIT ===');
-          console.log('Raw PocketBase record:', JSON.stringify(returnTravel, null, 2));
-          console.log('isMultiLeg from PocketBase:', returnTravel?.isMultiLeg);
-          console.log('legs from PocketBase:', JSON.stringify(returnTravel?.legs, null, 2));
-          console.log('legs count:', returnTravel?.legs?.length);
+          debugLog('=== LOADING RETURN TRAVEL FOR EDIT ===');
+          debugLog('Raw PocketBase record:', JSON.stringify(returnTravel, null, 2));
+          debugLog('isMultiLeg from PocketBase:', returnTravel?.isMultiLeg);
+          debugLog('legs from PocketBase:', JSON.stringify(returnTravel?.legs, null, 2));
+          debugLog('legs count:', returnTravel?.legs?.length);
 
           // Create a map of destination IDs to destination names
           const destinationIdToNameMap = new Map<string, string>();
@@ -1098,10 +1260,10 @@ export default function CreateItinerary() {
             })),
             outboundTravel: (() => {
               const mapped = mapOutboundFromDb(outboundTravel);
-              console.log('=== AFTER mapOutboundFromDb ===');
-              console.log('isMultiLeg:', mapped.isMultiLeg);
-              console.log('legs:', JSON.stringify(mapped.legs, null, 2));
-              console.log('legs count:', mapped.legs?.length);
+              debugLog('=== AFTER mapOutboundFromDb ===');
+              debugLog('isMultiLeg:', mapped.isMultiLeg);
+              debugLog('legs:', JSON.stringify(mapped.legs, null, 2));
+              debugLog('legs count:', mapped.legs?.length);
               return mapped;
             })(),
             // Migrate legacy data to segments (will be used by Page3Travel)
@@ -1109,21 +1271,21 @@ export default function CreateItinerary() {
               const { outboundToSegments } = await import('@/lib/travel-migration');
               const mapped = mapOutboundFromDb(outboundTravel);
               const segments = outboundToSegments(mapped);
-              console.log('=== AFTER outboundToSegments ===');
-              console.log('Segments count:', segments.length);
-              console.log('Flight segments:', segments.filter(s => s.type === 'flight').length);
-              console.log('Segments:', JSON.stringify(segments, null, 2));
+              debugLog('=== AFTER outboundToSegments ===');
+              debugLog('Segments count:', segments.length);
+              debugLog('Flight segments:', segments.filter(s => s.type === 'flight').length);
+              debugLog('Segments:', JSON.stringify(segments, null, 2));
               return segments;
             })() : [],
             accommodations: accommodations.map(a => {
               // DEBUG: Log what we're loading from DB
-              console.log(`=== LOADING ACCOMMODATION FROM DB ===`);
-              console.log(`Name: ${a.name}`);
-              console.log(`primaryImage from DB: ${a.primaryImage || '(empty)'}`);
-              console.log(`images from DB: ${a.images?.length || 0} items`);
+              debugLog(`=== LOADING ACCOMMODATION FROM DB ===`);
+              debugLog(`Name: ${a.name}`);
+              debugLog(`primaryImage from DB: ${a.primaryImage || '(empty)'}`);
+              debugLog(`images from DB: ${a.images?.length || 0} items`);
               const mapped = mapAccommodationFromDb(a);
-              console.log(`mapped primaryImage: ${mapped.primaryImage || '(empty)'}`);
-              console.log(`====================================`);
+              debugLog(`mapped primaryImage: ${mapped.primaryImage || '(empty)'}`);
+              debugLog(`====================================`);
               return {
                 ...mapped,
                 destinationId: a.destination ? destinationIdToNameMap.get(a.destination) : undefined,
@@ -1155,10 +1317,10 @@ export default function CreateItinerary() {
             }),
             returnTravel: (() => {
               const mapped = mapReturnFromDb(returnTravel);
-              console.log('=== AFTER mapReturnFromDb ===');
-              console.log('isMultiLeg:', mapped.isMultiLeg);
-              console.log('legs:', JSON.stringify(mapped.legs, null, 2));
-              console.log('legs count:', mapped.legs?.length);
+              debugLog('=== AFTER mapReturnFromDb ===');
+              debugLog('isMultiLeg:', mapped.isMultiLeg);
+              debugLog('legs:', JSON.stringify(mapped.legs, null, 2));
+              debugLog('legs count:', mapped.legs?.length);
               return mapped;
             })(),
             // Migrate legacy data to segments (will be used by Page3Travel)
@@ -1166,27 +1328,27 @@ export default function CreateItinerary() {
               const { returnToSegments } = await import('@/lib/travel-migration');
               const mapped = mapReturnFromDb(returnTravel);
               const segments = returnToSegments(mapped);
-              console.log('=== AFTER returnToSegments ===');
-              console.log('Segments count:', segments.length);
-              console.log('Flight segments:', segments.filter(s => s.type === 'flight').length);
-              console.log('Segments:', JSON.stringify(segments, null, 2));
+              debugLog('=== AFTER returnToSegments ===');
+              debugLog('Segments count:', segments.length);
+              debugLog('Flight segments:', segments.filter(s => s.type === 'flight').length);
+              debugLog('Segments:', JSON.stringify(segments, null, 2));
               return segments;
             })() : [],
             // Load additional travel segments from project or fallback to outbound travel
             additionalTravel: (() => {
               // Try project.additionalTravelSegments first
               if (project.additionalTravelSegments && Array.isArray(project.additionalTravelSegments)) {
-                console.log('=== LOADING ADDITIONAL TRAVEL FROM PROJECT ===');
-                console.log('additionalTravelSegments:', project.additionalTravelSegments);
+                debugLog('=== LOADING ADDITIONAL TRAVEL FROM PROJECT ===');
+                debugLog('additionalTravelSegments:', project.additionalTravelSegments);
                 return project.additionalTravelSegments;
               }
               // Fallback to outboundTravel.additionalSegments
               if (outboundTravel?.additionalSegments && Array.isArray(outboundTravel.additionalSegments)) {
-                console.log('=== LOADING ADDITIONAL TRAVEL FROM OUTBOUND (FALLBACK) ===');
-                console.log('additionalSegments:', outboundTravel.additionalSegments);
+                debugLog('=== LOADING ADDITIONAL TRAVEL FROM OUTBOUND (FALLBACK) ===');
+                debugLog('additionalSegments:', outboundTravel.additionalSegments);
                 return outboundTravel.additionalSegments;
               }
-              console.log('=== NO ADDITIONAL TRAVEL DATA FOUND ===');
+              debugLog('=== NO ADDITIONAL TRAVEL DATA FOUND ===');
               return [];
             })(),
             helpfulInformation: helpfulInfo ? {
@@ -1201,9 +1363,9 @@ export default function CreateItinerary() {
             customSections: [],
           };
 
-          console.log("Transformed wizard data:", transformedData);
-          console.log("=== DESTINATIONS DEBUG ===");
-          console.log("Loaded destinations from PocketBase:", destinations.map(d => ({
+          debugLog("Transformed wizard data:", transformedData);
+          debugLog("=== DESTINATIONS DEBUG ===");
+          debugLog("Loaded destinations from PocketBase:", destinations.map(d => ({
             id: d.id,
             name: d.name,
             startDate: d.startDate,
@@ -1211,11 +1373,11 @@ export default function CreateItinerary() {
             dates: d.dates,
             location: d.location,
           })));
-          console.log("Transformed destinations in wizardData:", transformedData.destinations);
+          debugLog("Transformed destinations in wizardData:", transformedData.destinations);
           setWizardData(transformedData);
           setDraftRestored(true); // Mark as restored to prevent draft loading
           setIsLoadingEdit(false);
-          console.log("Edit mode data loaded successfully");
+          debugLog("Edit mode data loaded successfully");
         } catch (error) {
           console.error("Error loading project:", error);
           console.error("Error details:", error instanceof Error ? error.message : String(error));
@@ -1283,17 +1445,17 @@ export default function CreateItinerary() {
   const persistDraft = async () => {
     // Only save if page 0 is complete AND title is set
     if (pageCompletion[0] !== "complete") {
-      console.log("Auto-save skipped: Page 0 not complete (missing title, assistant name, or travellers)");
+      debugLog("Auto-save skipped: Page 0 not complete (missing title, assistant name, or travellers)");
       return;
     }
 
     // Double-check title is set (required field for PocketBase)
     if (!wizardData.title?.trim()) {
-      console.log("Auto-save skipped: Title is empty");
+      debugLog("Auto-save skipped: Title is empty");
       return;
     }
 
-    console.log("Auto-saving draft with title:", wizardData.title);
+    debugLog("Auto-saving draft with title:", wizardData.title);
 
     try {
       await saveItinerary("draft");
@@ -1357,13 +1519,13 @@ export default function CreateItinerary() {
   const saveItinerary = async (statusParam: "draft" | "published") => {
     // Check authentication - user must be logged in with PocketBase
     if (!pb.authStore.isValid || !pb.authStore.model?.id) {
-      console.log("User not authenticated, redirecting to login");
+      debugLog("User not authenticated, redirecting to login");
       setLocation("/login");
       throw new Error("You must be logged in to save an itinerary");
     }
 
     const userId = pb.authStore.model.id;
-    console.log("Authenticated user ID:", userId);
+    debugLog("Authenticated user ID:", userId);
 
     // Defensive checks: ensure all arrays are defined
     const safeDestinations = wizardData.destinations || [];
@@ -1381,7 +1543,7 @@ export default function CreateItinerary() {
 
     if (isEditMode && editId) {
       // Update existing project
-      console.log("Updating project:", editId);
+      debugLog("Updating project:", editId);
 
       const updatedProject = await pb.collection('blckbx_projects').update(editId, {
         name: wizardData.title,
@@ -1392,10 +1554,10 @@ export default function CreateItinerary() {
 
       projectId = updatedProject.id;
       slug = updatedProject.customUrlSlug;
-      console.log("Updated project:", updatedProject);
+      debugLog("Updated project:", updatedProject);
 
       // Delete all existing related data before recreating
-      console.log("=== Deleting all existing related data for project:", projectId, "===");
+      debugLog("=== Deleting all existing related data for project:", projectId, "===");
 
       // Get all records to delete with explicit collection names
       const travellers = await pb.collection('blckbx_travellers').getFullList({ filter: `project = "${projectId}"` });
@@ -1405,7 +1567,7 @@ export default function CreateItinerary() {
       const bars = await pb.collection('blckbx_bars').getFullList({ filter: `project = "${projectId}"` });
       const additionalTravel = await pb.collection('blckbx_inter_destination_travel').getFullList({ filter: `fromDestination.project = "${projectId}"` });
 
-      console.log("Found records to delete:", {
+      debugLog("Found records to delete:", {
         travellers: travellers.length,
         accommodations: accommodations.length,
         activities: activities.length,
@@ -1434,7 +1596,7 @@ export default function CreateItinerary() {
         await pb.collection('blckbx_inter_destination_travel').delete(record.id);
       }
 
-      console.log("=== Deleted all existing related data ===");
+      debugLog("=== Deleted all existing related data ===");
 
       // Delete outbound and return travel (single records)
       try {
@@ -1456,10 +1618,10 @@ export default function CreateItinerary() {
         }
       } catch {}
 
-      console.log("Deleted all existing related data");
+      debugLog("Deleted all existing related data");
     } else {
       // Create new project
-      console.log("Creating project with status:", statusParam);
+      debugLog("Creating project with status:", statusParam);
 
       // When creating a NEW project, always generate a fresh unique slug
       // This prevents duplicate slug errors from reused data
@@ -1475,19 +1637,19 @@ export default function CreateItinerary() {
         projectType: projectType,
       };
 
-      console.log("=== CREATING PROJECT ===");
-      console.log("Collection: blckbx_projects");
-      console.log("Data to send:", JSON.stringify(projectData, null, 2));
-      console.log("Generated slug:", slug);
-      console.log("user:", userId, typeof userId);
-      console.log("name:", wizardData.title);
-      console.log("projectType:", projectType);
-      console.log("========================");
+      debugLog("=== CREATING PROJECT ===");
+      debugLog("Collection: blckbx_projects");
+      debugLog("Data to send:", JSON.stringify(projectData, null, 2));
+      debugLog("Generated slug:", slug);
+      debugLog("user:", userId, typeof userId);
+      debugLog("name:", wizardData.title);
+      debugLog("projectType:", projectType);
+      debugLog("========================");
 
       let createdProject;
       try {
         createdProject = await pb.collection('blckbx_projects').create(projectData);
-        console.log("Created project successfully:", createdProject);
+        debugLog("Created project successfully:", createdProject);
       } catch (error: any) {
         console.error("=== PROJECT CREATION FAILED ===");
         console.error("Error data sent:", JSON.stringify(projectData, null, 2));
@@ -1516,8 +1678,8 @@ export default function CreateItinerary() {
     }
 
     // Step 1: Save destinations first (items need destination IDs)
-    console.log(`=== SAVING ${safeDestinations.length} DESTINATIONS ===`);
-    console.log("Destinations to save:", JSON.stringify(safeDestinations, null, 2));
+    debugLog(`=== SAVING ${safeDestinations.length} DESTINATIONS ===`);
+    debugLog("Destinations to save:", JSON.stringify(safeDestinations, null, 2));
 
     // Map to store destination name -> ID mapping
     const destinationIdMap = new Map<string, string>();
@@ -1525,7 +1687,7 @@ export default function CreateItinerary() {
     for (let i = 0; i < safeDestinations.length; i++) {
       const dest = safeDestinations[i];
 
-      console.log(`=== SAVING DESTINATION ${i} ===`, {
+      debugLog(`=== SAVING DESTINATION ${i} ===`, {
         name: dest.name,
         location: dest.location,
         startDate: dest.startDate,
@@ -1550,13 +1712,13 @@ export default function CreateItinerary() {
             notes: dest.notes || "",
             displayOrder: i,
           };
-          console.log("Destination create data:", JSON.stringify(createData, null, 2));
+          debugLog("Destination create data:", JSON.stringify(createData, null, 2));
 
           const createdDest = await pb.collection('blckbx_destinations').create(createData);
 
           // Store mapping for linking items later
           destinationIdMap.set(dest.name, createdDest.id);
-          console.log(`Created destination "${dest.name}" with ID: ${createdDest.id}`);
+          debugLog(`Created destination "${dest.name}" with ID: ${createdDest.id}`);
         } catch (error) {
           console.error(`Failed to create destination "${dest.name}":`, error);
         }
@@ -1564,7 +1726,7 @@ export default function CreateItinerary() {
     }
 
     // Step 2: Create travellers
-    console.log(`Saving ${safeTravellers.length} travellers:`, safeTravellers);
+    debugLog(`Saving ${safeTravellers.length} travellers:`, safeTravellers);
     for (let i = 0; i < safeTravellers.length; i++) {
       const traveller = safeTravellers[i];
 
@@ -1590,20 +1752,45 @@ export default function CreateItinerary() {
     );
     if (hasOutboundData) {
       // DEBUG: Log outbound travel data being saved
-      console.log('=== SAVING OUTBOUND TRAVEL ===');
-      console.log('isMultiLeg:', wizardData.outboundTravel.isMultiLeg);
-      console.log('legs:', JSON.stringify(wizardData.outboundTravel.legs, null, 2));
-      console.log('legs count:', wizardData.outboundTravel.legs?.length);
-      console.log('additionalSegments:', wizardData.outboundTravel.additionalSegments);
-      console.log('Full outboundTravel:', JSON.stringify(wizardData.outboundTravel, null, 2));
+      debugLog('=== SAVING OUTBOUND TRAVEL ===');
+      debugLog('isMultiLeg:', wizardData.outboundTravel.isMultiLeg);
+      debugLog('legs:', JSON.stringify(wizardData.outboundTravel.legs, null, 2));
+      debugLog('legs count:', wizardData.outboundTravel.legs?.length);
+      debugLog('additionalSegments:', wizardData.outboundTravel.additionalSegments);
+      debugLog('Full outboundTravel:', JSON.stringify(wizardData.outboundTravel, null, 2));
 
       try {
-        const result = await pb.collection('blckbx_outbound_travel').create({
+        const toAirportType = wizardData.outboundTravel.transferToAirportTaxis?.length > 0
+          ? 'taxi'
+          : (wizardData.outboundTravel.transferToAirportTrains?.length > 0
+            ? 'train'
+            : (wizardData.outboundTravel.transferToAirportType || 'none'));
+        const toAccomType = wizardData.outboundTravel.transferToAccomTaxis?.length > 0
+          ? 'taxi'
+          : (wizardData.outboundTravel.transferToAccomTrains?.length > 0
+            ? 'train'
+            : (wizardData.outboundTravel.transferToAccomType || 'none'));
+        const transferToAirportDetails = [
+          ...(wizardData.outboundTravel.transferToAirportTaxis || []),
+          ...(wizardData.outboundTravel.transferToAirportTrains || []),
+        ];
+        const transferToAccomDetails = [
+          ...(wizardData.outboundTravel.transferToAccomTaxis || []),
+          ...(wizardData.outboundTravel.transferToAccomTrains || []),
+        ];
+
+        const outboundPayload = {
           project: projectId,
           ...wizardData.outboundTravel,
-        });
-        console.log('=== OUTBOUND TRAVEL SAVED SUCCESSFULLY ===');
-        console.log('Saved result:', JSON.stringify(result, null, 2));
+          transferToAirportType: toAirportType,
+          transferToAccomType: toAccomType,
+          transferToAirportDetails: transferToAirportDetails.length > 0 ? transferToAirportDetails : null,
+          transferToAccomDetails: transferToAccomDetails.length > 0 ? transferToAccomDetails : null,
+        };
+
+        const result = await pb.collection('blckbx_outbound_travel').create(outboundPayload as any);
+        debugLog('=== OUTBOUND TRAVEL SAVED SUCCESSFULLY ===');
+        debugLog('Saved result:', JSON.stringify(result, null, 2));
       } catch (error) {
         console.error('=== FAILED TO SAVE OUTBOUND TRAVEL ===');
         console.error('Error:', error);
@@ -1612,7 +1799,7 @@ export default function CreateItinerary() {
     }
 
     // Step 4: Create accommodations (with destination links)
-    console.log(`Saving ${safeAccommodations.length} accommodations`);
+    debugLog(`Saving ${safeAccommodations.length} accommodations`);
     for (let i = 0; i < safeAccommodations.length; i++) {
       const accommodation = safeAccommodations[i];
       if (accommodation.name) {
@@ -1620,12 +1807,12 @@ export default function CreateItinerary() {
         const destinationId = accommodation.destinationId ? destinationIdMap.get(accommodation.destinationId) : undefined;
 
         // DEBUG: Log what we're saving
-        console.log(`=== SAVING ACCOMMODATION [${i}] ===`);
-        console.log(`Name: ${accommodation.name}`);
-        console.log(`primaryImage: ${accommodation.primaryImage || '(empty)'}`);
-        console.log(`images: ${accommodation.images?.length || 0} items`);
-        console.log(`Final primaryImage value: ${accommodation.primaryImage || accommodation.images?.[0] || '(empty)'}`);
-        console.log(`============================`);
+        debugLog(`=== SAVING ACCOMMODATION [${i}] ===`);
+        debugLog(`Name: ${accommodation.name}`);
+        debugLog(`primaryImage: ${accommodation.primaryImage || '(empty)'}`);
+        debugLog(`images: ${accommodation.images?.length || 0} items`);
+        debugLog(`Final primaryImage value: ${accommodation.primaryImage || accommodation.images?.[0] || '(empty)'}`);
+        debugLog(`============================`);
 
         await pb.collection('blckbx_accommodations').create({
           project: projectId,
@@ -1648,7 +1835,7 @@ export default function CreateItinerary() {
     }
 
     // Step 5: Create activities (with destination links)
-    console.log(`Saving ${safeActivities.length} activities`);
+    debugLog(`Saving ${safeActivities.length} activities`);
     for (let i = 0; i < safeActivities.length; i++) {
       const activity = safeActivities[i];
       if (activity.name) {
@@ -1674,7 +1861,7 @@ export default function CreateItinerary() {
     }
 
     // Step 6: Create dining (with destination links)
-    console.log(`Saving ${safeDining.length} dining items`);
+    debugLog(`Saving ${safeDining.length} dining items`);
     for (let i = 0; i < safeDining.length; i++) {
       const restaurant = safeDining[i];
       if (restaurant.name) {
@@ -1701,7 +1888,7 @@ export default function CreateItinerary() {
     }
 
     // Step 7: Create bars (with destination links)
-    console.log(`Saving ${safeBars.length} bars`);
+    debugLog(`Saving ${safeBars.length} bars`);
     for (let i = 0; i < safeBars.length; i++) {
       const bar = safeBars[i];
       if (bar.name) {
@@ -1729,7 +1916,7 @@ export default function CreateItinerary() {
 
     // Step 8: Create inter-destination travel
     const safeInterDestinationTravel = wizardData.interDestinationTravel || [];
-    console.log(`Saving ${safeInterDestinationTravel.length} inter-destination travel items`);
+    debugLog(`Saving ${safeInterDestinationTravel.length} inter-destination travel items`);
     for (let i = 0; i < safeInterDestinationTravel.length; i++) {
       const travel = safeInterDestinationTravel[i];
 
@@ -1747,7 +1934,7 @@ export default function CreateItinerary() {
             displayOrder: i,
             visible: true,
           });
-          console.log(`Created inter-destination travel: ${travel.fromDestinationName} -> ${travel.toDestinationName} (${travel.travelType})`);
+          debugLog(`Created inter-destination travel: ${travel.fromDestinationName} -> ${travel.toDestinationName} (${travel.travelType})`);
         } else {
           console.warn(`Skipping inter-destination travel: missing destination IDs for ${travel.fromDestinationName} -> ${travel.toDestinationName}`);
         }
@@ -1760,24 +1947,49 @@ export default function CreateItinerary() {
     );
     if (hasReturnData) {
       // DEBUG: Log return travel data being saved
-      console.log('=== SAVING RETURN TRAVEL ===');
-      console.log('isMultiLeg:', wizardData.returnTravel.isMultiLeg);
-      console.log('legs:', JSON.stringify(wizardData.returnTravel.legs, null, 2));
-      console.log('legs count:', wizardData.returnTravel.legs?.length);
-      console.log('departureAirport:', wizardData.returnTravel.departureAirport);
-      console.log('arrivalAirport:', wizardData.returnTravel.arrivalAirport);
-      console.log('flightNumber:', wizardData.returnTravel.flightNumber);
-      console.log('transferHomeTaxis:', wizardData.returnTravel.transferHomeTaxis);
-      console.log('additionalSegments:', wizardData.returnTravel.additionalSegments);
-      console.log('Full returnTravel:', JSON.stringify(wizardData.returnTravel, null, 2));
+      debugLog('=== SAVING RETURN TRAVEL ===');
+      debugLog('isMultiLeg:', wizardData.returnTravel.isMultiLeg);
+      debugLog('legs:', JSON.stringify(wizardData.returnTravel.legs, null, 2));
+      debugLog('legs count:', wizardData.returnTravel.legs?.length);
+      debugLog('departureAirport:', wizardData.returnTravel.departureAirport);
+      debugLog('arrivalAirport:', wizardData.returnTravel.arrivalAirport);
+      debugLog('flightNumber:', wizardData.returnTravel.flightNumber);
+      debugLog('transferHomeTaxis:', wizardData.returnTravel.transferHomeTaxis);
+      debugLog('additionalSegments:', wizardData.returnTravel.additionalSegments);
+      debugLog('Full returnTravel:', JSON.stringify(wizardData.returnTravel, null, 2));
 
       try {
-        const result = await pb.collection('blckbx_return_travel').create({
+        const toAirportType = wizardData.returnTravel.transferToAirportTaxis?.length > 0
+          ? 'taxi'
+          : (wizardData.returnTravel.transferToAirportTrains?.length > 0
+            ? 'train'
+            : (wizardData.returnTravel.transferToAirportType || 'none'));
+        const homeType = wizardData.returnTravel.transferHomeTaxis?.length > 0
+          ? 'taxi'
+          : (wizardData.returnTravel.transferHomeTrains?.length > 0
+            ? 'train'
+            : (wizardData.returnTravel.transferHomeType || 'none'));
+        const transferToAirportDetails = [
+          ...(wizardData.returnTravel.transferToAirportTaxis || []),
+          ...(wizardData.returnTravel.transferToAirportTrains || []),
+        ];
+        const transferHomeDetails = [
+          ...(wizardData.returnTravel.transferHomeTaxis || []),
+          ...(wizardData.returnTravel.transferHomeTrains || []),
+        ];
+
+        const returnPayload = {
           project: projectId,
           ...wizardData.returnTravel,
-        });
-        console.log('=== RETURN TRAVEL SAVED SUCCESSFULLY ===');
-        console.log('Saved result:', JSON.stringify(result, null, 2));
+          transferToAirportType: toAirportType,
+          transferHomeType: homeType,
+          transferToAirportDetails: transferToAirportDetails.length > 0 ? transferToAirportDetails : null,
+          transferHomeDetails: transferHomeDetails.length > 0 ? transferHomeDetails : null,
+        };
+
+        const result = await pb.collection('blckbx_return_travel').create(returnPayload as any);
+        debugLog('=== RETURN TRAVEL SAVED SUCCESSFULLY ===');
+        debugLog('Saved result:', JSON.stringify(result, null, 2));
       } catch (error) {
         console.error('=== FAILED TO SAVE RETURN TRAVEL ===');
         console.error('Error:', error);
@@ -1788,9 +2000,9 @@ export default function CreateItinerary() {
     // Step 9.5: Save new additional travel segments (from Page3Travel Additional Travel tab)
     // These are AdditionalTravelSegment[] - travel during the trip (internal flights, ferries, etc.)
     const safeAdditionalTravelSegments = wizardData.additionalTravel || [];
-    console.log('=== ADDITIONAL TRAVEL DATA ===');
-    console.log('wizardData.additionalTravel:', JSON.stringify(safeAdditionalTravelSegments, null, 2));
-    console.log('additionalTravel count:', safeAdditionalTravelSegments.length);
+    debugLog('=== ADDITIONAL TRAVEL DATA ===');
+    debugLog('wizardData.additionalTravel:', JSON.stringify(safeAdditionalTravelSegments, null, 2));
+    debugLog('additionalTravel count:', safeAdditionalTravelSegments.length);
 
     // Save additional travel segments to the project as JSON
     // Update the project with the additionalTravelSegments field
@@ -1799,20 +2011,20 @@ export default function CreateItinerary() {
         await pb.collection('blckbx_projects').update(projectId, {
           additionalTravelSegments: safeAdditionalTravelSegments,
         });
-        console.log('=== ADDITIONAL TRAVEL SAVED SUCCESSFULLY ===');
+        debugLog('=== ADDITIONAL TRAVEL SAVED SUCCESSFULLY ===');
       } catch (error) {
         console.error('=== FAILED TO SAVE ADDITIONAL TRAVEL ===');
         console.error('Error:', error);
         // Don't throw - this field may not exist in the schema yet
         // Instead, try saving to outbound travel as a fallback
-        console.log('Attempting fallback: saving to outbound travel additionalSegments...');
+        debugLog('Attempting fallback: saving to outbound travel additionalSegments...');
         try {
           const existingOutbound = await pb.collection('blckbx_outbound_travel').getFirstListItem(`project = "${projectId}"`).catch(() => null);
           if (existingOutbound) {
             await pb.collection('blckbx_outbound_travel').update(existingOutbound.id, {
               additionalSegments: safeAdditionalTravelSegments,
             });
-            console.log('=== ADDITIONAL TRAVEL SAVED TO OUTBOUND (FALLBACK) ===');
+            debugLog('=== ADDITIONAL TRAVEL SAVED TO OUTBOUND (FALLBACK) ===');
           }
         } catch (fallbackError) {
           console.error('Fallback also failed:', fallbackError);
@@ -1996,7 +2208,12 @@ export default function CreateItinerary() {
   };
 
   const updateData = (updates: Partial<WizardData>) => {
-    setWizardData({ ...wizardData, ...updates });
+    setWizardData((prev) => ({ ...prev, ...updates }));
+  };
+
+  const handlePreparePdfPreview = () => {
+    setPdfPreviewSnapshot(previewData);
+    setIsPdfPreviewRequested(true);
   };
 
   const renderPage = () => {
@@ -2006,7 +2223,14 @@ export default function CreateItinerary() {
       case 1:
         return <Page2Destinations data={wizardData} updateData={updateData} />;
       case 2:
-        return <Page3Travel data={wizardData} updateData={updateData} />;
+        return (
+          <Page3Travel
+            data={wizardData}
+            updateData={updateData}
+            isEditMode={!!isEditMode}
+            isLoadingEdit={isLoadingEdit}
+          />
+        );
       case 3:
         return <Page3Accommodation data={wizardData} updateData={updateData} />;
       case 4:
@@ -2158,22 +2382,41 @@ export default function CreateItinerary() {
             Save as Draft
           </Button>
 
-          {processedPreviewData && !isProcessingImages ? (
-            <PDFDownloadLink
-              document={<ItineraryPDFTemplate data={processedPreviewData} />}
-              fileName={`${wizardData.customUrlSlug || wizardData.title || 'preview'}_BlckBx_Preview_${Date.now()}.pdf`}
+          {!isPdfPreviewRequested ? (
+            <Button
+              variant="outline"
+              onClick={handlePreparePdfPreview}
+              data-testid="button-preview-pdf"
             >
-              {({ loading }) => (
-                <Button 
-                  variant="outline"
-                  disabled={loading}
-                  data-testid="button-preview-pdf"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  {loading ? "Generating..." : "Preview PDF"}
-                </Button>
-              )}
-            </PDFDownloadLink>
+              <FileText className="w-4 h-4 mr-2" />
+              Prepare PDF
+            </Button>
+          ) : processedPreviewData && !isProcessingImages ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={handlePreparePdfPreview}
+                data-testid="button-regenerate-pdf"
+              >
+                <Loader2 className="w-4 h-4 mr-2" />
+                Regenerate PDF
+              </Button>
+              <PDFDownloadLink
+                document={<ItineraryPDFTemplate data={processedPreviewData} />}
+                fileName={`${wizardData.customUrlSlug || wizardData.title || 'preview'}_BlckBx_Preview_${Date.now()}.pdf`}
+              >
+                {({ loading }) => (
+                  <Button
+                    variant="outline"
+                    disabled={loading}
+                    data-testid="button-preview-pdf"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    {loading ? "Generating..." : "Preview PDF"}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            </div>
           ) : (
             <Button 
               variant="outline"
@@ -2181,7 +2424,7 @@ export default function CreateItinerary() {
               data-testid="button-preview-pdf"
             >
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Processing Images...
+              Preparing PDF...
             </Button>
           )}
 

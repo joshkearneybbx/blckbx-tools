@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -33,6 +34,123 @@ const TRANSFER_TYPES: { value: TransferType; label: string; icon: React.ReactNod
   { value: 'train', label: 'Train', icon: <Train className="w-4 h-4" /> },
   { value: 'other', label: 'Other', icon: <Car className="w-4 h-4" /> },
 ];
+
+const TRANSFER_FIELD_CONFIG: Record<
+  TransferType,
+  {
+    pickupLabel: string;
+    pickupPlaceholder: string;
+    timeLabel: string;
+    dropoffLabel: string;
+    dropoffPlaceholder: string;
+    operatorLabel: string;
+    operatorPlaceholder: string;
+    bookingLabel: string;
+    bookingPlaceholder: string;
+    showContact: boolean;
+    contactLabel: string;
+    contactPlaceholder: string;
+    showPrice: boolean;
+    showVehicleRegistration: boolean;
+  }
+> = {
+  taxi: {
+    pickupLabel: "Pickup Location",
+    pickupPlaceholder: "e.g., Home, Hotel lobby",
+    timeLabel: "Pickup Time",
+    dropoffLabel: "Drop-off Location",
+    dropoffPlaceholder: "e.g., Airport Terminal 2",
+    operatorLabel: "Company / Driver",
+    operatorPlaceholder: "e.g., Uber, Local Taxi Co.",
+    bookingLabel: "Booking Reference",
+    bookingPlaceholder: "e.g., ABC123",
+    showContact: true,
+    contactLabel: "Contact",
+    contactPlaceholder: "e.g., +44 123 456 7890",
+    showPrice: true,
+    showVehicleRegistration: false,
+  },
+  private_car: {
+    pickupLabel: "Pickup Address",
+    pickupPlaceholder: "e.g., 12 King St, Paris",
+    timeLabel: "Pickup Time",
+    dropoffLabel: "Drop-off Address",
+    dropoffPlaceholder: "e.g., 8 Rue de Rivoli, Paris",
+    operatorLabel: "Driver",
+    operatorPlaceholder: "e.g., John Smith",
+    bookingLabel: "Booking Reference",
+    bookingPlaceholder: "e.g., CAR-9482",
+    showContact: true,
+    contactLabel: "Driver Contact",
+    contactPlaceholder: "e.g., +44 123 456 7890",
+    showPrice: true,
+    showVehicleRegistration: true,
+  },
+  shuttle: {
+    pickupLabel: "Pickup Point",
+    pickupPlaceholder: "e.g., Hotel reception",
+    timeLabel: "Pickup Time",
+    dropoffLabel: "Drop-off Point",
+    dropoffPlaceholder: "e.g., Airport Departures",
+    operatorLabel: "Shuttle Provider",
+    operatorPlaceholder: "e.g., Hilton Shuttle",
+    bookingLabel: "Shuttle Reference",
+    bookingPlaceholder: "e.g., SHUT-2241",
+    showContact: true,
+    contactLabel: "Contact",
+    contactPlaceholder: "e.g., +44 123 456 7890",
+    showPrice: true,
+    showVehicleRegistration: false,
+  },
+  bus: {
+    pickupLabel: "Departure Stop",
+    pickupPlaceholder: "e.g., Victoria Coach Station",
+    timeLabel: "Departure Time",
+    dropoffLabel: "Arrival Stop",
+    dropoffPlaceholder: "e.g., Charles de Gaulle Bus Terminal",
+    operatorLabel: "Bus Operator",
+    operatorPlaceholder: "e.g., FlixBus",
+    bookingLabel: "Ticket Number",
+    bookingPlaceholder: "e.g., BUS-1918",
+    showContact: false,
+    contactLabel: "Contact",
+    contactPlaceholder: "",
+    showPrice: false,
+    showVehicleRegistration: false,
+  },
+  train: {
+    pickupLabel: "Departure Station",
+    pickupPlaceholder: "e.g., Gare du Nord",
+    timeLabel: "Departure Time",
+    dropoffLabel: "Arrival Station",
+    dropoffPlaceholder: "e.g., Lyon Part-Dieu",
+    operatorLabel: "Train Operator",
+    operatorPlaceholder: "e.g., SNCF",
+    bookingLabel: "Ticket Reference",
+    bookingPlaceholder: "e.g., TGV-9021",
+    showContact: false,
+    contactLabel: "Contact",
+    contactPlaceholder: "",
+    showPrice: false,
+    showVehicleRegistration: false,
+  },
+  other: {
+    pickupLabel: "From",
+    pickupPlaceholder: "e.g., City Center",
+    timeLabel: "Departure Time",
+    dropoffLabel: "To",
+    dropoffPlaceholder: "e.g., Conference Venue",
+    operatorLabel: "Operator / Provider",
+    operatorPlaceholder: "e.g., Local Transport",
+    bookingLabel: "Reference",
+    bookingPlaceholder: "e.g., REF-1002",
+    showContact: true,
+    contactLabel: "Contact",
+    contactPlaceholder: "e.g., +44 123 456 7890",
+    showPrice: false,
+    showVehicleRegistration: false,
+  },
+};
 
 export function EditTransferModal({
   isOpen,
@@ -77,6 +195,7 @@ export function EditTransferModal({
   };
 
   const isEditing = transfer && transfer.pickupLocation;
+  const config = TRANSFER_FIELD_CONFIG[formData.type];
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -85,6 +204,9 @@ export function EditTransferModal({
           <DialogTitle>
             {isEditing ? 'Edit Transfer' : 'Add Transfer'}
           </DialogTitle>
+          <DialogDescription>
+            Add transfer details for this journey segment.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -111,15 +233,15 @@ export function EditTransferModal({
           {/* Pickup Location and Time */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-sm">Pickup Location</Label>
+              <Label className="text-sm">{config.pickupLabel}</Label>
               <Input
                 value={formData.pickupLocation}
                 onChange={(e) => handleChange('pickupLocation', e.target.value)}
-                placeholder="e.g., Home, Hotel lobby"
+                placeholder={config.pickupPlaceholder}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">Pickup Time</Label>
+              <Label className="text-sm">{config.timeLabel}</Label>
               <Input
                 type="time"
                 value={formData.pickupTime}
@@ -130,52 +252,67 @@ export function EditTransferModal({
 
           {/* Drop-off Location */}
           <div className="space-y-2">
-            <Label className="text-sm">Drop-off Location</Label>
+            <Label className="text-sm">{config.dropoffLabel}</Label>
             <Input
               value={formData.dropoffLocation}
               onChange={(e) => handleChange('dropoffLocation', e.target.value)}
-              placeholder="e.g., Airport Terminal 2, Train Station"
+              placeholder={config.dropoffPlaceholder}
             />
           </div>
 
           {/* Company and Contact */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${config.showContact ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <div className="space-y-2">
-              <Label className="text-sm">Company / Driver</Label>
+              <Label className="text-sm">{config.operatorLabel}</Label>
               <Input
                 value={formData.company || ''}
                 onChange={(e) => handleChange('company', e.target.value)}
-                placeholder="e.g., Uber, Local Taxi Co."
+                placeholder={config.operatorPlaceholder}
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm">Contact</Label>
-              <Input
-                value={formData.contact || ''}
-                onChange={(e) => handleChange('contact', e.target.value)}
-                placeholder="e.g., +44 123 456 7890"
-              />
-            </div>
+            {config.showContact && (
+              <div className="space-y-2">
+                <Label className="text-sm">{config.contactLabel}</Label>
+                <Input
+                  value={formData.contact || ''}
+                  onChange={(e) => handleChange('contact', e.target.value)}
+                  placeholder={config.contactPlaceholder}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Booking Reference and Price */}
-          <div className="grid grid-cols-2 gap-4">
+          {config.showVehicleRegistration && (
             <div className="space-y-2">
-              <Label className="text-sm">Booking Reference</Label>
+              <Label className="text-sm">Number Plate</Label>
+              <Input
+                value={formData.vehicleRegistration || ''}
+                onChange={(e) => handleChange('vehicleRegistration', e.target.value)}
+                placeholder="e.g., AB12 CDE"
+              />
+            </div>
+          )}
+
+          {/* Booking Reference and Price */}
+          <div className={`grid gap-4 ${config.showPrice ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <div className="space-y-2">
+              <Label className="text-sm">{config.bookingLabel}</Label>
               <Input
                 value={formData.bookingReference || ''}
                 onChange={(e) => handleChange('bookingReference', e.target.value)}
-                placeholder="e.g., ABC123"
+                placeholder={config.bookingPlaceholder}
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm">Price</Label>
-              <Input
-                value={formData.price || ''}
-                onChange={(e) => handleChange('price', e.target.value)}
-                placeholder="e.g., £25"
-              />
-            </div>
+            {config.showPrice && (
+              <div className="space-y-2">
+                <Label className="text-sm">Price</Label>
+                <Input
+                  value={formData.price || ''}
+                  onChange={(e) => handleChange('price', e.target.value)}
+                  placeholder="e.g., £25"
+                />
+              </div>
+            )}
           </div>
 
           {/* Notes */}

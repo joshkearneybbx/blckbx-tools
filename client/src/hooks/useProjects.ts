@@ -1,7 +1,7 @@
 import { pb, type Project, type FullProjectData } from '@/lib/pocketbase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-// Fetch all projects for current user
+// Fetch all projects visible to the authenticated user (team-wide access via PB rules)
 export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
@@ -10,8 +10,7 @@ export function useProjects() {
         return [];
       }
       return await pb.collection('blckbx_projects').getFullList({
-        sort: '-created',
-        filter: `user = "${pb.authStore.model.id}"`
+        sort: '-created'
       });
     },
     enabled: pb.authStore.isValid

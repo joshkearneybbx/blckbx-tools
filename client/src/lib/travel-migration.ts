@@ -9,20 +9,120 @@ import type { TravelSegment } from './travel-segments';
 import { generateSegmentId } from './travel-segments';
 import type { WizardData } from '@/pages/CreateItinerary';
 
+const debugLog = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
+const parseDetailsArray = (value: any): any[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const isTrainTransferDetail = (detail: any): boolean => {
+  if (!detail) return false;
+  const transferType = String((detail as any).transferType || '').toLowerCase();
+  return (
+    transferType === 'train' ||
+    !!(detail as any).departingStation ||
+    !!(detail as any).arrivalStation ||
+    !!(detail as any).provider ||
+    !!(detail as any).bookingRef
+  );
+};
+
+const splitTransferDetails = (details: any[]): { road: any[]; rail: any[] } => {
+  const safe = Array.isArray(details) ? details.filter(Boolean) : [];
+  return {
+    road: safe.filter((d) => !isTrainTransferDetail(d)),
+    rail: safe.filter((d) => isTrainTransferDetail(d)),
+  };
+};
+
+const normalizeRoadTransferType = (value: any): 'taxi' | 'private_car' | 'shuttle' | 'bus' | 'other' => {
+  const v = String(value || '').toLowerCase();
+  if (v === 'private_car' || v === 'shuttle' || v === 'bus' || v === 'other') return v;
+  return 'taxi';
+};
+
+const safeLower = (value: any): string => String(value || '').toLowerCase();
+
+const extractLayoverFromNotes = (notes?: string): string => {
+  if (!notes) return '';
+  const match = notes.match(/Layover:\s*([^|]+)/i);
+  return match ? match[1].trim() : '';
+};
+
+const stripLayoverFromNotes = (notes?: string): string => {
+  if (!notes) return '';
+  return notes
+    .replace(/\s*\|?\s*Layover:\s*[^|]+/gi, '')
+    .replace(/^Layover:\s*[^|]+$/i, '')
+    .trim();
+};
+
+const isMainSegment = (segment: TravelSegment): boolean => {
+  if (segment.role === 'main') return true;
+  if (segment.role === 'transfer' || segment.role === 'additional') return false;
+  // Backward compatibility for older records without role metadata.
+  return segment.type === 'flight';
+};
+
+const isTransferSegment = (segment: TravelSegment): boolean => {
+  if (segment.role === 'transfer') return true;
+  if (segment.role === 'main' || segment.role === 'additional') return false;
+  // Backward compatibility for older records without role metadata.
+  return ['taxi', 'private_car', 'shuttle', 'bus', 'train', 'other'].includes(segment.type);
+};
+
 /**
  * Convert legacy outboundTravel structure to array of TravelSegments
  */
 export function outboundToSegments(outbound: WizardData['outboundTravel']): TravelSegment[] {
   const segments: TravelSegment[] = [];
-  let counter = 0;
 
   if (!outbound) return segments;
 
+  const toAirportDetails = parseDetailsArray((outbound as any).transferToAirportDetails);
+  const toAccomDetails = parseDetailsArray((outbound as any).transferToAccomDetails);
+  const splitToAirport = splitTransferDetails(toAirportDetails);
+  const splitToAccom = splitTransferDetails(toAccomDetails);
+
+  const toAirportTaxis = (outbound.transferToAirportTaxis && outbound.transferToAirportTaxis.length > 0)
+    ? outbound.transferToAirportTaxis
+    : splitToAirport.road;
+  const toAirportTrains = (outbound.transferToAirportTrains && outbound.transferToAirportTrains.length > 0)
+    ? outbound.transferToAirportTrains
+    : splitToAirport.rail;
+  const toAccomTaxis = (outbound.transferToAccomTaxis && outbound.transferToAccomTaxis.length > 0)
+    ? outbound.transferToAccomTaxis
+    : splitToAccom.road;
+  const toAccomTrains = (outbound.transferToAccomTrains && outbound.transferToAccomTrains.length > 0)
+    ? outbound.transferToAccomTrains
+    : splitToAccom.rail;
+
   // Transfer to airport (taxi) - single legacy field
-  if (outbound.transferToAirportType === 'taxi' && outbound.transferToAirportTaxiBooked) {
+  if (outbound.transferToAirportType === 'taxi' && toAirportTaxis.length === 0 && (
+    outbound.transferToAirportTaxiBooked ||
+    outbound.transferToAirportCompany ||
+    outbound.transferToAirportContact ||
+    outbound.transferToAirportCollectionTime ||
+    outbound.transferToAirportPickupLocation
+  )) {
     segments.push({
       id: generateSegmentId(),
       type: 'taxi',
+      role: 'transfer',
       fromLocation: 'Home/Hotel',
       toLocation: outbound.departureAirport || 'Airport',
       date: outbound.flightDate || '',
@@ -34,10 +134,11 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
   }
 
   // Transfer to airport (train) - single legacy field
-  if (outbound.transferToAirportType === 'train') {
+  if (outbound.transferToAirportType === 'train' && toAirportTrains.length === 0) {
     segments.push({
       id: generateSegmentId(),
       type: 'train',
+      role: 'transfer',
       fromLocation: outbound.transferToAirportTrainDepartingStation || 'Station',
       toLocation: outbound.transferToAirportTrainArrivalStation || 'Airport',
       date: outbound.flightDate || '',
@@ -49,25 +150,28 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
   }
 
   // Multiple taxis to airport (array-based)
-  outbound.transferToAirportTaxis?.forEach((taxi) => {
+  toAirportTaxis.forEach((taxi) => {
     segments.push({
       id: generateSegmentId(),
-      type: 'taxi',
+      type: normalizeRoadTransferType((taxi as any).transferType),
+      role: 'transfer',
       fromLocation: taxi.pickupLocation || 'Pickup',
       toLocation: taxi.dropoffLocation || outbound.departureAirport || 'Airport',
       date: outbound.flightDate || '',
       departureTime: taxi.collectionTime || undefined,
       company: taxi.company || '',
       contactDetails: taxi.contact || '',
+      confirmationNumber: taxi.vehicleRegistration || '',
       bookingReference: taxi.paymentStatus || '',
     });
   });
 
   // Multiple trains to airport (array-based)
-  outbound.transferToAirportTrains?.forEach((train) => {
+  toAirportTrains.forEach((train) => {
     segments.push({
       id: generateSegmentId(),
       type: 'train',
+      role: 'transfer',
       fromLocation: train.departingStation || 'Station',
       toLocation: outbound.departureAirport || 'Airport',
       date: outbound.flightDate || '',
@@ -87,14 +191,20 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
       segments.push({
         id: generateSegmentId(),
         type: 'flight',
+        role: 'main',
         fromLocation: leg.departureAirport || '',
         toLocation: leg.arrivalAirport || '',
         date: flightDate,
         departureTime: leg.departureTime || undefined,
         arrivalTime: leg.arrivalTime || undefined,
         flightNumber: leg.flightNumber || outbound.flightNumber || '',
-        airline: outbound.flightNumber?.split(' ')[0] || '', // Extract airline from flight number
-        notes: leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : '',
+        airline: leg.airline || outbound.airline || '',
+        confirmationNumber: index === 0 ? (outbound.passengersSeats || '') : '',
+        bookingReference: outbound.bookingReference || '',
+        contactDetails: outbound.contact || '',
+        notes: index === 0
+          ? (outbound.thingsToRemember || (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''))
+          : (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''),
       });
     });
   } else {
@@ -103,21 +213,33 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
       segments.push({
         id: generateSegmentId(),
         type: 'flight',
+        role: 'main',
         fromLocation: outbound.departureAirport || '',
         toLocation: outbound.arrivalAirport || '',
         date: flightDate,
         departureTime: outbound.departureTime || undefined,
         arrivalTime: outbound.arrivalTime || undefined,
         flightNumber: outbound.flightNumber || '',
+        airline: outbound.airline || '',
+        confirmationNumber: outbound.passengersSeats || '',
+        bookingReference: outbound.bookingReference || '',
+        contactDetails: outbound.contact || '',
+        notes: outbound.thingsToRemember || '',
       });
     }
   }
 
   // Transfer to accommodation (taxi)
-  if (outbound.transferToAccomType === 'taxi' && outbound.transferToAccomTaxiBooked) {
+  if (outbound.transferToAccomType === 'taxi' && toAccomTaxis.length === 0 && (
+    outbound.transferToAccomTaxiBooked ||
+    outbound.transferToAccomCompany ||
+    outbound.transferToAccomContact ||
+    outbound.transferToAccomCollectionTime
+  )) {
     segments.push({
       id: generateSegmentId(),
       type: 'taxi',
+      role: 'transfer',
       fromLocation: outbound.arrivalAirport || 'Airport',
       toLocation: 'Hotel/Accommodation',
       date: flightDate,
@@ -129,25 +251,28 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
   }
 
   // Transfer to accommodation (multiple taxis)
-  outbound.transferToAccomTaxis?.forEach((taxi) => {
+  toAccomTaxis.forEach((taxi) => {
     segments.push({
       id: generateSegmentId(),
-      type: 'taxi',
+      type: normalizeRoadTransferType((taxi as any).transferType),
+      role: 'transfer',
       fromLocation: outbound.arrivalAirport || 'Airport',
       toLocation: taxi.dropoffLocation || 'Hotel',
       date: flightDate,
       departureTime: taxi.collectionTime || undefined,
       company: taxi.company || '',
       contactDetails: taxi.contact || '',
+      confirmationNumber: taxi.vehicleRegistration || '',
       bookingReference: taxi.paymentStatus || '',
     });
   });
 
   // Transfer to accommodation (trains)
-  outbound.transferToAccomTrains?.forEach((train) => {
+  toAccomTrains.forEach((train) => {
     segments.push({
       id: generateSegmentId(),
       type: 'train',
+      role: 'transfer',
       fromLocation: train.departingStation || 'Station',
       toLocation: train.arrivalStation || 'Hotel',
       date: flightDate,
@@ -164,6 +289,7 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
     outbound.additionalSegments.forEach((seg: TravelSegment) => {
       segments.push({
         ...seg,
+        role: seg.role || 'additional',
         id: seg.id || generateSegmentId(), // Ensure ID exists
       });
     });
@@ -180,18 +306,19 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
  * private_transfer, car_rental, other) are stored in additionalSegments JSON field
  */
 export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outboundTravel'] {
-  const flights = segments.filter(s => s.type === 'flight');
-  const taxis = segments.filter(s => s.type === 'taxi');
-  const trains = segments.filter(s => s.type === 'train');
+  const flights = segments.filter(s => s.type === 'flight' && isMainSegment(s));
+  const transferSegments = segments.filter(isTransferSegment);
+  const taxis = transferSegments.filter(s => ['taxi', 'private_car', 'shuttle', 'bus', 'other'].includes(s.type));
+  const trains = transferSegments.filter(s => s.type === 'train');
 
   // Segment types not supported by legacy format - store as JSON
-  const unsupportedTypes = ['bus', 'ferry', 'shuttle', 'private_transfer', 'car_rental', 'other'];
+  const unsupportedTypes = ['ferry', 'private_transfer', 'car_rental'];
   const additionalSegments = segments.filter(s => unsupportedTypes.includes(s.type));
 
   // DEBUG: Log what we're converting
-  console.log('=== segmentsToOutbound DEBUG ===');
-  console.log('Input segments:', segments.map(s => ({ type: s.type, from: s.fromLocation, to: s.toLocation })));
-  console.log('Additional segments (bus/ferry/etc):', additionalSegments.length, additionalSegments);
+  debugLog('=== segmentsToOutbound DEBUG ===');
+  debugLog('Input segments:', segments.map(s => ({ type: s.type, from: s.fromLocation, to: s.toLocation })));
+  debugLog('Additional segments (bus/ferry/etc):', additionalSegments.length, additionalSegments);
 
   // Extract flight data
   const firstFlight = flights[0];
@@ -204,7 +331,66 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
     departureTime: f.departureTime || '',
     arrivalTime: f.arrivalTime || '',
     flightNumber: f.flightNumber || '',
-    layoverDuration: f.notes?.includes('Layover:') ? f.notes.replace('Layover: ', '') : '',
+    layoverDuration: extractLayoverFromNotes(f.notes),
+  }));
+
+  const firstMainIndex = segments.findIndex(isMainSegment);
+
+  const toAirportTaxis = taxis.filter(t =>
+    safeLower(t.toLocation).includes('airport') ||
+    (firstMainIndex >= 0 && segments.indexOf(t) < firstMainIndex)
+  ).map(t => ({
+    id: '',
+    transferType: t.type,
+    company: t.company || '',
+    contact: t.contactDetails || '',
+    vehicleRegistration: t.confirmationNumber || '',
+    collectionTime: t.departureTime || '',
+    pickupLocation: t.fromLocation || '',
+    dropoffLocation: t.toLocation || '',
+    paymentStatus: t.bookingReference || '',
+  }));
+
+  const toAirportTrains = trains.filter(t =>
+    safeLower(t.toLocation).includes('airport') ||
+    (firstMainIndex >= 0 && segments.indexOf(t) < firstMainIndex)
+  ).map(t => ({
+    id: '',
+    departingStation: t.fromLocation || '',
+    arrivalStation: t.toLocation || '',
+    departureTime: t.departureTime || '',
+    provider: t.company || '',
+    bookingRef: t.bookingReference || '',
+    paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
+    notes: t.notes || '',
+  }));
+
+  const toAccomTaxis = taxis.filter(t =>
+    safeLower(t.fromLocation).includes('airport') ||
+    (firstMainIndex >= 0 && segments.indexOf(t) >= firstMainIndex)
+  ).map(t => ({
+    id: '',
+    transferType: t.type,
+    company: t.company || '',
+    contact: t.contactDetails || '',
+    vehicleRegistration: t.confirmationNumber || '',
+    collectionTime: t.departureTime || '',
+    dropoffLocation: t.toLocation || '',
+    paymentStatus: t.bookingReference || '',
+  }));
+
+  const toAccomTrains = trains.filter(t =>
+    safeLower(t.fromLocation).includes('airport') ||
+    (firstMainIndex >= 0 && segments.indexOf(t) >= firstMainIndex)
+  ).map(t => ({
+    id: '',
+    departingStation: t.fromLocation || '',
+    arrivalStation: t.toLocation || '',
+    departureTime: t.departureTime || '',
+    provider: t.company || '',
+    bookingRef: t.bookingReference || '',
+    paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
+    notes: t.notes || '',
   }));
 
   // Build legacy structure
@@ -216,99 +402,57 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
     arrivalAirport: lastFlight?.toLocation || '',
     departureTime: firstFlight?.departureTime || '',
     arrivalTime: lastFlight?.arrivalTime || '',
-    passengersSeats: '',
-    thingsToRemember: '',
+    airline: firstFlight?.airline || '',
+    bookingReference: firstFlight?.bookingReference || '',
+    contact: firstFlight?.contactDetails || '',
+    passengersSeats: firstFlight?.confirmationNumber || '',
+    thingsToRemember: stripLayoverFromNotes(firstFlight?.notes),
     isMultiLeg: flights.length > 1 ? 1 : 0,
     legs: legs,
 
     // Transfer to airport - legacy single field
-    transferToAirportType: 'none',
-    transferToAirportTaxiBooked: 0,
-    transferToAirportCompany: '',
-    transferToAirportContact: '',
-    transferToAirportCollectionTime: '',
-    transferToAirportPickupLocation: '',
+    transferToAirportType: toAirportTaxis.length > 0 ? 'taxi' : (toAirportTrains.length > 0 ? 'train' : 'none'),
+    transferToAirportTaxiBooked: toAirportTaxis.length > 0 ? 1 : 0,
+    transferToAirportCompany: toAirportTaxis[0]?.company || '',
+    transferToAirportContact: toAirportTaxis[0]?.contact || '',
+    transferToAirportCollectionTime: toAirportTaxis[0]?.collectionTime || '',
+    transferToAirportPickupLocation: toAirportTaxis[0]?.pickupLocation || '',
     transferToAirportPaymentStatus: '',
-    transferToAirportTrainDepartingStation: '',
-    transferToAirportTrainArrivalStation: '',
-    transferToAirportTrainDepartureTime: '',
-    transferToAirportTrainProvider: '',
-    transferToAirportTrainBookingRef: '',
+    transferToAirportTrainDepartingStation: toAirportTrains[0]?.departingStation || '',
+    transferToAirportTrainArrivalStation: toAirportTrains[0]?.arrivalStation || '',
+    transferToAirportTrainDepartureTime: toAirportTrains[0]?.departureTime || '',
+    transferToAirportTrainProvider: toAirportTrains[0]?.provider || '',
+    transferToAirportTrainBookingRef: toAirportTrains[0]?.bookingRef || '',
     transferToAirportTrainPaymentStatus: '',
     transferToAirportTrainNotes: '',
-    transferToAirportTaxis: taxis.filter(t =>
-      t.toLocation.toLowerCase().includes('airport') ||
-      (flights.length > 0 && segments.indexOf(t) < segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      company: t.company || '',
-      contact: t.contactDetails || '',
-      collectionTime: t.departureTime || '',
-      pickupLocation: t.fromLocation || '',
-      dropoffLocation: t.toLocation || '',
-      paymentStatus: t.bookingReference || '',
-    })),
-    transferToAirportTrains: trains.filter(t =>
-      t.toLocation.toLowerCase().includes('airport') ||
-      (flights.length > 0 && segments.indexOf(t) < segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      departingStation: t.fromLocation || '',
-      arrivalStation: t.toLocation || '',
-      departureTime: t.departureTime || '',
-      provider: t.company || '',
-      bookingRef: t.bookingReference || '',
-      paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
-      notes: t.notes || '',
-    })),
+    transferToAirportTaxis: toAirportTaxis,
+    transferToAirportTrains: toAirportTrains,
 
     // Transfer to accommodation - legacy single field
-    transferToAccomType: 'none',
-    transferToAccomTaxiBooked: 0,
-    transferToAccomCompany: '',
-    transferToAccomContact: '',
-    transferToAccomCollectionTime: '',
+    transferToAccomType: toAccomTaxis.length > 0 ? 'taxi' : (toAccomTrains.length > 0 ? 'train' : 'none'),
+    transferToAccomTaxiBooked: toAccomTaxis.length > 0 ? 1 : 0,
+    transferToAccomCompany: toAccomTaxis[0]?.company || '',
+    transferToAccomContact: toAccomTaxis[0]?.contact || '',
+    transferToAccomCollectionTime: toAccomTaxis[0]?.collectionTime || '',
     transferToAccomPickupLocation: '',
     transferToAccomPaymentStatus: '',
-    transferToAccomTrainDepartingStation: '',
-    transferToAccomTrainArrivalStation: '',
-    transferToAccomTrainDepartureTime: '',
-    transferToAccomTrainProvider: '',
-    transferToAccomTrainBookingRef: '',
+    transferToAccomTrainDepartingStation: toAccomTrains[0]?.departingStation || '',
+    transferToAccomTrainArrivalStation: toAccomTrains[0]?.arrivalStation || '',
+    transferToAccomTrainDepartureTime: toAccomTrains[0]?.departureTime || '',
+    transferToAccomTrainProvider: toAccomTrains[0]?.provider || '',
+    transferToAccomTrainBookingRef: toAccomTrains[0]?.bookingRef || '',
     transferToAccomTrainPaymentStatus: '',
     transferToAccomTrainNotes: '',
-    transferToAccomTaxis: taxis.filter(t =>
-      t.fromLocation.toLowerCase().includes('airport') ||
-      (flights.length > 0 && segments.indexOf(t) >= segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      company: t.company || '',
-      contact: t.contactDetails || '',
-      collectionTime: t.departureTime || '',
-      dropoffLocation: t.toLocation || '',
-      paymentStatus: t.bookingReference || '',
-    })),
-    transferToAccomTrains: trains.filter(t =>
-      t.fromLocation.toLowerCase().includes('airport') ||
-      (flights.length > 0 && segments.indexOf(t) >= segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      departingStation: t.fromLocation || '',
-      arrivalStation: t.toLocation || '',
-      departureTime: t.departureTime || '',
-      provider: t.company || '',
-      bookingRef: t.bookingReference || '',
-      paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
-      notes: t.notes || '',
-    })),
+    transferToAccomTaxis: toAccomTaxis,
+    transferToAccomTrains: toAccomTrains,
 
     // Store segment types not supported by legacy format as JSON
     additionalSegments: additionalSegments.length > 0 ? additionalSegments : undefined,
   };
 
   // DEBUG: Log what we're outputting
-  console.log('=== segmentsToOutbound OUTPUT ===');
-  console.log('additionalSegments in legacy object:', legacy.additionalSegments);
+  debugLog('=== segmentsToOutbound OUTPUT ===');
+  debugLog('additionalSegments in legacy object:', legacy.additionalSegments);
 
   return legacy;
 }
@@ -321,23 +465,118 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
 
   if (!returnTravel) return segments;
 
+  const toAirportDetails = parseDetailsArray((returnTravel as any).transferToAirportDetails);
+  const homeDetails = parseDetailsArray((returnTravel as any).transferHomeDetails);
+  const splitToAirport = splitTransferDetails(toAirportDetails);
+  const splitHome = splitTransferDetails(homeDetails);
+
+  const toAirportTaxis = (returnTravel.transferToAirportTaxis && returnTravel.transferToAirportTaxis.length > 0)
+    ? returnTravel.transferToAirportTaxis
+    : splitToAirport.road;
+  const toAirportTrains = (returnTravel.transferToAirportTrains && returnTravel.transferToAirportTrains.length > 0)
+    ? returnTravel.transferToAirportTrains
+    : splitToAirport.rail;
+  const homeTaxis = (returnTravel.transferHomeTaxis && returnTravel.transferHomeTaxis.length > 0)
+    ? returnTravel.transferHomeTaxis
+    : splitHome.road;
+  const homeTrains = (returnTravel.transferHomeTrains && returnTravel.transferHomeTrains.length > 0)
+    ? returnTravel.transferHomeTrains
+    : splitHome.rail;
+
   const flightDate = returnTravel.flightDate || '';
+
+  // Transfer to airport (taxi)
+  if (returnTravel.transferToAirportType === 'taxi' && toAirportTaxis.length === 0 && (
+    returnTravel.transferToAirportTaxiBooked ||
+    returnTravel.transferToAirportCompany ||
+    returnTravel.transferToAirportContact ||
+    returnTravel.transferToAirportCollectionTime ||
+    returnTravel.transferToAirportPickupLocation
+  )) {
+    segments.push({
+      id: generateSegmentId(),
+      type: 'taxi',
+      role: 'transfer',
+      fromLocation: returnTravel.transferToAirportPickupLocation || 'Accommodation',
+      toLocation: returnTravel.departureAirport || 'Airport',
+      date: flightDate,
+      departureTime: returnTravel.transferToAirportCollectionTime || '',
+      company: returnTravel.transferToAirportCompany || '',
+      contactDetails: returnTravel.transferToAirportContact || '',
+      notes: returnTravel.transferToAirportPaymentStatus ? `Payment: ${returnTravel.transferToAirportPaymentStatus}` : '',
+    });
+  }
+
+  // Transfer to airport (train)
+  if (returnTravel.transferToAirportType === 'train' && toAirportTrains.length === 0) {
+    segments.push({
+      id: generateSegmentId(),
+      type: 'train',
+      role: 'transfer',
+      fromLocation: returnTravel.transferToAirportTrainDepartingStation || 'Station',
+      toLocation: returnTravel.transferToAirportTrainArrivalStation || 'Airport',
+      date: flightDate,
+      departureTime: returnTravel.transferToAirportTrainDepartureTime || '',
+      company: returnTravel.transferToAirportTrainProvider || '',
+      bookingReference: returnTravel.transferToAirportTrainBookingRef || '',
+      notes: returnTravel.transferToAirportTrainPaymentStatus ? `Payment: ${returnTravel.transferToAirportTrainPaymentStatus}` : '',
+    });
+  }
+
+  // Multiple transfers to airport
+  toAirportTaxis.forEach((taxi) => {
+    segments.push({
+      id: generateSegmentId(),
+      type: normalizeRoadTransferType((taxi as any).transferType),
+      role: 'transfer',
+      fromLocation: taxi.pickupLocation || 'Accommodation',
+      toLocation: taxi.dropoffLocation || returnTravel.departureAirport || 'Airport',
+      date: flightDate,
+      departureTime: taxi.collectionTime || '',
+      company: taxi.company || '',
+      contactDetails: taxi.contact || '',
+      confirmationNumber: taxi.vehicleRegistration || '',
+      bookingReference: taxi.paymentStatus || '',
+    });
+  });
+
+  toAirportTrains.forEach((train) => {
+    segments.push({
+      id: generateSegmentId(),
+      type: 'train',
+      role: 'transfer',
+      fromLocation: train.departingStation || 'Station',
+      toLocation: train.arrivalStation || returnTravel.departureAirport || 'Airport',
+      date: flightDate,
+      departureTime: train.departureTime || '',
+      company: train.provider || '',
+      bookingReference: train.bookingRef || '',
+      notes: train.paymentStatus ? `Payment: ${train.paymentStatus}` : '',
+    });
+  });
 
   // Flight(s)
   // Check isMultiLeg as truthy (handles both boolean true and number 1)
   if (returnTravel.isMultiLeg && returnTravel.legs && returnTravel.legs.length > 0) {
     // Multi-leg flight
-    returnTravel.legs.forEach((leg) => {
+    returnTravel.legs.forEach((leg, index) => {
       segments.push({
         id: generateSegmentId(),
         type: 'flight',
+        role: 'main',
         fromLocation: leg.departureAirport || '',
         toLocation: leg.arrivalAirport || '',
         date: flightDate,
         departureTime: leg.departureTime || '',
         arrivalTime: leg.arrivalTime || '',
         flightNumber: leg.flightNumber || '',
-        notes: leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : '',
+        airline: leg.airline || returnTravel.airline || '',
+        confirmationNumber: index === 0 ? (returnTravel.passengersSeats || '') : '',
+        bookingReference: returnTravel.bookingReference || '',
+        contactDetails: returnTravel.contact || '',
+        notes: index === 0
+          ? (returnTravel.thingsToRemember || (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''))
+          : (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''),
       });
     });
   } else {
@@ -346,21 +585,33 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
       segments.push({
         id: generateSegmentId(),
         type: 'flight',
+        role: 'main',
         fromLocation: returnTravel.departureAirport || '',
         toLocation: returnTravel.arrivalAirport || '',
         date: flightDate,
         departureTime: returnTravel.departureTime || '',
         arrivalTime: returnTravel.arrivalTime || '',
         flightNumber: returnTravel.flightNumber || '',
+        airline: returnTravel.airline || '',
+        confirmationNumber: returnTravel.passengersSeats || '',
+        bookingReference: returnTravel.bookingReference || '',
+        contactDetails: returnTravel.contact || '',
+        notes: returnTravel.thingsToRemember || '',
       });
     }
   }
 
   // Transfer from airport (taxi)
-  if (returnTravel.transferHomeType === 'taxi' && returnTravel.transferHomeTaxiBooked) {
+  if (returnTravel.transferHomeType === 'taxi' && homeTaxis.length === 0 && (
+    returnTravel.transferHomeTaxiBooked ||
+    returnTravel.transferHomeCompany ||
+    returnTravel.transferHomeContact ||
+    returnTravel.transferHomeCollectionTime
+  )) {
     segments.push({
       id: generateSegmentId(),
       type: 'taxi',
+      role: 'transfer',
       fromLocation: returnTravel.arrivalAirport || 'Airport',
       toLocation: 'Home',
       date: flightDate,
@@ -371,10 +622,11 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
   }
 
   // Transfer from airport (train)
-  if (returnTravel.transferHomeType === 'train') {
+  if (returnTravel.transferHomeType === 'train' && homeTrains.length === 0) {
     segments.push({
       id: generateSegmentId(),
       type: 'train',
+      role: 'transfer',
       fromLocation: returnTravel.transferHomeTrainDepartingStation || 'Station',
       toLocation: returnTravel.transferHomeTrainArrivalStation || 'Home',
       date: flightDate,
@@ -384,23 +636,26 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
   }
 
   // Multiple transfers
-  returnTravel.transferHomeTaxis?.forEach((taxi) => {
+  homeTaxis.forEach((taxi) => {
     segments.push({
       id: generateSegmentId(),
-      type: 'taxi',
+      type: normalizeRoadTransferType((taxi as any).transferType),
+      role: 'transfer',
       fromLocation: taxi.pickupLocation || 'Airport',
       toLocation: taxi.dropoffLocation || 'Home',
       date: flightDate,
       departureTime: taxi.collectionTime || '',
       company: taxi.company || '',
       contactDetails: taxi.contact || '',
+      confirmationNumber: taxi.vehicleRegistration || '',
     });
   });
 
-  returnTravel.transferHomeTrains?.forEach((train) => {
+  homeTrains.forEach((train) => {
     segments.push({
       id: generateSegmentId(),
       type: 'train',
+      role: 'transfer',
       fromLocation: train.departingStation || 'Airport',
       toLocation: train.arrivalStation || 'Home',
       date: flightDate,
@@ -415,6 +670,7 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
     returnTravel.additionalSegments.forEach((seg: TravelSegment) => {
       segments.push({
         ...seg,
+        role: seg.role || 'additional',
         id: seg.id || generateSegmentId(), // Ensure ID exists
       });
     });
@@ -430,18 +686,19 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
  * private_transfer, car_rental, other) are stored in additionalSegments JSON field
  */
 export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnTravel'] {
-  const flights = segments.filter(s => s.type === 'flight');
-  const taxis = segments.filter(s => s.type === 'taxi');
-  const trains = segments.filter(s => s.type === 'train');
+  const flights = segments.filter(s => s.type === 'flight' && isMainSegment(s));
+  const transferSegments = segments.filter(isTransferSegment);
+  const taxis = transferSegments.filter(s => ['taxi', 'private_car', 'shuttle', 'bus', 'other'].includes(s.type));
+  const trains = transferSegments.filter(s => s.type === 'train');
 
   // Segment types not supported by legacy format - store as JSON
-  const unsupportedTypes = ['bus', 'ferry', 'shuttle', 'private_transfer', 'car_rental', 'other'];
+  const unsupportedTypes = ['ferry', 'private_transfer', 'car_rental'];
   const additionalSegments = segments.filter(s => unsupportedTypes.includes(s.type));
 
   // DEBUG: Log what we're converting
-  console.log('=== segmentsToReturn DEBUG ===');
-  console.log('Input segments:', segments.map(s => ({ type: s.type, from: s.fromLocation, to: s.toLocation })));
-  console.log('Additional segments (bus/ferry/etc):', additionalSegments.length, additionalSegments);
+  debugLog('=== segmentsToReturn DEBUG ===');
+  debugLog('Input segments:', segments.map(s => ({ type: s.type, from: s.fromLocation, to: s.toLocation })));
+  debugLog('Additional segments (bus/ferry/etc):', additionalSegments.length, additionalSegments);
 
   const firstFlight = flights[0];
   const lastFlight = flights[flights.length - 1];
@@ -452,7 +709,67 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
     departureTime: f.departureTime || '',
     arrivalTime: f.arrivalTime || '',
     flightNumber: f.flightNumber || '',
-    layoverDuration: f.notes?.includes('Layover:') ? f.notes.replace('Layover: ', '') : '',
+    layoverDuration: extractLayoverFromNotes(f.notes),
+  }));
+
+  const firstMainIndex = segments.findIndex(isMainSegment);
+
+  const toAirportTaxis = taxis.filter(t =>
+    safeLower(t.toLocation).includes('airport') ||
+    (firstMainIndex >= 0 && segments.indexOf(t) < firstMainIndex)
+  ).map(t => ({
+    id: '',
+    transferType: t.type,
+    company: t.company || '',
+    contact: t.contactDetails || '',
+    vehicleRegistration: t.confirmationNumber || '',
+    collectionTime: t.departureTime || '',
+    pickupLocation: t.fromLocation || '',
+    dropoffLocation: t.toLocation || '',
+    paymentStatus: t.bookingReference || '',
+  }));
+
+  const toAirportTrains = trains.filter(t =>
+    safeLower(t.toLocation).includes('airport') ||
+    (firstMainIndex >= 0 && segments.indexOf(t) < firstMainIndex)
+  ).map(t => ({
+    id: '',
+    departingStation: t.fromLocation || '',
+    arrivalStation: t.toLocation || '',
+    departureTime: t.departureTime || '',
+    provider: t.company || '',
+    bookingRef: t.bookingReference || '',
+    paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
+    notes: '',
+  }));
+
+  const homeTaxis = taxis.filter(t =>
+    !safeLower(t.fromLocation).includes('home') &&
+    (firstMainIndex === -1 || segments.indexOf(t) > firstMainIndex)
+  ).map(t => ({
+    id: '',
+    transferType: t.type,
+    company: t.company || '',
+    contact: t.contactDetails || '',
+    vehicleRegistration: t.confirmationNumber || '',
+    collectionTime: t.departureTime || '',
+    pickupLocation: t.fromLocation || '',
+    dropoffLocation: t.toLocation || '',
+    paymentStatus: t.bookingReference || '',
+  }));
+
+  const homeTrains = trains.filter(t =>
+    !safeLower(t.fromLocation).includes('home') &&
+    (firstMainIndex === -1 || segments.indexOf(t) > firstMainIndex)
+  ).map(t => ({
+    id: '',
+    departingStation: t.fromLocation || '',
+    arrivalStation: t.toLocation || '',
+    departureTime: t.departureTime || '',
+    provider: t.company || '',
+    bookingRef: t.bookingReference || '',
+    paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
+    notes: t.notes || '',
   }));
 
   const legacy: WizardData['returnTravel'] = {
@@ -462,100 +779,57 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
     arrivalAirport: lastFlight?.toLocation || '',
     departureTime: firstFlight?.departureTime || '',
     arrivalTime: lastFlight?.arrivalTime || '',
-    passengersSeats: '',
-    thingsToRemember: '',
+    airline: firstFlight?.airline || '',
+    bookingReference: firstFlight?.bookingReference || '',
+    contact: firstFlight?.contactDetails || '',
+    passengersSeats: firstFlight?.confirmationNumber || '',
+    thingsToRemember: stripLayoverFromNotes(firstFlight?.notes),
     isMultiLeg: flights.length > 1 ? 1 : 0,
     legs: legs,
 
     // Transfer to airport (before the flight)
-    transferToAirportType: 'none',
-    transferToAirportTaxiBooked: 0,
-    transferToAirportCompany: '',
-    transferToAirportContact: '',
-    transferToAirportCollectionTime: '',
-    transferToAirportPickupLocation: '',
+    transferToAirportType: toAirportTaxis.length > 0 ? 'taxi' : (toAirportTrains.length > 0 ? 'train' : 'none'),
+    transferToAirportTaxiBooked: toAirportTaxis.length > 0 ? 1 : 0,
+    transferToAirportCompany: toAirportTaxis[0]?.company || '',
+    transferToAirportContact: toAirportTaxis[0]?.contact || '',
+    transferToAirportCollectionTime: toAirportTaxis[0]?.collectionTime || '',
+    transferToAirportPickupLocation: toAirportTaxis[0]?.pickupLocation || '',
     transferToAirportPaymentStatus: '',
-    transferToAirportTrainDepartingStation: '',
-    transferToAirportTrainArrivalStation: '',
-    transferToAirportTrainDepartureTime: '',
-    transferToAirportTrainProvider: '',
-    transferToAirportTrainBookingRef: '',
+    transferToAirportTrainDepartingStation: toAirportTrains[0]?.departingStation || '',
+    transferToAirportTrainArrivalStation: toAirportTrains[0]?.arrivalStation || '',
+    transferToAirportTrainDepartureTime: toAirportTrains[0]?.departureTime || '',
+    transferToAirportTrainProvider: toAirportTrains[0]?.provider || '',
+    transferToAirportTrainBookingRef: toAirportTrains[0]?.bookingRef || '',
     transferToAirportTrainPaymentStatus: '',
     transferToAirportTrainNotes: '',
-    transferToAirportTaxis: taxis.filter(t =>
-      t.toLocation.toLowerCase().includes('airport') ||
-      (flights.length > 0 && segments.indexOf(t) < segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      company: t.company || '',
-      contact: t.contactDetails || '',
-      collectionTime: t.departureTime || '',
-      pickupLocation: t.fromLocation || '',
-      dropoffLocation: t.toLocation || '',
-      paymentStatus: t.bookingReference || '',
-    })),
-    transferToAirportTrains: trains.filter(t =>
-      t.toLocation.toLowerCase().includes('airport') ||
-      (flights.length > 0 && segments.indexOf(t) < segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      departingStation: t.fromLocation || '',
-      arrivalStation: t.toLocation || '',
-      departureTime: t.departureTime || '',
-      provider: t.company || '',
-      bookingRef: t.bookingReference || '',
-      paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
-      notes: '',
-    })),
+    transferToAirportTaxis: toAirportTaxis,
+    transferToAirportTrains: toAirportTrains,
 
     // Transfer home (after the flight)
-    transferHomeType: 'none',
-    transferHomeTaxiBooked: 0,
-    transferHomeCompany: '',
-    transferHomeContact: '',
-    transferHomeCollectionTime: '',
-    transferHomePickupLocation: '',
+    transferHomeType: homeTaxis.length > 0 ? 'taxi' : (homeTrains.length > 0 ? 'train' : 'none'),
+    transferHomeTaxiBooked: homeTaxis.length > 0 ? 1 : 0,
+    transferHomeCompany: homeTaxis[0]?.company || '',
+    transferHomeContact: homeTaxis[0]?.contact || '',
+    transferHomeCollectionTime: homeTaxis[0]?.collectionTime || '',
+    transferHomePickupLocation: homeTaxis[0]?.pickupLocation || '',
     transferHomePaymentStatus: '',
-    transferHomeTrainDepartingStation: '',
-    transferHomeTrainArrivalStation: '',
-    transferHomeTrainDepartureTime: '',
-    transferHomeTrainProvider: '',
-    transferHomeTrainBookingRef: '',
+    transferHomeTrainDepartingStation: homeTrains[0]?.departingStation || '',
+    transferHomeTrainArrivalStation: homeTrains[0]?.arrivalStation || '',
+    transferHomeTrainDepartureTime: homeTrains[0]?.departureTime || '',
+    transferHomeTrainProvider: homeTrains[0]?.provider || '',
+    transferHomeTrainBookingRef: homeTrains[0]?.bookingRef || '',
     transferHomeTrainPaymentStatus: '',
     transferHomeTrainNotes: '',
-    transferHomeTaxis: taxis.filter(t =>
-      !t.fromLocation.toLowerCase().includes('home') &&
-      (flights.length === 0 || segments.indexOf(t) > segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      company: t.company || '',
-      contact: t.contactDetails || '',
-      collectionTime: t.departureTime || '',
-      pickupLocation: t.fromLocation || '',
-      dropoffLocation: t.toLocation || '',
-      paymentStatus: t.bookingReference || '',
-    })),
-    transferHomeTrains: trains.filter(t =>
-      !t.fromLocation.toLowerCase().includes('home') &&
-      (flights.length === 0 || segments.indexOf(t) > segments.findIndex(s => s.type === 'flight'))
-    ).map(t => ({
-      id: '',
-      departingStation: t.fromLocation || '',
-      arrivalStation: t.toLocation || '',
-      departureTime: t.departureTime || '',
-      provider: t.company || '',
-      bookingRef: t.bookingReference || '',
-      paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
-      notes: t.notes || '',
-    })),
+    transferHomeTaxis: homeTaxis,
+    transferHomeTrains: homeTrains,
 
     // Store segment types not supported by legacy format as JSON
     additionalSegments: additionalSegments.length > 0 ? additionalSegments : undefined,
   };
 
   // DEBUG: Log what we're outputting
-  console.log('=== segmentsToReturn OUTPUT ===');
-  console.log('additionalSegments in legacy object:', legacy.additionalSegments);
+  debugLog('=== segmentsToReturn OUTPUT ===');
+  debugLog('additionalSegments in legacy object:', legacy.additionalSegments);
 
   return legacy;
 }

@@ -14,7 +14,12 @@ import { preprocessImagesForPDF } from '@/lib/imageToBase64';
  * 4. Returns processed data for PDF rendering
  */
 
-export function useImagePreprocessor(itinerary: any) {
+type UseImagePreprocessorOptions = {
+  enabled?: boolean;
+};
+
+export function useImagePreprocessor(itinerary: any, options?: UseImagePreprocessorOptions) {
+  const enabled = options?.enabled ?? true;
   const [processedItinerary, setProcessedItinerary] = useState(itinerary || null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,14 +27,16 @@ export function useImagePreprocessor(itinerary: any) {
     let cancelled = false;
 
     const processImages = async () => {
-      if (!itinerary) {
+      if (!enabled || !itinerary) {
         setProcessedItinerary(null);
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-      console.log('[ImagePreprocessor] Starting image conversion...');
+      if (import.meta.env.DEV) {
+        console.log('[ImagePreprocessor] Starting image conversion...');
+      }
 
       try {
         // Process all image collections in parallel
@@ -56,7 +63,9 @@ export function useImagePreprocessor(itinerary: any) {
 
         if (!cancelled) {
           setProcessedItinerary(processed);
-          console.log('[ImagePreprocessor] Image conversion complete');
+          if (import.meta.env.DEV) {
+            console.log('[ImagePreprocessor] Image conversion complete');
+          }
         }
       } catch (error) {
         console.error('[ImagePreprocessor] Error processing images:', error);
@@ -76,7 +85,7 @@ export function useImagePreprocessor(itinerary: any) {
     return () => {
       cancelled = true;
     };
-  }, [itinerary]);
+  }, [itinerary, enabled]);
 
   return { processedItinerary, isLoading };
 }
