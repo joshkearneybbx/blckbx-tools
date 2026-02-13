@@ -160,9 +160,11 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
       date: outbound.flightDate || '',
       departureTime: taxi.collectionTime || undefined,
       company: taxi.company || '',
-      contactDetails: taxi.contact || '',
+      contactDetails: taxi.contact || taxi.contactDetails || '',
       confirmationNumber: taxi.vehicleRegistration || '',
-      bookingReference: taxi.paymentStatus || '',
+      bookingReference: taxi.bookingReference || taxi.paymentStatus || '',
+      price: taxi.price || '',
+      notes: taxi.notes || '',
     });
   });
 
@@ -177,8 +179,10 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
       date: outbound.flightDate || '',
       departureTime: train.departureTime || undefined,
       company: train.provider || '',
-      bookingReference: train.bookingRef || '',
-      notes: train.paymentStatus ? `Payment: ${train.paymentStatus}` : '',
+      contactDetails: train.contact || train.contactDetails || '',
+      bookingReference: train.bookingRef || train.bookingReference || '',
+      price: train.price || '',
+      notes: train.notes || (train.paymentStatus ? `Payment: ${train.paymentStatus}` : ''),
     });
   });
 
@@ -261,9 +265,11 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
       date: flightDate,
       departureTime: taxi.collectionTime || undefined,
       company: taxi.company || '',
-      contactDetails: taxi.contact || '',
+      contactDetails: taxi.contact || taxi.contactDetails || '',
       confirmationNumber: taxi.vehicleRegistration || '',
-      bookingReference: taxi.paymentStatus || '',
+      bookingReference: taxi.bookingReference || taxi.paymentStatus || '',
+      price: taxi.price || '',
+      notes: taxi.notes || '',
     });
   });
 
@@ -278,8 +284,10 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
       date: flightDate,
       departureTime: train.departureTime || undefined,
       company: train.provider || '',
-      bookingReference: train.bookingRef || '',
-      notes: train.paymentStatus ? `Payment: ${train.paymentStatus}` : '',
+      contactDetails: train.contact || train.contactDetails || '',
+      bookingReference: train.bookingRef || train.bookingReference || '',
+      price: train.price || '',
+      notes: train.notes || (train.paymentStatus ? `Payment: ${train.paymentStatus}` : ''),
     });
   });
 
@@ -348,7 +356,10 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
     collectionTime: t.departureTime || '',
     pickupLocation: t.fromLocation || '',
     dropoffLocation: t.toLocation || '',
+    bookingReference: t.bookingReference || '',
     paymentStatus: t.bookingReference || '',
+    price: t.price || '',
+    notes: t.notes || '',
   }));
 
   const toAirportTrains = trains.filter(t =>
@@ -361,6 +372,9 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
     departureTime: t.departureTime || '',
     provider: t.company || '',
     bookingRef: t.bookingReference || '',
+    bookingReference: t.bookingReference || '',
+    contact: t.contactDetails || '',
+    price: t.price || '',
     paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
     notes: t.notes || '',
   }));
@@ -376,7 +390,10 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
     vehicleRegistration: t.confirmationNumber || '',
     collectionTime: t.departureTime || '',
     dropoffLocation: t.toLocation || '',
+    bookingReference: t.bookingReference || '',
     paymentStatus: t.bookingReference || '',
+    price: t.price || '',
+    notes: t.notes || '',
   }));
 
   const toAccomTrains = trains.filter(t =>
@@ -389,6 +406,9 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
     departureTime: t.departureTime || '',
     provider: t.company || '',
     bookingRef: t.bookingReference || '',
+    bookingReference: t.bookingReference || '',
+    contact: t.contactDetails || '',
+    price: t.price || '',
     paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
     notes: t.notes || '',
   }));
@@ -534,9 +554,11 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
       date: flightDate,
       departureTime: taxi.collectionTime || '',
       company: taxi.company || '',
-      contactDetails: taxi.contact || '',
+      contactDetails: taxi.contact || taxi.contactDetails || '',
       confirmationNumber: taxi.vehicleRegistration || '',
-      bookingReference: taxi.paymentStatus || '',
+      bookingReference: taxi.bookingReference || taxi.paymentStatus || '',
+      price: taxi.price || '',
+      notes: taxi.notes || '',
     });
   });
 
@@ -550,8 +572,10 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
       date: flightDate,
       departureTime: train.departureTime || '',
       company: train.provider || '',
-      bookingReference: train.bookingRef || '',
-      notes: train.paymentStatus ? `Payment: ${train.paymentStatus}` : '',
+      contactDetails: train.contact || train.contactDetails || '',
+      bookingReference: train.bookingRef || train.bookingReference || '',
+      price: train.price || '',
+      notes: train.notes || (train.paymentStatus ? `Payment: ${train.paymentStatus}` : ''),
     });
   });
 
@@ -646,8 +670,11 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
       date: flightDate,
       departureTime: taxi.collectionTime || '',
       company: taxi.company || '',
-      contactDetails: taxi.contact || '',
+      contactDetails: taxi.contact || taxi.contactDetails || '',
       confirmationNumber: taxi.vehicleRegistration || '',
+      bookingReference: taxi.bookingReference || taxi.paymentStatus || '',
+      price: taxi.price || '',
+      notes: taxi.notes || '',
     });
   });
 
@@ -661,6 +688,10 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
       date: flightDate,
       departureTime: train.departureTime || '',
       company: train.provider || '',
+      contactDetails: train.contact || train.contactDetails || '',
+      bookingReference: train.bookingRef || train.bookingReference || '',
+      price: train.price || '',
+      notes: train.notes || '',
     });
   });
 
@@ -726,7 +757,10 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
     collectionTime: t.departureTime || '',
     pickupLocation: t.fromLocation || '',
     dropoffLocation: t.toLocation || '',
+    bookingReference: t.bookingReference || '',
     paymentStatus: t.bookingReference || '',
+    price: t.price || '',
+    notes: t.notes || '',
   }));
 
   const toAirportTrains = trains.filter(t =>
@@ -739,8 +773,11 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
     departureTime: t.departureTime || '',
     provider: t.company || '',
     bookingRef: t.bookingReference || '',
+    bookingReference: t.bookingReference || '',
+    contact: t.contactDetails || '',
+    price: t.price || '',
     paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
-    notes: '',
+    notes: t.notes || '',
   }));
 
   const homeTaxis = taxis.filter(t =>
@@ -755,7 +792,10 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
     collectionTime: t.departureTime || '',
     pickupLocation: t.fromLocation || '',
     dropoffLocation: t.toLocation || '',
+    bookingReference: t.bookingReference || '',
     paymentStatus: t.bookingReference || '',
+    price: t.price || '',
+    notes: t.notes || '',
   }));
 
   const homeTrains = trains.filter(t =>
@@ -768,6 +808,9 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
     departureTime: t.departureTime || '',
     provider: t.company || '',
     bookingRef: t.bookingReference || '',
+    bookingReference: t.bookingReference || '',
+    contact: t.contactDetails || '',
+    price: t.price || '',
     paymentStatus: t.notes?.includes('Payment:') ? t.notes.replace('Payment: ', '') : '',
     notes: t.notes || '',
   }));

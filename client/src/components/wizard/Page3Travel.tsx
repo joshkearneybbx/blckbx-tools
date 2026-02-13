@@ -275,6 +275,7 @@ export default function Page3Travel({
         contact: seg.contactDetails,
         vehicleRegistration: seg.confirmationNumber,
         bookingReference: seg.bookingReference,
+        price: seg.price,
         notes: seg.notes,
       };
 
@@ -310,6 +311,7 @@ export default function Page3Travel({
           contactDetails: transfer.contact,
           confirmationNumber: transfer.vehicleRegistration,
           bookingReference: transfer.bookingReference,
+          price: transfer.price,
           notes: transfer.notes,
         });
       });
@@ -359,6 +361,7 @@ export default function Page3Travel({
           contactDetails: transfer.contact,
           confirmationNumber: transfer.vehicleRegistration,
           bookingReference: transfer.bookingReference,
+          price: transfer.price,
           notes: transfer.notes,
         });
       });
