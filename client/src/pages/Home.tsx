@@ -75,8 +75,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#E8E4DE]">
       <header className="p-8">
-        <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
-          <div className="text-center flex-1">
+        <div className="max-w-5xl mx-auto relative">
+          <div className="text-center">
             <img
               src={logoUrl}
               alt="BlckBx"
@@ -88,7 +88,7 @@ export default function Home() {
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-full bg-[#E7C51C] text-[#232220] text-sm font-medium px-4 py-2 hover:bg-[#d8b614] transition-colors"
+            className="absolute top-0 right-0 rounded-full bg-[#E7C51C] text-[#232220] text-sm font-medium px-4 py-2 hover:bg-[#d8b614] transition-colors"
             data-testid="button-home-signout"
           >
             Sign Out
