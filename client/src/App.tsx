@@ -10,6 +10,7 @@ import SectionBuilder from "@/pages/SectionBuilder";
 import PreviewArrange from "@/pages/PreviewArrange";
 import ListEditor from "@/pages/ListEditor";
 import MealsComingSoon from "@/pages/MealsComingSoon";
+import BigPurchases from "@/pages/BigPurchases";
 import Login from "@/pages/Login";
 import OAuthCallback from "@/pages/OAuthCallback";
 import NotFound from "@/pages/not-found";
@@ -113,6 +114,15 @@ function Router() {
           {() => (
             <ProtectedRoute>
               <MealsComingSoon />
+            </ProtectedRoute>
+          )}
+        </Route>
+
+        {/* Big Purchases Tool */}
+        <Route path="/big-purchases">
+          {() => (
+            <ProtectedRoute>
+              <BigPurchases />
             </ProtectedRoute>
           )}
         </Route>
