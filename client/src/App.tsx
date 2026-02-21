@@ -9,7 +9,6 @@ import ViewItinerary from "@/pages/ViewItinerary";
 import SectionBuilder from "@/pages/SectionBuilder";
 import PreviewArrange from "@/pages/PreviewArrange";
 import ListEditor from "@/pages/ListEditor";
-import MealsComingSoon from "@/pages/MealsComingSoon";
 import BigPurchases from "@/pages/BigPurchases";
 import Login from "@/pages/Login";
 import OAuthCallback from "@/pages/OAuthCallback";
@@ -17,6 +16,7 @@ import NotFound from "@/pages/not-found";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
+import MealCraftPage from "@/pages/meals/MealCraftPage";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -109,11 +109,11 @@ function Router() {
           )}
         </Route>
 
-        {/* Meals Tool - Coming Soon */}
+        {/* Meals Tool */}
         <Route path="/meals">
           {() => (
             <ProtectedRoute>
-              <MealsComingSoon />
+              <MealCraftPage />
             </ProtectedRoute>
           )}
         </Route>

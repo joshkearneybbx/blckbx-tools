@@ -1,4 +1,4 @@
-import { Map, UtensilsCrossed, ClipboardList, Plus, ReceiptPoundSterling } from "lucide-react";
+import { Map, UtensilsCrossed, ClipboardList, ReceiptPoundSterling, LayoutDashboard } from "lucide-react";
 import { ToolCard, type Tool } from "@/components/ToolCard";
 import logoUrl from "@assets/blckbx-logo.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,19 +6,11 @@ import { useLocation } from "wouter";
 
 const tools: Tool[] = [
   {
-    id: "itinerary",
-    name: "Itinerary Maker",
-    description: "Create professional travel itineraries & PDF documents",
-    icon: Map,
-    href: "/itinerary",
-    status: "active",
-  },
-  {
-    id: "meals",
-    name: "Meal Planner",
-    description: "AI-powered meal planning with smart shopping lists",
-    icon: UtensilsCrossed,
-    href: "/meals",
+    id: "foh-dashboard",
+    name: "FOH Dashboard",
+    description: "Front of house dashboard for daily operations",
+    icon: LayoutDashboard,
+    href: null,
     status: "coming-soon",
   },
   {
@@ -30,6 +22,14 @@ const tools: Tool[] = [
     status: "coming-soon",
   },
   {
+    id: "itinerary",
+    name: "Itinerary Maker",
+    description: "Create professional travel itineraries & PDF documents",
+    icon: Map,
+    href: "/itinerary",
+    status: "active",
+  },
+  {
     id: "big-purchases",
     name: "Big Purchases",
     description: "Flag a big client purchase for the partnerships team",
@@ -38,28 +38,12 @@ const tools: Tool[] = [
     status: "active",
   },
   {
-    id: "tool-4",
-    name: "Coming Soon",
-    description: "More tools on the way",
-    icon: Plus,
-    href: null,
-    status: "placeholder",
-  },
-  {
-    id: "tool-5",
-    name: "Coming Soon",
-    description: "More tools on the way",
-    icon: Plus,
-    href: null,
-    status: "placeholder",
-  },
-  {
-    id: "tool-6",
-    name: "Coming Soon",
-    description: "More tools on the way",
-    icon: Plus,
-    href: null,
-    status: "placeholder",
+    id: "meals",
+    name: "Meal Planner",
+    description: "AI-powered meal planning with smart shopping lists",
+    icon: UtensilsCrossed,
+    href: "/meals",
+    status: "active",
   },
 ];
 

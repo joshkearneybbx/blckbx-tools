@@ -71,8 +71,6 @@ export function Sidebar() {
           icon={UtensilsCrossed}
           label="Meal Planner"
           active={location.startsWith("/meals")}
-          disabled
-          badge="Soon"
         />
         <SidebarLink
           to="/big-purchases"
