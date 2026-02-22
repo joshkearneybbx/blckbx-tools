@@ -43,7 +43,7 @@ export function ShoppingList({
             </Button>
           ) : null}
           <Button type="button" onClick={onExportPdf} disabled={isExportingPdf} className="bg-[#E7C51C] text-black hover:bg-[#d4b419]">
-            {isExportingPdf ? "Generating PDF..." : "Export PDF"}
+            {isExportingPdf ? "Preparing PDF..." : "Export PDF"}
           </Button>
         </div>
       </div>

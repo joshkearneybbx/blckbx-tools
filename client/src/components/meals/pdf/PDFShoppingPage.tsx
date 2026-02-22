@@ -6,7 +6,6 @@ import { sanitizePdfText } from "./textSanitizer";
 
 interface PDFShoppingPageProps {
   dateLabel: string;
-  pageNumber: number;
   numDays: number;
   shoppingList: ShoppingList;
 }
@@ -20,16 +19,16 @@ function Header({ dateLabel }: { dateLabel: string }) {
   );
 }
 
-function Footer({ pageNumber }: { pageNumber: number }) {
+function Footer() {
   return (
     <View style={pdfStyles.footer} fixed>
       <Text style={pdfStyles.footerText}>blckbx.co.uk</Text>
-      <Text style={pdfStyles.footerPage}>{pageNumber}</Text>
+      <Text style={pdfStyles.footerPage} render={({ pageNumber }) => String(pageNumber)} />
     </View>
   );
 }
 
-export function PDFShoppingPage({ dateLabel, pageNumber, numDays, shoppingList }: PDFShoppingPageProps) {
+export function PDFShoppingPage({ dateLabel, numDays, shoppingList }: PDFShoppingPageProps) {
   const categories = Object.entries(shoppingList);
 
   return (
@@ -42,23 +41,23 @@ export function PDFShoppingPage({ dateLabel, pageNumber, numDays, shoppingList }
 
         <View style={pdfStyles.shoppingGrid}>
           {categories.map(([category, items]) => (
-            <View key={category} style={pdfStyles.shoppingCategory}>
+            <View key={category} style={pdfStyles.shoppingCategory} wrap={false}>
               <View style={pdfStyles.shoppingCategoryInner}>
                 <View style={pdfStyles.shoppingHeader}>
                   <Text style={pdfStyles.shoppingTitle}>{category}</Text>
                 </View>
-                {items.slice(0, 18).map((item, index) => (
-                  <View key={`${category}-${index}`} style={pdfStyles.shoppingItemRow}>
+                {items.map((item, itemIndex) => (
+                  <View key={`${category}-${itemIndex}`} style={pdfStyles.shoppingItemRow}>
                     <View style={pdfStyles.checkbox} />
-                  <Text style={pdfStyles.shoppingText}>{sanitizePdfText(item)}</Text>
-                </View>
-              ))}
+                    <Text style={pdfStyles.shoppingText}>{sanitizePdfText(item)}</Text>
+                  </View>
+                ))}
               </View>
             </View>
           ))}
         </View>
 
-        <View style={pdfStyles.tipsBox}>
+        <View style={pdfStyles.tipsBox} wrap={false}>
           <Text style={pdfStyles.tipsTitle}>Shopping Tips</Text>
           <Text style={pdfStyles.tipText}>- Check pantry staples before shopping to avoid duplicate purchases.</Text>
           <Text style={pdfStyles.tipText}>- Buy fresh produce last to keep it crisp and fresh.</Text>
@@ -66,7 +65,7 @@ export function PDFShoppingPage({ dateLabel, pageNumber, numDays, shoppingList }
         </View>
       </View>
 
-      <Footer pageNumber={pageNumber} />
+      <Footer />
     </Page>
   );
 }

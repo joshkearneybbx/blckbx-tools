@@ -40,7 +40,13 @@ function sourceLabel(source?: string): string {
     .join(" "));
 }
 
-export function RecipeCard({ recipe }: { recipe: PDFRecipeItem }) {
+export function RecipeCard({
+  recipe,
+  images,
+}: {
+  recipe: PDFRecipeItem;
+  images?: Record<string, string>;
+}) {
   const title = sanitizePdfText(recipe.title ?? recipe.recipe?.title ?? "Untitled recipe");
   const ingredients = (recipe.ingredients ?? recipe.recipe?.ingredients ?? []).map(sanitizePdfText);
   const instructions = (recipe.instructions ?? recipe.recipe?.instructions ?? []).map(sanitizePdfText);
@@ -49,6 +55,8 @@ export function RecipeCard({ recipe }: { recipe: PDFRecipeItem }) {
   const servings = recipe.servings ?? recipe.recipe?.servings;
   const source = recipe.source ?? recipe.recipe?.source;
   const sourceUrl = recipe.source_url ?? recipe.recipe?.source_url;
+  const recipeImageId = recipe.recipe?.id ?? recipe.recipe_id ?? recipe.id;
+  const imageData = recipeImageId ? images?.[recipeImageId] : undefined;
 
   return (
     <View style={pdfStyles.recipeCard} wrap={false}>
@@ -63,21 +71,28 @@ export function RecipeCard({ recipe }: { recipe: PDFRecipeItem }) {
 
       <View style={pdfStyles.recipeBody}>
         <View style={pdfStyles.metaRow}>
-          <View style={pdfStyles.metaItem}>
-            <ClockIcon size={9} color="#6B6B68" />
-            <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{cookTime ?? 0} mins</Text></Text>
-          </View>
-          <View style={pdfStyles.metaItem}>
-            <ActivityIcon size={9} color="#6B6B68" />
-            <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{calories ?? 0} kcal</Text></Text>
-          </View>
-          <View style={pdfStyles.metaItem}>
-            <UsersIcon size={9} color="#6B6B68" />
-            <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{servings ?? 1} servings</Text></Text>
-          </View>
-          <View style={pdfStyles.metaItem}>
-            <LinkIcon size={9} color="#6B6B68" />
-            <Text style={pdfStyles.metaText}>{sourceLabel(source)}</Text>
+          {imageData ? (
+            <View style={pdfStyles.metaThumbnailWrap}>
+              <Image src={imageData} style={pdfStyles.recipeThumbnail} />
+            </View>
+          ) : null}
+          <View style={pdfStyles.metaItemsWrap}>
+            <View style={pdfStyles.metaItem}>
+              <ClockIcon size={9} color="#6B6B68" />
+              <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{cookTime ?? 0} mins</Text></Text>
+            </View>
+            <View style={pdfStyles.metaItem}>
+              <ActivityIcon size={9} color="#6B6B68" />
+              <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{calories ?? 0} kcal</Text></Text>
+            </View>
+            <View style={pdfStyles.metaItem}>
+              <UsersIcon size={9} color="#6B6B68" />
+              <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{servings ?? 1} servings</Text></Text>
+            </View>
+            <View style={pdfStyles.metaItem}>
+              <LinkIcon size={9} color="#6B6B68" />
+              <Text style={pdfStyles.metaText}>{sourceLabel(source)}</Text>
+            </View>
           </View>
         </View>
 
@@ -107,7 +122,12 @@ export function RecipeCard({ recipe }: { recipe: PDFRecipeItem }) {
   );
 }
 
-export function PDFRecipePage({ dateLabel, pageNumber, recipes }: HeaderFooterProps & { recipes: PDFRecipeItem[] }) {
+export function PDFRecipePage({
+  dateLabel,
+  pageNumber,
+  recipes,
+  images,
+}: HeaderFooterProps & { recipes: PDFRecipeItem[]; images?: Record<string, string> }) {
   return (
     <Page size="A4" style={pdfStyles.page}>
       <Header dateLabel={dateLabel} />
@@ -115,7 +135,7 @@ export function PDFRecipePage({ dateLabel, pageNumber, recipes }: HeaderFooterPr
       <View style={pdfStyles.content}>
         <Text style={pdfStyles.sectionHeading}>Recipes</Text>
         {recipes.map((recipe) => (
-          <RecipeCard key={`${recipe.id}-${recipe.pdfDayNumber}`} recipe={recipe} />
+          <RecipeCard key={`${recipe.id}-${recipe.pdfDayNumber}`} recipe={recipe} images={images} />
         ))}
       </View>
 

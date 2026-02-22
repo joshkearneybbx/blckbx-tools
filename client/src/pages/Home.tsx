@@ -8,7 +8,7 @@ const tools: Tool[] = [
   {
     id: "foh-dashboard",
     name: "FOH Dashboard",
-    description: "Front of house dashboard for daily operations",
+    description: "Front of House dashboard for monitoring client activity",
     icon: LayoutDashboard,
     href: null,
     status: "coming-soon",

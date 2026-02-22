@@ -13,6 +13,7 @@ interface MealPlanPDFProps {
   plan: MealPlanDay[];
   shoppingList: ShoppingList;
   stats: MealPlanStats;
+  images?: Record<string, string>;
 }
 
 function formatDate(date: Date): string {
@@ -44,6 +45,7 @@ export function MealPlanPDF({
   plan,
   shoppingList,
   stats,
+  images,
 }: MealPlanPDFProps) {
   const dateLabel = formatDate(generatedAt);
 
@@ -69,8 +71,6 @@ export function MealPlanPDF({
 
   const averageKcalPerDay = plan.length > 0 ? round(totalCalories / plan.length) : 0;
 
-  const shoppingPageNumber = recipePageChunks.length + 2;
-
   return (
     <Document title={`Meal Plan - ${clientName}`}>
       <PDFCoverPage
@@ -83,6 +83,7 @@ export function MealPlanPDF({
         stats={stats}
         menuOverview={menuOverview}
         firstRecipe={firstRecipe}
+        images={images}
       />
 
       {recipePageChunks.map((recipesChunk, index) => (
@@ -91,12 +92,12 @@ export function MealPlanPDF({
           dateLabel={dateLabel}
           pageNumber={index + 2}
           recipes={recipesChunk}
+          images={images}
         />
       ))}
 
       <PDFShoppingPage
         dateLabel={dateLabel}
-        pageNumber={shoppingPageNumber}
         numDays={numDays}
         shoppingList={shoppingList}
       />

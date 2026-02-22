@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { toast } from "@/hooks/use-toast";
 import type { MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, ShoppingList } from "@/lib/meals/api";
-import { computeMealPlanStats } from "@/lib/meals/api";
+import { computeMealPlanStats, enhanceImageUrl } from "@/lib/meals/api";
 import { StepIndicator } from "@/components/meals/StepIndicator";
 import { ClientSelect } from "@/components/meals/ClientSelect";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
@@ -16,6 +16,7 @@ import { useMealFeedback } from "@/hooks/meals/useMealFeedback";
 import { MealPlanPDF } from "@/components/meals/pdf/MealPlanPDF";
 import { pb } from "@/lib/pocketbase";
 import { useRecentPlans } from "@/hooks/meals/useClientPlans";
+import { fetchRecipeImages } from "@/lib/meals/pdfImages";
 
 const INITIAL_CRITERIA: PlanCriteriaValues = {
   free_prompt: "",
@@ -80,7 +81,7 @@ function mapRecipeRecord(record: any): MealCraftRecipe {
     title: String(record.title ?? "Untitled recipe"),
     source: record.source ? String(record.source) : undefined,
     source_url: record.source_url ? String(record.source_url) : undefined,
-    image_url: record.image_url ? String(record.image_url) : undefined,
+    image_url: record.image_url ? enhanceImageUrl(String(record.image_url)) : undefined,
     cook_time: typeof record.cook_time === "number" ? record.cook_time : undefined,
     prep_time: typeof record.prep_time === "number" ? record.prep_time : undefined,
     calories: typeof record.calories === "number" ? record.calories : undefined,
@@ -113,6 +114,7 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
       title: recipe?.title ?? "Untitled meal",
       source: recipe?.source,
       source_url: recipe?.source_url,
+      image_url: recipe?.image_url,
       ingredients: recipe?.ingredients,
       instructions: recipe?.instructions,
       cook_time: recipe?.cook_time,
@@ -283,6 +285,7 @@ export default function MealCraftPage() {
               recipe: replacementRecipe,
               source: replacementRecipe.source,
               source_url: replacementRecipe.source_url,
+              image_url: replacementRecipe.image_url,
               ingredients: replacementRecipe.ingredients,
               instructions: replacementRecipe.instructions,
               cook_time: replacementRecipe.cook_time,
@@ -346,6 +349,20 @@ export default function MealCraftPage() {
 
     setIsExportingPdf(true);
     try {
+      const imageEntries = planResult.plan
+        .flatMap((day) => day.meals)
+        .map((meal) => ({
+          id: meal.recipe?.id || meal.recipe_id || meal.id,
+          url: meal.image_url || meal.recipe?.image_url || "",
+        }))
+        .filter((entry) => entry.id && entry.url);
+
+      const uniqueImages = Array.from(
+        new Map(imageEntries.map((entry) => [entry.id, entry])).values()
+      );
+
+      const imageMap = await fetchRecipeImages(uniqueImages);
+
       const blob = await pdf(
         <MealPlanPDF
           clientName={selectedClient.name}
@@ -356,6 +373,7 @@ export default function MealCraftPage() {
           plan={planResult.plan}
           shoppingList={planResult.shopping_list}
           stats={planResult.stats}
+          images={imageMap}
         />
       ).toBlob();
 

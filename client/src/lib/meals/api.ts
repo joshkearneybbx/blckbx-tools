@@ -31,6 +31,7 @@ export interface MealPlanItem {
   id: string;
   meal_plan_item_id?: string;
   recipe_id?: string;
+  image_url?: string;
   day_number: number;
   meal_type: MealType;
   feedback?: "liked" | "disliked" | null;
@@ -146,6 +147,15 @@ function toNumber(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+export function enhanceImageUrl(url: string): string {
+  if (!url) return url;
+  if (url.includes("scene7.com")) {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}wid=800&hei=600`;
+  }
+  return url;
+}
+
 export function computeMealPlanStats(days: MealPlanDay[]): MealPlanStats {
   const meals = days.flatMap((day) => day.meals);
   const recipeIds = new Set<string>();
@@ -182,7 +192,7 @@ function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
         title: String(rawMeal.recipe.title ?? rawMeal.title ?? "Untitled meal"),
         source: rawMeal.recipe.source,
         source_url: rawMeal.recipe.source_url,
-        image_url: rawMeal.recipe.image_url,
+        image_url: enhanceImageUrl(String(rawMeal.recipe.image_url ?? "")),
         cook_time: toNumber(rawMeal.recipe.cook_time),
         prep_time: toNumber(rawMeal.recipe.prep_time),
         calories: toNumber(rawMeal.recipe.calories),
@@ -207,6 +217,7 @@ function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
     title: String(rawMeal.title ?? recipe?.title ?? "Untitled meal"),
     source: String(rawMeal.source ?? recipe?.source ?? ""),
     source_url: String(rawMeal.source_url ?? recipe?.source_url ?? ""),
+    image_url: enhanceImageUrl(String(rawMeal.image_url ?? recipe?.image_url ?? "")),
     ingredients: asArrayString(rawMeal.ingredients).length
       ? asArrayString(rawMeal.ingredients)
       : recipe?.ingredients,

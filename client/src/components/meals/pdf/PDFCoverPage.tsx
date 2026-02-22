@@ -19,6 +19,7 @@ interface PDFCoverPageProps {
   stats: MealPlanStats;
   menuOverview: MenuOverviewItem[];
   firstRecipe: PDFRecipeItem | null;
+  images?: Record<string, string>;
 }
 
 function Header({ dateLabel }: { dateLabel: string }) {
@@ -56,6 +57,7 @@ export function PDFCoverPage({
   stats,
   menuOverview,
   firstRecipe,
+  images,
 }: PDFCoverPageProps) {
   const subtitleTags = focusTags.slice(0, 2).map(formatTag);
 
@@ -108,7 +110,7 @@ export function PDFCoverPage({
         </View>
 
         <Text style={pdfStyles.sectionHeading}>Recipes</Text>
-        {firstRecipe ? <RecipeCard recipe={firstRecipe} /> : null}
+        {firstRecipe ? <RecipeCard recipe={firstRecipe} images={images} /> : null}
       </View>
 
       <Footer pageNumber={pageNumber} />

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
-import type { MealPlanItem } from "@/lib/meals/api";
+import { enhanceImageUrl, type MealPlanItem } from "@/lib/meals/api";
 
 interface MealCardProps {
   item: MealPlanItem;
@@ -17,21 +17,34 @@ const MEAL_TYPE_STYLES: Record<string, string> = {
 
 export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const currentFeedback = item.feedback ?? null;
   const title = item.title ?? item.recipe?.title ?? "Untitled meal";
   const ingredients = item.ingredients ?? item.recipe?.ingredients ?? [];
   const instructions = item.instructions ?? item.recipe?.instructions ?? [];
+  const imageUrl = enhanceImageUrl(item.image_url || item.recipe?.image_url || "");
 
   return (
     <div className="rounded-[10px] border border-[#E6E5E0] bg-white p-4">
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <span className={[
-            "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
-            MEAL_TYPE_STYLES[item.meal_type] ?? "bg-[#F8F8F8] text-[#424242]",
-          ].join(" ")}>{item.meal_type}</span>
-          <h4 className="mt-1 text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">{title}</h4>
+        <div className="flex min-w-0 items-start gap-3">
+          {imageUrl && !imgError ? (
+            <img
+              src={imageUrl}
+              alt={title}
+              onError={() => setImgError(true)}
+              className="h-12 w-12 shrink-0 rounded-[8px] object-cover"
+              loading="lazy"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <span className={[
+              "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
+              MEAL_TYPE_STYLES[item.meal_type] ?? "bg-[#F8F8F8] text-[#424242]",
+            ].join(" ")}>{item.meal_type}</span>
+            <h4 className="mt-1 text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">{title}</h4>
+          </div>
         </div>
 
         <div className="flex items-center gap-1">
@@ -89,27 +102,29 @@ export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
       </div>
 
       {expanded ? (
-        <div className="mt-3 grid grid-cols-1 gap-3 border-t border-[#E6E5E0] pt-3 text-xs [font-family:Inter,sans-serif] md:grid-cols-2">
-          <div>
-            <h5 className="mb-1 font-semibold text-[#1a1a1a]">Ingredients</h5>
-            <ul className="list-disc space-y-1 pl-4 text-[#424242]">
-              {ingredients.map((ingredient, index) => (
-                <li key={`${ingredient}-${index}`}>{ingredient}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h5 className="mb-1 font-semibold text-[#1a1a1a]">Method</h5>
-            <ol className="list-decimal space-y-1 pl-4 text-[#424242]">
-              {instructions.map((instruction, index) => (
-                <li key={`${instruction}-${index}`}>{instruction}</li>
-              ))}
-            </ol>
-            {item.source_url ? (
-              <a href={item.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[#7C3AED] underline">
-                View source
-              </a>
-            ) : null}
+        <div className="mt-3 border-t border-[#E6E5E0] pt-3 text-xs [font-family:Inter,sans-serif]">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <h5 className="mb-1 font-semibold text-[#1a1a1a]">Ingredients</h5>
+              <ul className="list-disc space-y-1 pl-4 text-[#424242]">
+                {ingredients.map((ingredient, index) => (
+                  <li key={`${ingredient}-${index}`}>{ingredient}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h5 className="mb-1 font-semibold text-[#1a1a1a]">Method</h5>
+              <ol className="list-decimal space-y-1 pl-4 text-[#424242]">
+                {instructions.map((instruction, index) => (
+                  <li key={`${instruction}-${index}`}>{instruction}</li>
+                ))}
+              </ol>
+              {item.source_url ? (
+                <a href={item.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[#7C3AED] underline">
+                  View source
+                </a>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
