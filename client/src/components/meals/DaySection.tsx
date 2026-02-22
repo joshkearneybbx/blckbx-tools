@@ -16,7 +16,10 @@ export function DaySection({ day, onSwapClick, onFeedback }: DaySectionProps) {
     (sum, meal) => sum + (meal.protein ?? meal.recipe?.protein ?? 0),
     0
   );
-  const showNutritionSummary = totalCalories > 0 || totalProtein > 0;
+  const summaryParts = [
+    totalCalories > 0 ? `${Math.round(totalCalories)} kcal` : null,
+    totalProtein > 0 ? `${Math.round(totalProtein)}g protein` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <section className="rounded-[14px] border border-[#E6E5E0] bg-white p-4 shadow-sm">
@@ -25,9 +28,9 @@ export function DaySection({ day, onSwapClick, onFeedback }: DaySectionProps) {
           <span className="rounded-full bg-[#E7C51C] px-2 py-0.5 text-[11px] font-bold text-black">Day {day.day_number}</span>
           <h3 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">{day.label ?? `Day ${day.day_number}`}</h3>
         </div>
-        {showNutritionSummary ? (
+        {summaryParts.length > 0 ? (
           <p className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
-            {Math.round(totalCalories)} kcal • {Math.round(totalProtein)}g protein
+            {summaryParts.join(" • ")}
           </p>
         ) : null}
       </div>

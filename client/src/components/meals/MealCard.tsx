@@ -24,6 +24,15 @@ export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
   const ingredients = item.ingredients ?? item.recipe?.ingredients ?? [];
   const instructions = item.instructions ?? item.recipe?.instructions ?? [];
   const imageUrl = enhanceImageUrl(item.image_url || item.recipe?.image_url || "");
+  const calories = item.calories ?? item.recipe?.calories ?? 0;
+  const protein = item.protein ?? item.recipe?.protein ?? 0;
+  const metaItems = [
+    `${item.cook_time ?? 0} min`,
+    calories > 0 ? `${calories} kcal` : null,
+    protein > 0 ? `${protein}g protein` : null,
+    `${item.servings ?? 1} servings`,
+    item.source ? item.source : null,
+  ].filter(Boolean) as string[];
 
   return (
     <div className="rounded-[10px] border border-[#E6E5E0] bg-white p-4">
@@ -94,11 +103,9 @@ export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
       </div>
 
       <div className="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
-        <span>{item.cook_time ?? 0} min</span>
-        <span>{item.calories ?? 0} kcal</span>
-        <span>{item.protein ?? 0}g protein</span>
-        <span>{item.servings ?? 1} servings</span>
-        {item.source ? <span>{item.source}</span> : null}
+        {metaItems.map((meta) => (
+          <span key={meta}>{meta}</span>
+        ))}
       </div>
 
       {expanded ? (
