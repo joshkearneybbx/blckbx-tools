@@ -428,6 +428,48 @@ const mergeUniqueTransfers = (primary: any[], fallback: any[]): any[] => {
   return result;
 };
 
+const normalizeTaxiTransfer = (item: any, fallbackId: string): TaxiTransfer => {
+  const transferType = String(item?.transferType || "").toLowerCase();
+  return {
+    id: item?.id || fallbackId,
+    transferType: transferType === "private_car" || transferType === "shuttle" || transferType === "bus" || transferType === "other"
+      ? transferType
+      : "taxi",
+    company: item?.company || item?.provider || "",
+    contact: item?.contact || item?.contactDetails || "",
+    vehicleRegistration: item?.vehicleRegistration || item?.confirmationNumber || "",
+    collectionTime: item?.collectionTime || item?.pickupTime || item?.departureTime || "",
+    pickupLocation: item?.pickupLocation || item?.fromLocation || item?.departingFrom || "",
+    dropoffLocation: item?.dropoffLocation || item?.toLocation || item?.destination || "",
+    paymentStatus: item?.paymentStatus || "",
+  };
+};
+
+const normalizeTrainTransfer = (item: any, fallbackId: string): TrainTransfer => {
+  return {
+    id: item?.id || fallbackId,
+    departingStation: item?.departingStation || item?.fromLocation || item?.departureStation || "",
+    arrivalStation: item?.arrivalStation || item?.toLocation || item?.destination || "",
+    departureTime: item?.departureTime || item?.collectionTime || "",
+    provider: item?.provider || item?.company || "",
+    bookingRef: item?.bookingRef || item?.bookingReference || "",
+    paymentStatus: item?.paymentStatus || "",
+    notes: item?.notes || "",
+  };
+};
+
+const normalizeTaxiTransfers = (items: any[], keyPrefix: string): TaxiTransfer[] => {
+  return (Array.isArray(items) ? items : [])
+    .filter(Boolean)
+    .map((item, index) => normalizeTaxiTransfer(item, `${keyPrefix}-taxi-${index}`));
+};
+
+const normalizeTrainTransfers = (items: any[], keyPrefix: string): TrainTransfer[] => {
+  return (Array.isArray(items) ? items : [])
+    .filter(Boolean)
+    .map((item, index) => normalizeTrainTransfer(item, `${keyPrefix}-train-${index}`));
+};
+
 const initialData: WizardData = {
   title: "",
   assistantName: "",
@@ -600,6 +642,10 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
   const detailsToAirport = parseJsonArray(data.transferToAirportDetails);
   const detailsToAccom = parseJsonArray(data.transferToAccomDetails);
   const legs = parseJsonArray(data.legs);
+  const transferToAirportTaxisRaw = parseJsonArray(data.transferToAirportTaxis);
+  const transferToAirportTrainsRaw = parseJsonArray(data.transferToAirportTrains);
+  const transferToAccomTaxisRaw = parseJsonArray(data.transferToAccomTaxis);
+  const transferToAccomTrainsRaw = parseJsonArray(data.transferToAccomTrains);
   const splitToAirport = splitTransferDetails(detailsToAirport);
   const splitToAccom = splitTransferDetails(detailsToAccom);
   
@@ -627,19 +673,19 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
     }
   }
   const transferToAirportTaxis = mergeUniqueTransfers(
-    Array.isArray(data.transferToAirportTaxis) ? data.transferToAirportTaxis : [],
+    transferToAirportTaxisRaw,
     splitToAirport.road
   );
   const transferToAirportTrains = mergeUniqueTransfers(
-    Array.isArray(data.transferToAirportTrains) ? data.transferToAirportTrains : [],
+    transferToAirportTrainsRaw,
     splitToAirport.rail
   );
   const transferToAccomTaxis = mergeUniqueTransfers(
-    Array.isArray(data.transferToAccomTaxis) ? data.transferToAccomTaxis : [],
+    transferToAccomTaxisRaw,
     splitToAccom.road
   );
   const transferToAccomTrains = mergeUniqueTransfers(
-    Array.isArray(data.transferToAccomTrains) ? data.transferToAccomTrains : [],
+    transferToAccomTrainsRaw,
     splitToAccom.rail
   );
   
@@ -658,8 +704,8 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
     transferToAirportTrainBookingRef: data.transferToAirportTrainBookingRef || "",
     transferToAirportTrainPaymentStatus: data.transferToAirportTrainPaymentStatus || "",
     transferToAirportTrainNotes: data.transferToAirportTrainNotes || "",
-    transferToAirportTaxis,
-    transferToAirportTrains,
+    transferToAirportTaxis: normalizeTaxiTransfers(transferToAirportTaxis, "outbound-to-airport"),
+    transferToAirportTrains: normalizeTrainTransfers(transferToAirportTrains, "outbound-to-airport"),
     flightNumber: data.flightNumber || "",
     flightDate: data.flightDate || "",
     departureAirport: data.departureAirport || "",
@@ -687,8 +733,8 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
     transferToAccomTrainBookingRef: data.transferToAccomTrainBookingRef || "",
     transferToAccomTrainPaymentStatus: data.transferToAccomTrainPaymentStatus || "",
     transferToAccomTrainNotes: data.transferToAccomTrainNotes || "",
-    transferToAccomTaxis,
-    transferToAccomTrains,
+    transferToAccomTaxis: normalizeTaxiTransfers(transferToAccomTaxis, "outbound-to-accom"),
+    transferToAccomTrains: normalizeTrainTransfers(transferToAccomTrains, "outbound-to-accom"),
     additionalSegments: Array.isArray(data.additionalSegments) ? data.additionalSegments : [],
   };
 }
@@ -699,6 +745,10 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
   const detailsToAirport = parseJsonArray(data.transferToAirportDetails);
   const detailsHome = parseJsonArray(data.transferHomeDetails);
   const legs = parseJsonArray(data.legs);
+  const transferToAirportTaxisRaw = parseJsonArray(data.transferToAirportTaxis);
+  const transferToAirportTrainsRaw = parseJsonArray(data.transferToAirportTrains);
+  const transferHomeTaxisRaw = parseJsonArray(data.transferHomeTaxis);
+  const transferHomeTrainsRaw = parseJsonArray(data.transferHomeTrains);
   const splitToAirport = splitTransferDetails(detailsToAirport);
   const splitHome = splitTransferDetails(detailsHome);
   
@@ -726,19 +776,19 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
     }
   }
   const transferToAirportTaxis = mergeUniqueTransfers(
-    Array.isArray(data.transferToAirportTaxis) ? data.transferToAirportTaxis : [],
+    transferToAirportTaxisRaw,
     splitToAirport.road
   );
   const transferToAirportTrains = mergeUniqueTransfers(
-    Array.isArray(data.transferToAirportTrains) ? data.transferToAirportTrains : [],
+    transferToAirportTrainsRaw,
     splitToAirport.rail
   );
   const transferHomeTaxis = mergeUniqueTransfers(
-    Array.isArray(data.transferHomeTaxis) ? data.transferHomeTaxis : [],
+    transferHomeTaxisRaw,
     splitHome.road
   );
   const transferHomeTrains = mergeUniqueTransfers(
-    Array.isArray(data.transferHomeTrains) ? data.transferHomeTrains : [],
+    transferHomeTrainsRaw,
     splitHome.rail
   );
   
@@ -757,8 +807,8 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
     transferToAirportTrainBookingRef: data.transferToAirportTrainBookingRef || "",
     transferToAirportTrainPaymentStatus: data.transferToAirportTrainPaymentStatus || "",
     transferToAirportTrainNotes: data.transferToAirportTrainNotes || "",
-    transferToAirportTaxis,
-    transferToAirportTrains,
+    transferToAirportTaxis: normalizeTaxiTransfers(transferToAirportTaxis, "return-to-airport"),
+    transferToAirportTrains: normalizeTrainTransfers(transferToAirportTrains, "return-to-airport"),
     flightNumber: data.flightNumber || "",
     flightDate: data.flightDate || "",
     departureAirport: data.departureAirport || "",
@@ -786,8 +836,8 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
     transferHomeTrainBookingRef: data.transferHomeTrainBookingRef || "",
     transferHomeTrainPaymentStatus: data.transferHomeTrainPaymentStatus || "",
     transferHomeTrainNotes: data.transferHomeTrainNotes || "",
-    transferHomeTaxis,
-    transferHomeTrains,
+    transferHomeTaxis: normalizeTaxiTransfers(transferHomeTaxis, "return-home"),
+    transferHomeTrains: normalizeTrainTransfers(transferHomeTrains, "return-home"),
     additionalSegments: Array.isArray(data.additionalSegments) ? data.additionalSegments : [],
   };
 }
@@ -804,6 +854,7 @@ function mapAccommodationFromDb(acc: any): WizardData['accommodations'][0] {
     contactInfo: acc.contactInfo || "",
     images: acc.images || [],
     primaryImage: acc.primaryImage || "",
+    notes: acc.notes || "",
     displayOrder: acc.displayOrder,
   };
 }
@@ -819,6 +870,7 @@ function mapActivityFromDb(act: any): WizardData['activities'][0] {
     websiteUrl: act.websiteUrl || "",
     images: act.images || [],
     primaryImage: act.primaryImage || "",
+    notes: act.notes || "",
     displayOrder: act.displayOrder,
   };
 }
@@ -826,6 +878,7 @@ function mapActivityFromDb(act: any): WizardData['activities'][0] {
 function mapDiningFromDb(rest: any): WizardData['dining'][0] {
   return {
     name: rest.name,
+    description: rest.description || "",
     cuisineType: rest.cuisineType || "",
     priceRange: rest.priceRange || "",
     contactDetails: rest.contactDetails || "",
@@ -834,6 +887,7 @@ function mapDiningFromDb(rest: any): WizardData['dining'][0] {
     websiteUrl: rest.websiteUrl || "",
     images: rest.images || [],
     primaryImage: rest.primaryImage || "",
+    notes: rest.notes || "",
     displayOrder: rest.displayOrder,
   };
 }
@@ -841,6 +895,7 @@ function mapDiningFromDb(rest: any): WizardData['dining'][0] {
 function mapBarFromDb(bar: any): WizardData['bars'][0] {
   return {
     name: bar.name,
+    description: bar.description || "",
     barType: bar.barType || "",
     priceRange: bar.priceRange || "",
     contactDetails: bar.contactDetails || "",
@@ -849,6 +904,7 @@ function mapBarFromDb(bar: any): WizardData['bars'][0] {
     websiteUrl: bar.websiteUrl || "",
     images: bar.images || [],
     primaryImage: bar.primaryImage || "",
+    notes: bar.notes || "",
     displayOrder: bar.displayOrder,
   };
 }
@@ -1341,6 +1397,12 @@ export default function CreateItinerary() {
                 debugLog('=== LOADING ADDITIONAL TRAVEL FROM PROJECT ===');
                 debugLog('additionalTravelSegments:', project.additionalTravelSegments);
                 return project.additionalTravelSegments;
+              }
+              // Legacy project field fallback
+              if (project.additionalTravel && Array.isArray(project.additionalTravel)) {
+                debugLog('=== LOADING LEGACY ADDITIONAL TRAVEL FROM PROJECT ===');
+                debugLog('additionalTravel:', project.additionalTravel);
+                return project.additionalTravel;
               }
               // Fallback to outboundTravel.additionalSegments
               if (outboundTravel?.additionalSegments && Array.isArray(outboundTravel.additionalSegments)) {
