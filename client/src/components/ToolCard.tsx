@@ -8,6 +8,7 @@ export interface Tool {
   icon: LucideIcon;
   href: string | null;
   status: "active" | "coming-soon" | "placeholder";
+  badge?: string;
 }
 
 interface ToolCardProps {
@@ -28,7 +29,13 @@ export function ToolCard({ tool }: ToolCardProps) {
 
   const content = (
     <>
-      {isComingSoon && (
+      {tool.badge ? (
+        <span className="absolute top-4 right-4 bg-[#E7C51C] text-[#1a1a1a] text-xs font-medium px-2 py-1 rounded-full">
+          {tool.badge}
+        </span>
+      ) : null}
+
+      {isComingSoon && !tool.badge && (
         <span className="absolute top-4 right-4 bg-[#E7C51C] text-[#1a1a1a] text-xs font-medium px-2 py-1 rounded-full">
           Coming Soon
         </span>

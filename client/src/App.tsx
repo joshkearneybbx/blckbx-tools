@@ -10,6 +10,7 @@ import SectionBuilder from "@/pages/SectionBuilder";
 import PreviewArrange from "@/pages/PreviewArrange";
 import ListEditor from "@/pages/ListEditor";
 import BigPurchases from "@/pages/BigPurchases";
+import TaskGuidePage from "@/pages/task-guide/TaskGuidePage";
 import Login from "@/pages/Login";
 import OAuthCallback from "@/pages/OAuthCallback";
 import NotFound from "@/pages/not-found";
@@ -123,6 +124,15 @@ function Router() {
           {() => (
             <ProtectedRoute>
               <BigPurchases />
+            </ProtectedRoute>
+          )}
+        </Route>
+
+        {/* Task Guide Tool */}
+        <Route path="/task-guide">
+          {() => (
+            <ProtectedRoute>
+              <TaskGuidePage />
             </ProtectedRoute>
           )}
         </Route>

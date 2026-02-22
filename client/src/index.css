@@ -2,8 +2,8 @@
    BLCK BX DESIGN SYSTEM - Dark Sand + Yellow CTA
    ============================================================ */
 
-/* Project typography: Noto Serif */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&display=swap');
+/* Project typography: Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -172,8 +172,8 @@
   /* =========================================
      TYPOGRAPHY
      ========================================= */
-  --font-sans: "Noto Serif", "Times New Roman", serif;
-  --font-serif: "Noto Serif", "Times New Roman", serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "Maison Neue Mono", "SF Mono", Menlo, Monaco, "Courier New", monospace;
 
   /* =========================================

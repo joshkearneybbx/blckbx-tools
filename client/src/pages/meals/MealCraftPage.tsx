@@ -424,7 +424,6 @@ export default function MealCraftPage() {
         <div className="mb-6 flex items-center justify-between rounded-[10px] border border-[#E6E5E0] bg-white px-5 py-3 shadow-sm">
           <div className="flex items-center gap-2">
             <h1 className="text-[15px] font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">MealCraft</h1>
-            <span className="rounded-full bg-[#E7C51C] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.5px] text-black">Beta</span>
           </div>
         </div>
 

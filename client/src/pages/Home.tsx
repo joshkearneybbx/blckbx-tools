@@ -18,8 +18,9 @@ const tools: Tool[] = [
     name: "Task Guide",
     description: "Not sure how to complete a task? Ask the Task Guide to help you",
     icon: ClipboardList,
-    href: null,
-    status: "coming-soon",
+    href: "/task-guide",
+    status: "active",
+    badge: "Testing",
   },
   {
     id: "itinerary",
@@ -44,6 +45,7 @@ const tools: Tool[] = [
     icon: UtensilsCrossed,
     href: "/meals",
     status: "active",
+    badge: "Testing",
   },
 ];
 

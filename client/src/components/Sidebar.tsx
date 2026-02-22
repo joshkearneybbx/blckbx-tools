@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -77,6 +77,12 @@ export function Sidebar() {
           icon={ReceiptPoundSterling}
           label="Big Purchases"
           active={location.startsWith("/big-purchases")}
+        />
+        <SidebarLink
+          to="/task-guide"
+          icon={ClipboardList}
+          label="Task Guide"
+          active={location.startsWith("/task-guide")}
         />
       </nav>
       {isAuthenticated && (
