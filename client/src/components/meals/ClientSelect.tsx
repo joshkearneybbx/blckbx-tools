@@ -6,6 +6,7 @@ import type { MealCraftClient } from "@/lib/meals/api";
 import { useClients } from "@/hooks/meals/useClients";
 import { ClientCard } from "./ClientCard";
 import { PastPlansModal } from "./PastPlansModal";
+import { NewClientModal } from "./NewClientModal";
 
 interface ClientSelectProps {
   selectedClient: MealCraftClient | null;
@@ -24,13 +25,20 @@ export function ClientSelect({
 }: ClientSelectProps) {
   const [search, setSearch] = useState("");
   const [pastPlansClient, setPastPlansClient] = useState<MealCraftClient | null>(null);
+  const [newClientOpen, setNewClientOpen] = useState(false);
   const { data: clients = [], isLoading } = useClients(search);
 
   return (
     <div className="rounded-[14px] border border-[#E6E5E0] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#E6E5E0] px-5 py-4">
         <h3 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Select Client</h3>
-        <Button type="button" variant="outline" size="sm" disabled className="gap-1.5 border-[#E6E5E0] text-[#9B9797]">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5 border-[#E6E5E0] text-[#424242] hover:border-[#D0D6D0]"
+          onClick={() => setNewClientOpen(true)}
+        >
           <UserPlus className="h-3.5 w-3.5" />
           New Client
         </Button>
@@ -94,6 +102,15 @@ export function ClientSelect({
           if (!pastPlansClient) return;
           await onLoadPlan(planId, pastPlansClient);
           setPastPlansClient(null);
+        }}
+      />
+
+      <NewClientModal
+        open={newClientOpen}
+        onOpenChange={setNewClientOpen}
+        onCreated={(client) => {
+          onSelectClient(client);
+          setNewClientOpen(false);
         }}
       />
     </div>

@@ -32,14 +32,6 @@ function Footer({ pageNumber }: { pageNumber: number }) {
   );
 }
 
-function sourceLabel(source?: string): string {
-  if (!source) return "Source";
-  return sanitizePdfText(source
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" "));
-}
-
 export function RecipeCard({
   recipe,
   images,
@@ -54,7 +46,6 @@ export function RecipeCard({
   const calories = recipe.calories ?? recipe.recipe?.calories;
   const protein = recipe.protein ?? recipe.recipe?.protein;
   const servings = recipe.servings ?? recipe.recipe?.servings;
-  const source = recipe.source ?? recipe.recipe?.source;
   const sourceUrl = recipe.source_url ?? recipe.recipe?.source_url;
   const recipeImageId = recipe.recipe?.id ?? recipe.recipe_id ?? recipe.id;
   const imageData = recipeImageId ? images?.[recipeImageId] : undefined;
@@ -63,11 +54,18 @@ export function RecipeCard({
     <View style={pdfStyles.recipeCard} wrap={false}>
       <View style={pdfStyles.recipeHeader}>
         <Text style={pdfStyles.dayBadge}>Day {recipe.pdfDayNumber}</Text>
-        {sourceUrl ? (
-          <Link src={sourceUrl} style={pdfStyles.recipeTitle}>{title}</Link>
-        ) : (
-          <Text style={pdfStyles.recipeTitle}>{title}</Text>
-        )}
+        <View style={pdfStyles.recipeTitleRow}>
+          {sourceUrl ? (
+            <>
+              <Link src={sourceUrl} style={pdfStyles.recipeTitle}>{title}</Link>
+              <View style={pdfStyles.recipeTitleIcon}>
+                <LinkIcon size={9} color="#E7C51C" />
+              </View>
+            </>
+          ) : (
+            <Text style={pdfStyles.recipeTitle}>{title}</Text>
+          )}
+        </View>
       </View>
 
       <View style={pdfStyles.recipeBody}>
@@ -96,10 +94,6 @@ export function RecipeCard({
             <View style={pdfStyles.metaItem}>
               <UsersIcon size={9} color="#6B6B68" />
               <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{servings ?? 1} servings</Text></Text>
-            </View>
-            <View style={pdfStyles.metaItem}>
-              <LinkIcon size={9} color="#6B6B68" />
-              <Text style={pdfStyles.metaText}>{sourceLabel(source)}</Text>
             </View>
           </View>
         </View>

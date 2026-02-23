@@ -147,6 +147,11 @@ function toNumber(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function pickImageUrl(...values: unknown[]): string {
+  const match = values.find((value) => typeof value === "string" && value.trim().length > 0) as string | undefined;
+  return match ? enhanceImageUrl(match.trim()) : "";
+}
+
 export function enhanceImageUrl(url: string): string {
   if (!url) return url;
   if (url.includes("scene7.com")) {
@@ -192,7 +197,7 @@ function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
         title: String(rawMeal.recipe.title ?? rawMeal.title ?? "Untitled meal"),
         source: rawMeal.recipe.source,
         source_url: rawMeal.recipe.source_url,
-        image_url: enhanceImageUrl(String(rawMeal.recipe.image_url ?? "")),
+        image_url: pickImageUrl(rawMeal.recipe.image_url, rawMeal.recipe.imageUrl, rawMeal.recipe.image),
         cook_time: toNumber(rawMeal.recipe.cook_time),
         prep_time: toNumber(rawMeal.recipe.prep_time),
         calories: toNumber(rawMeal.recipe.calories),
@@ -217,7 +222,7 @@ function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
     title: String(rawMeal.title ?? recipe?.title ?? "Untitled meal"),
     source: String(rawMeal.source ?? recipe?.source ?? ""),
     source_url: String(rawMeal.source_url ?? recipe?.source_url ?? ""),
-    image_url: enhanceImageUrl(String(rawMeal.image_url ?? recipe?.image_url ?? "")),
+    image_url: pickImageUrl(rawMeal.image_url, rawMeal.imageUrl, rawMeal.image, recipe?.image_url),
     ingredients: asArrayString(rawMeal.ingredients).length
       ? asArrayString(rawMeal.ingredients)
       : recipe?.ingredients,

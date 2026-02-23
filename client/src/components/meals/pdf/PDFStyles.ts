@@ -224,6 +224,14 @@ export const pdfStyles = StyleSheet.create({
     flex: 1,
     textDecoration: "none",
   },
+  recipeTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  recipeTitleIcon: {
+    marginLeft: 6,
+  },
   recipeBody: {
     padding: 10,
   },

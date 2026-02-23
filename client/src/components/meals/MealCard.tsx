@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 import { enhanceImageUrl, type MealPlanItem } from "@/lib/meals/api";
 
@@ -24,6 +24,10 @@ export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
   const ingredients = item.ingredients ?? item.recipe?.ingredients ?? [];
   const instructions = item.instructions ?? item.recipe?.instructions ?? [];
   const imageUrl = enhanceImageUrl(item.image_url || item.recipe?.image_url || "");
+
+  useEffect(() => {
+    setImgError(false);
+  }, [imageUrl]);
   const calories = item.calories ?? item.recipe?.calories ?? 0;
   const protein = item.protein ?? item.recipe?.protein ?? 0;
   const metaItems = [
