@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 
-const DEFAULT_TASK_GUIDE_WEBHOOK = "https://n8n.blckbx.co.uk/webhook/task-guide";
+const DEFAULT_TASK_GUIDE_WEBHOOK = "";
 const TASK_GUIDE_TIMEOUT_MS = 60_000;
 
 function withTimeout(ms: number): AbortSignal {
