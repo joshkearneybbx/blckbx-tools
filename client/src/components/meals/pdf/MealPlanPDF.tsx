@@ -58,7 +58,7 @@ export function MealPlanPDF({
 
   const menuOverview = plan.map((day) => ({
     dayLabel: `Day ${day.day_number}`,
-    title: day.meals[0]?.title ?? day.meals[0]?.recipe?.title ?? "Meal plan entry",
+    titles: day.meals.map((meal) => meal.title ?? meal.recipe?.title ?? "Meal plan entry"),
   }));
 
   const firstRecipe = recipes[0] ?? null;

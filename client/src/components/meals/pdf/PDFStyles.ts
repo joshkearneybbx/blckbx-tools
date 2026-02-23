@@ -191,6 +191,7 @@ export const pdfStyles = StyleSheet.create({
     color: pdfColors.black,
     fontWeight: 600,
     lineHeight: 1.3,
+    marginBottom: 2,
   },
   recipeCard: {
     borderWidth: 1,

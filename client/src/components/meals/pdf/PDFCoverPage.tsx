@@ -6,7 +6,7 @@ import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
 
 interface MenuOverviewItem {
   dayLabel: string;
-  title: string;
+  titles: string[];
 }
 
 interface PDFCoverPageProps {
@@ -103,7 +103,11 @@ export function PDFCoverPage({
             <View key={`${item.dayLabel}-${index}`} style={pdfStyles.menuCard}>
               <View style={pdfStyles.menuCardInner}>
                 <Text style={pdfStyles.menuDay}>{item.dayLabel}</Text>
-                <Text style={pdfStyles.menuTitle}>{item.title}</Text>
+                {(item.titles?.length ? item.titles : ["Meal plan entry"]).map((title, titleIndex) => (
+                  <Text key={`${item.dayLabel}-${titleIndex}`} style={pdfStyles.menuTitle}>
+                    {title}
+                  </Text>
+                ))}
               </View>
             </View>
           ))}
