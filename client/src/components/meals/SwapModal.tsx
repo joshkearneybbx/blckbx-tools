@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { MealCraftRecipe } from "@/lib/meals/api";
 import { RecipeSearch } from "./RecipeSearch";
+import { ImportRecipeModal } from "./ImportRecipeModal";
 
 interface SwapModalProps {
   open: boolean;
@@ -17,6 +18,7 @@ export function SwapModal({ open, onOpenChange, onConfirm, isSwapping }: SwapMod
   const [mode, setMode] = useState<"suggest" | "specific">("suggest");
   const [reason, setReason] = useState("");
   const [recipe, setRecipe] = useState<MealCraftRecipe | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const canSubmit = useMemo(() => {
     if (mode === "suggest") return reason.trim().length > 0;
@@ -43,7 +45,7 @@ export function SwapModal({ open, onOpenChange, onConfirm, isSwapping }: SwapMod
         <DialogHeader className="border-b border-[#E6E5E0] px-5 py-4 text-left">
           <DialogTitle className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Swap Meal</DialogTitle>
           <DialogDescription className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
-            Choose AI suggest mode or pick a specific replacement recipe.
+            Choose AI suggest mode, pick from the recipe library, or import a recipe URL.
           </DialogDescription>
         </DialogHeader>
 
@@ -67,8 +69,20 @@ export function SwapModal({ open, onOpenChange, onConfirm, isSwapping }: SwapMod
                 mode === "specific" ? "border-[#1a1a1a] bg-[#1a1a1a] text-white" : "border-[#E6E5E0]",
               ].join(" ")}
             >
-              Specific Recipe
+              Recipe Library
             </button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setMode("specific");
+                setImportOpen(true);
+              }}
+              className="rounded-full border-[#E6E5E0] bg-white px-3 py-1 text-xs font-medium text-[#424242] hover:bg-[#FAF9F8]"
+            >
+              Import from URL
+            </Button>
           </div>
 
           {mode === "suggest" ? (
@@ -107,6 +121,18 @@ export function SwapModal({ open, onOpenChange, onConfirm, isSwapping }: SwapMod
           </div>
         </div>
       </DialogContent>
+
+      <ImportRecipeModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(importedRecipe) => {
+          setRecipe({
+            id: importedRecipe.id,
+            title: importedRecipe.title,
+            source: importedRecipe.source,
+          });
+        }}
+      />
     </Dialog>
   );
 }

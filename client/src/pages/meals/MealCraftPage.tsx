@@ -9,6 +9,7 @@ import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCr
 import { GeneratingLoader } from "@/components/meals/GeneratingLoader";
 import { PlanReview } from "@/components/meals/PlanReview";
 import { ShoppingList as ShoppingListSection } from "@/components/meals/ShoppingList";
+import { ImportRecipeModal } from "@/components/meals/ImportRecipeModal";
 import { Button } from "@/components/ui/button";
 import { useGeneratePlan } from "@/hooks/meals/useGeneratePlan";
 import { useSwapMeal } from "@/hooks/meals/useSwapMeal";
@@ -157,6 +158,7 @@ export default function MealCraftPage() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
   const [isMarkingAsSent, setIsMarkingAsSent] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const generateMutation = useGeneratePlan();
   const swapMutation = useSwapMeal();
@@ -499,6 +501,7 @@ export default function MealCraftPage() {
             onChange={setCriteria}
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
+            onOpenImportRecipe={() => setImportModalOpen(true)}
           />
         ) : null}
 
@@ -528,6 +531,11 @@ export default function MealCraftPage() {
           />
         ) : null}
       </div>
+
+      <ImportRecipeModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+      />
     </div>
   );
 }

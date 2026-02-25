@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,7 @@ interface PlanCriteriaProps {
   onChange: (next: PlanCriteriaValues) => void;
   onGenerate: () => void;
   isGenerating: boolean;
+  onOpenImportRecipe: () => void;
 }
 
 const MEAL_TYPES: Array<{ label: string; value: MealType }> = [
@@ -47,7 +48,7 @@ const FOCUS_TAGS = [
   { label: "Comfort Food", value: "comfort-food" },
 ];
 
-export function PlanCriteria({ client, values, onChange, onGenerate, isGenerating }: PlanCriteriaProps) {
+export function PlanCriteria({ client, values, onChange, onGenerate, isGenerating, onOpenImportRecipe }: PlanCriteriaProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const setField = <K extends keyof PlanCriteriaValues>(key: K, value: PlanCriteriaValues[K]) => {
@@ -61,6 +62,16 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
           <h3 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Plan Criteria</h3>
           <p className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">Client: {client.name}</p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onOpenImportRecipe}
+          className="h-8 border-[#1a1a1a] bg-white px-3 text-xs font-semibold text-[#1a1a1a] hover:bg-[#FAF9F8]"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Import Recipe
+        </Button>
       </div>
 
       <div className="space-y-4 p-5">
