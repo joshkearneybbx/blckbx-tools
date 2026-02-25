@@ -28,6 +28,11 @@ export interface TaskGuidePartner {
   category?: string;
   url?: string;
   website?: string;
+  price_category?: string;
+  login_notes?: string;
+  commission?: string;
+  partnership_type?: string;
+  partnership_link?: string;
 }
 
 export interface TaskGuideCortexItem {
@@ -82,6 +87,11 @@ function normalizeResponse(raw: any): TaskGuideResult {
       category: partner?.category ? String(partner.category) : undefined,
       url: partner?.url ? String(partner.url) : undefined,
       website: partner?.website ? String(partner.website) : undefined,
+      price_category: partner?.price_category ? String(partner.price_category) : undefined,
+      login_notes: partner?.login_notes ? String(partner.login_notes) : undefined,
+      commission: partner?.commission ? String(partner.commission) : undefined,
+      partnership_type: partner?.partnership_type ? String(partner.partnership_type) : undefined,
+      partnership_link: partner?.partnership_link ? String(partner.partnership_link) : undefined,
     })),
     cortex: (Array.isArray(raw?.cortex) ? raw.cortex : []).map((item: any) => ({
       name: String(item?.name ?? "Unnamed recommendation"),
