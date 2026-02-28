@@ -19,6 +19,7 @@ export function ToolCard({ tool }: ToolCardProps) {
   const isActive = tool.status === "active";
   const isComingSoon = tool.status === "coming-soon";
   const isPlaceholder = tool.status === "placeholder";
+  const isExternal = Boolean(tool.href && /^https?:\/\//.test(tool.href));
 
   const cardClassName = `
     relative bg-white rounded-xl p-8 text-center
@@ -61,6 +62,14 @@ export function ToolCard({ tool }: ToolCardProps) {
       </p>
     </>
   );
+
+  if (isActive && tool.href && isExternal) {
+    return (
+      <a href={tool.href} className={cardClassName}>
+        {content}
+      </a>
+    );
+  }
 
   if (isActive && tool.href) {
     return (

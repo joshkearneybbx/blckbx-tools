@@ -50,7 +50,7 @@ const tools: Tool[] = [
     name: "Purchase Logger",
     description: "Log recipient purchases and track gifting signals",
     icon: ShoppingBag,
-    href: "/purchase-logger",
+    href: "https://bxgig.blckbx.co.uk/purchase-logger",
     status: "active",
     badge: "New",
   },
