@@ -80,7 +80,17 @@ type PurchasesResponse = {
   }>;
 };
 
-const API_BASE = "/api/gift-graph";
+const API_BASE = "https://bxgig.blckbx.co.uk";
+const CF_ACCESS_CLIENT_ID = import.meta.env.VITE_CF_ACCESS_CLIENT_ID || "";
+const CF_ACCESS_CLIENT_SECRET = import.meta.env.VITE_CF_ACCESS_CLIENT_SECRET || "";
+
+function getAccessHeaders(contentTypeJson = false): HeadersInit {
+  return {
+    ...(contentTypeJson ? { "Content-Type": "application/json" } : {}),
+    "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
+    "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
+  };
+}
 
 const initialFormState = (): PurchaseFormState => ({
   reason: "",
@@ -157,8 +167,6 @@ export default function PurchaseLogger() {
   const [showValidation, setShowValidation] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const apiEnabled = useMemo(() => Boolean(API_BASE), []);
-
   const hasInvalidFields =
     !selectedClient ||
     !selectedRecipient ||
@@ -190,13 +198,9 @@ export default function PurchaseLogger() {
   };
 
   const loadRecentPurchases = async () => {
-    if (!apiEnabled) {
-      setRecentPurchases([]);
-      return;
-    }
-
     try {
       const response = await fetch(`${API_BASE}/purchases?limit=10`, {
+        headers: getAccessHeaders(),
         credentials: "include",
       });
 
@@ -223,11 +227,6 @@ export default function PurchaseLogger() {
   }, []);
 
   useEffect(() => {
-    if (!apiEnabled) {
-      setClientOptions([]);
-      return;
-    }
-
     const search = clientQuery.trim();
     const timeout = setTimeout(async () => {
       setClientLoading(true);
@@ -239,6 +238,7 @@ export default function PurchaseLogger() {
         }
 
         const response = await fetch(`${API_BASE}/client-accounts?${params.toString()}`, {
+          headers: getAccessHeaders(),
           credentials: "include",
         });
 
@@ -257,14 +257,14 @@ export default function PurchaseLogger() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [apiEnabled, clientQuery]);
+  }, [clientQuery]);
 
   useEffect(() => {
     setSelectedRecipient(null);
     setRecipientQuery("");
     setRecipientOptions([]);
 
-    if (!apiEnabled || !selectedClient?._key) {
+    if (!selectedClient?._key) {
       return;
     }
 
@@ -273,7 +273,7 @@ export default function PurchaseLogger() {
       try {
         const response = await fetch(
           `${API_BASE}/client-accounts/${selectedClient._key}/recipients`,
-          { credentials: "include" },
+          { headers: getAccessHeaders(), credentials: "include" },
         );
 
         if (!response.ok) {
@@ -291,14 +291,9 @@ export default function PurchaseLogger() {
     };
 
     void run();
-  }, [apiEnabled, selectedClient?._key]);
+  }, [selectedClient?._key]);
 
   useEffect(() => {
-    if (!apiEnabled) {
-      setProductOptions([]);
-      return;
-    }
-
     const search = productQuery.trim();
     if (search.length < 2) {
       setProductOptions([]);
@@ -314,6 +309,7 @@ export default function PurchaseLogger() {
         params.set("limit", "10");
 
         const response = await fetch(`${API_BASE}/products/search?${params.toString()}`, {
+          headers: getAccessHeaders(),
           credentials: "include",
         });
 
@@ -332,7 +328,7 @@ export default function PurchaseLogger() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [apiEnabled, productQuery]);
+  }, [productQuery]);
 
   const resetForm = () => {
     setFormState((prev) => ({
@@ -360,11 +356,6 @@ export default function PurchaseLogger() {
       return;
     }
 
-    if (!apiEnabled) {
-      setErrorMessage("API base is not configured.");
-      return;
-    }
-
     setIsCreatingRecipient(true);
     setErrorMessage("");
 
@@ -381,7 +372,7 @@ export default function PurchaseLogger() {
 
       const response = await fetch(`${API_BASE}/client-accounts/${selectedClient._key}/recipients`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAccessHeaders(true),
         credentials: "include",
         body: JSON.stringify(body),
       });
@@ -431,17 +422,12 @@ export default function PurchaseLogger() {
       return;
     }
 
-    if (!apiEnabled) {
-      setErrorMessage("API base is not configured.");
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
       const response = await fetch(`${API_BASE}/purchases`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAccessHeaders(true),
         credentials: "include",
         body: JSON.stringify({
           client_account_key: selectedClient?._key,
@@ -592,7 +578,7 @@ export default function PurchaseLogger() {
                     <div className="px-4 py-3 text-sm text-gray-500">Loading recipients...</div>
                   ) : (
                     <>
-                      {recipientMatches.map((item) => (
+                      {recipientMatches.map((item: Recipient) => (
                         <button
                           key={item._key}
                           type="button"

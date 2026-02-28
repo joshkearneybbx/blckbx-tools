@@ -22,12 +22,5 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
-    proxy: {
-      "/api/gift-graph": {
-        target: "http://blckbx-api:3000",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/gift-graph/, ""),
-      },
-    },
   },
 });
