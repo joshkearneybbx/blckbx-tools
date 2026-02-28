@@ -10,6 +10,7 @@ import SectionBuilder from "@/pages/SectionBuilder";
 import PreviewArrange from "@/pages/PreviewArrange";
 import ListEditor from "@/pages/ListEditor";
 import BigPurchases from "@/pages/BigPurchases";
+import PurchaseLogger from "@/pages/PurchaseLogger";
 import TaskGuidePage from "@/pages/task-guide/TaskGuidePage";
 import Login from "@/pages/Login";
 import OAuthCallback from "@/pages/OAuthCallback";
@@ -124,6 +125,15 @@ function Router() {
           {() => (
             <ProtectedRoute>
               <BigPurchases />
+            </ProtectedRoute>
+          )}
+        </Route>
+
+        {/* Purchase Logger Tool */}
+        <Route path="/purchase-logger">
+          {() => (
+            <ProtectedRoute>
+              <PurchaseLogger />
             </ProtectedRoute>
           )}
         </Route>

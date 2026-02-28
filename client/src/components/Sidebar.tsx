@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -77,6 +77,13 @@ export function Sidebar() {
           icon={ReceiptPoundSterling}
           label="Big Purchases"
           active={location.startsWith("/big-purchases")}
+        />
+        <SidebarLink
+          to="/purchase-logger"
+          icon={ShoppingBag}
+          label="Purchase Logger"
+          active={location.startsWith("/purchase-logger")}
+          badge="New"
         />
         <SidebarLink
           to="/task-guide"

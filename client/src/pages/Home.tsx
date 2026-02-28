@@ -1,4 +1,11 @@
-import { Map, UtensilsCrossed, ClipboardList, ReceiptPoundSterling, LayoutDashboard } from "lucide-react";
+import {
+  Map,
+  UtensilsCrossed,
+  ClipboardList,
+  ReceiptPoundSterling,
+  LayoutDashboard,
+  ShoppingBag,
+} from "lucide-react";
 import { ToolCard, type Tool } from "@/components/ToolCard";
 import logoUrl from "@assets/blckbx-logo.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,6 +44,15 @@ const tools: Tool[] = [
     icon: ReceiptPoundSterling,
     href: "/big-purchases",
     status: "active",
+  },
+  {
+    id: "purchase-logger",
+    name: "Purchase Logger",
+    description: "Log recipient purchases and track gifting signals",
+    icon: ShoppingBag,
+    href: "/purchase-logger",
+    status: "active",
+    badge: "New",
   },
   {
     id: "meals",

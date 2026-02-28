@@ -22,7 +22,12 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
-    // Proxy removed - PocketBase SDK makes direct requests to https://pocketbase.blckbx.co.uk
-    // No proxy needed since all API calls go through PocketBase SDK
+    proxy: {
+      "/api/gift-graph": {
+        target: "http://blckbx-api:3000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/gift-graph/, ""),
+      },
+    },
   },
 });
