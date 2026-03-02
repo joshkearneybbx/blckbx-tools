@@ -14,6 +14,7 @@ const TEAM_MEMBERS = [
   "Kate",
   "Lily",
   "Mimi",
+  "Nicole",
   "Oceane",
   "Saule",
 ] as const;
@@ -28,6 +29,8 @@ const CATEGORIES = [
   "Other",
 ] as const;
 
+const PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
+
 const WEBHOOK_URL = import.meta.env.VITE_BIG_PURCHASE_WEBHOOK_URL;
 
 type FormState = {
@@ -36,6 +39,8 @@ type FormState = {
   pointOfContact: string;
   estimatedAmount: string;
   purchaseDate: string;
+  needBy: string;
+  priority: string;
   category: string;
 };
 
@@ -53,6 +58,8 @@ const initialFormState = (): FormState => ({
   pointOfContact: "",
   estimatedAmount: "",
   purchaseDate: todayISODate(),
+  needBy: "",
+  priority: "Medium",
   category: "",
 });
 
@@ -83,6 +90,7 @@ export default function BigPurchases() {
     !formState.pointOfContact.trim() ||
     !formState.estimatedAmount.trim() ||
     !formState.purchaseDate ||
+    !formState.priority ||
     !formState.category;
 
   const getFieldClassName = (isInvalid: boolean, extra = "") =>
@@ -119,6 +127,8 @@ export default function BigPurchases() {
           pointOfContact: formState.pointOfContact,
           estimatedAmountGBP: Number(formState.estimatedAmount),
           purchaseDate: formState.purchaseDate,
+          need_by: formState.needBy,
+          priority: formState.priority,
           category: formState.category,
         }),
       });
@@ -261,7 +271,7 @@ export default function BigPurchases() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label htmlFor="purchase-date" className="block text-sm font-medium text-[#1a1a1a] mb-2">
-                    Purchase Date
+                    Today's Date
                   </label>
                   <input
                     id="purchase-date"
@@ -271,6 +281,38 @@ export default function BigPurchases() {
                     required
                     className={getFieldClassName(showValidation && !formState.purchaseDate)}
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="need-by" className="block text-sm font-medium text-[#1a1a1a] mb-2">
+                    Need By
+                  </label>
+                  <input
+                    id="need-by"
+                    type="date"
+                    value={formState.needBy}
+                    onChange={(e) => updateField("needBy", e.target.value)}
+                    className={getFieldClassName(false)}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="priority" className="block text-sm font-medium text-[#1a1a1a] mb-2">
+                    Priority
+                  </label>
+                  <select
+                    id="priority"
+                    value={formState.priority}
+                    onChange={(e) => updateField("priority", e.target.value)}
+                    required
+                    className={getFieldClassName(showValidation && !formState.priority)}
+                  >
+                    {PRIORITIES.map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
