@@ -1,5 +1,5 @@
 import { Document } from "@react-pdf/renderer";
-import type { MealPlanDay, MealPlanStats, ShoppingList } from "@/lib/meals/api";
+import { getMealMacros, type MacroOverride, type MealPlanDay, type MealPlanStats, type ShoppingList } from "@/lib/meals/api";
 import { PDFCoverPage } from "./PDFCoverPage";
 import { PDFRecipeItem, PDFRecipePage } from "./PDFRecipePage";
 import { PDFShoppingPage } from "./PDFShoppingPage";
@@ -13,6 +13,7 @@ interface MealPlanPDFProps {
   plan: MealPlanDay[];
   shoppingList: ShoppingList;
   stats: MealPlanStats;
+  macroOverrides?: Record<string, MacroOverride>;
   images?: Record<string, string>;
 }
 
@@ -45,6 +46,7 @@ export function MealPlanPDF({
   plan,
   shoppingList,
   stats,
+  macroOverrides,
   images,
 }: MealPlanPDFProps) {
   const dateLabel = formatDate(generatedAt);
@@ -66,7 +68,7 @@ export function MealPlanPDF({
   const recipePageChunks = chunk(remainingRecipes, 2);
 
   const totalCalories = plan.reduce((sum, day) => {
-    return sum + day.meals.reduce((mealSum, meal) => mealSum + (meal.calories ?? meal.recipe?.calories ?? 0), 0);
+    return sum + day.meals.reduce((mealSum, meal) => mealSum + (getMealMacros(meal, macroOverrides).calories ?? 0), 0);
   }, 0);
 
   const averageKcalPerDay = plan.length > 0 ? round(totalCalories / plan.length) : 0;
@@ -83,6 +85,7 @@ export function MealPlanPDF({
         stats={stats}
         menuOverview={menuOverview}
         firstRecipe={firstRecipe}
+        macroOverrides={macroOverrides}
         images={images}
       />
 
@@ -92,6 +95,7 @@ export function MealPlanPDF({
           dateLabel={dateLabel}
           pageNumber={index + 2}
           recipes={recipesChunk}
+          macroOverrides={macroOverrides}
           images={images}
         />
       ))}

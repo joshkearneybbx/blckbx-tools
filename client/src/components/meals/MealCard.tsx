@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
-import { enhanceImageUrl, type MealPlanItem } from "@/lib/meals/api";
+import { ChevronDown, ChevronUp, Pencil, RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
+import { enhanceImageUrl, getMealMacros, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
 
 interface MealCardProps {
   item: MealPlanItem;
+  macroOverride?: MacroOverride;
   onSwap: () => void;
   onFeedback: (feedback: "liked" | "disliked") => void;
+  onSaveMacros: (macros: MacroOverride) => void;
+  onSaveTitle: (title: string) => Promise<void> | void;
 }
 
 const MEAL_TYPE_STYLES: Record<string, string> = {
@@ -15,25 +18,69 @@ const MEAL_TYPE_STYLES: Record<string, string> = {
   snack: "bg-[#E8F5E9] text-[#1EA86B]",
 };
 
-export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
+function toInputValue(value?: number): string {
+  return typeof value === "number" && value > 0 ? String(value) : "";
+}
+
+function parseMacroInput(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
+
+export function MealCard({ item, macroOverride, onSwap, onFeedback, onSaveMacros, onSaveTitle }: MealCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [isEditingMacros, setIsEditingMacros] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
 
   const currentFeedback = item.feedback ?? null;
   const title = item.title ?? item.recipe?.title ?? "Untitled meal";
+  const [titleDraft, setTitleDraft] = useState(title);
   const ingredients = item.ingredients ?? item.recipe?.ingredients ?? [];
   const instructions = item.instructions ?? item.recipe?.instructions ?? [];
   const imageUrl = enhanceImageUrl(item.image_url || item.recipe?.image_url || "");
+  const macros = getMealMacros(item, macroOverride ? { [item.meal_plan_item_id ?? item.id]: macroOverride } : undefined);
+  const [macroDraft, setMacroDraft] = useState({
+    calories: toInputValue(macros.calories),
+    protein: toInputValue(macros.protein),
+    carbs: toInputValue(macros.carbs),
+    fat: toInputValue(macros.fat),
+  });
 
   useEffect(() => {
     setImgError(false);
   }, [imageUrl]);
-  const calories = item.calories ?? item.recipe?.calories ?? 0;
-  const protein = item.protein ?? item.recipe?.protein ?? 0;
+
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setTitleDraft(title);
+    }
+  }, [isEditingTitle, title]);
+
+  useEffect(() => {
+    if (!isEditingMacros) {
+      setMacroDraft({
+        calories: toInputValue(macros.calories),
+        protein: toInputValue(macros.protein),
+        carbs: toInputValue(macros.carbs),
+        fat: toInputValue(macros.fat),
+      });
+    }
+  }, [isEditingMacros, macros.calories, macros.protein, macros.carbs, macros.fat]);
+
+  const macroMetaItems = [
+    typeof macros.calories === "number" ? `${Math.round(macros.calories)} kcal` : null,
+    typeof macros.protein === "number" ? `${Math.round(macros.protein)}g protein` : null,
+    typeof macros.carbs === "number" ? `${Math.round(macros.carbs)}g carbs` : null,
+    typeof macros.fat === "number" ? `${Math.round(macros.fat)}g fat` : null,
+  ].filter(Boolean) as string[];
+
   const metaItems = [
     `${item.cook_time ?? 0} min`,
-    calories > 0 ? `${calories} kcal` : null,
-    protein > 0 ? `${protein}g protein` : null,
+    ...macroMetaItems,
     `${item.servings ?? 1} servings`,
     item.source ? item.source : null,
   ].filter(Boolean) as string[];
@@ -56,7 +103,60 @@ export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
               "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
               MEAL_TYPE_STYLES[item.meal_type] ?? "bg-[#F8F8F8] text-[#424242]",
             ].join(" ")}>{item.meal_type}</span>
-            <h4 className="mt-1 text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">{title}</h4>
+            {isEditingTitle ? (
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={titleDraft}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  className="h-7 w-full min-w-[180px] rounded-md border border-[#E6E5E0] bg-white px-2 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+                />
+                <button
+                  type="button"
+                  disabled={isSavingTitle}
+                  onClick={() => {
+                    setTitleDraft(title);
+                    setIsEditingTitle(false);
+                  }}
+                  className="rounded-md border border-[#E6E5E0] px-2 py-1 text-[11px] font-medium text-[#6B6B68]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingTitle || !titleDraft.trim()}
+                  onClick={async () => {
+                    const nextTitle = titleDraft.trim();
+                    if (!nextTitle || nextTitle === title) {
+                      setIsEditingTitle(false);
+                      return;
+                    }
+                    setIsSavingTitle(true);
+                    try {
+                      await onSaveTitle(nextTitle);
+                      setIsEditingTitle(false);
+                    } finally {
+                      setIsSavingTitle(false);
+                    }
+                  }}
+                  className="rounded-md bg-[#E7C51C] px-2 py-1 text-[11px] font-semibold text-black disabled:opacity-60"
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <div className="mt-1 flex items-center gap-1.5">
+                <h4 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">{title}</h4>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTitle(true)}
+                  className="rounded-md border border-[#E6E5E0] p-1 text-[#6B6B68]"
+                  aria-label="Edit recipe name"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -103,6 +203,14 @@ export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
             <RefreshCcw className="h-3 w-3" />
             Swap
           </button>
+          <button
+            type="button"
+            onClick={() => setIsEditingMacros((prev) => !prev)}
+            className="inline-flex items-center gap-1 rounded-md border border-[#E6E5E0] px-2 py-1 text-xs font-medium text-[#6B6B68]"
+          >
+            <Pencil className="h-3 w-3" />
+            Edit Macros
+          </button>
         </div>
       </div>
 
@@ -111,6 +219,89 @@ export function MealCard({ item, onSwap, onFeedback }: MealCardProps) {
           <span key={meta}>{meta}</span>
         ))}
       </div>
+
+      {isEditingMacros ? (
+        <div className="mt-2 rounded-md border border-[#E6E5E0] bg-[#FAF9F8] p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-[11px] text-[#6B6B68]">
+              Calories (kcal)
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={macroDraft.calories}
+                onChange={(event) => setMacroDraft((prev) => ({ ...prev, calories: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+              />
+            </label>
+            <label className="text-[11px] text-[#6B6B68]">
+              Protein (g)
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={macroDraft.protein}
+                onChange={(event) => setMacroDraft((prev) => ({ ...prev, protein: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+              />
+            </label>
+            <label className="text-[11px] text-[#6B6B68]">
+              Carbs (g)
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={macroDraft.carbs}
+                onChange={(event) => setMacroDraft((prev) => ({ ...prev, carbs: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+              />
+            </label>
+            <label className="text-[11px] text-[#6B6B68]">
+              Fat (g)
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={macroDraft.fat}
+                onChange={(event) => setMacroDraft((prev) => ({ ...prev, fat: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+              />
+            </label>
+          </div>
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMacroDraft({
+                  calories: toInputValue(macros.calories),
+                  protein: toInputValue(macros.protein),
+                  carbs: toInputValue(macros.carbs),
+                  fat: toInputValue(macros.fat),
+                });
+                setIsEditingMacros(false);
+              }}
+              className="rounded-md border border-[#E6E5E0] px-2.5 py-1 text-xs font-medium text-[#6B6B68]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSaveMacros({
+                  calories: parseMacroInput(macroDraft.calories),
+                  protein: parseMacroInput(macroDraft.protein),
+                  carbs: parseMacroInput(macroDraft.carbs),
+                  fat: parseMacroInput(macroDraft.fat),
+                });
+                setIsEditingMacros(false);
+              }}
+              className="rounded-md bg-[#E7C51C] px-2.5 py-1 text-xs font-semibold text-black hover:bg-[#d4b419]"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {expanded ? (
         <div className="mt-3 border-t border-[#E6E5E0] pt-3 text-xs [font-family:Inter,sans-serif]">

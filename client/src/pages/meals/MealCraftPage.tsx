@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { toast } from "@/hooks/use-toast";
-import type { MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, ShoppingList } from "@/lib/meals/api";
-import { computeMealPlanStats, enhanceImageUrl } from "@/lib/meals/api";
+import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, ShoppingList } from "@/lib/meals/api";
+import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey } from "@/lib/meals/api";
 import { StepIndicator } from "@/components/meals/StepIndicator";
 import { ClientSelect } from "@/components/meals/ClientSelect";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
@@ -121,6 +121,8 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
       cook_time: recipe?.cook_time,
       calories: recipe?.calories,
       protein: recipe?.protein,
+      carbs: recipe?.carbs,
+      fat: recipe?.fat,
       servings: recipe?.servings,
     };
 
@@ -146,6 +148,7 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
     plan,
     shopping_list: normalizeShoppingList(planRecord.shopping_list),
     stats: computeMealPlanStats(plan),
+    macroOverrides: {},
   };
 }
 
@@ -187,7 +190,7 @@ export default function MealCraftPage() {
       ]);
 
       const loadedPlan = buildPlanResultFromPocketBase(planRecord, itemRecords);
-      setPlanResult(loadedPlan);
+      setPlanResult({ ...loadedPlan, macroOverrides: loadedPlan.macroOverrides ?? {} });
 
       const clientFromPlan = planRecord.expand?.client
         ? {
@@ -245,7 +248,7 @@ export default function MealCraftPage() {
       });
 
       const merged = mergeDailySummary(generated);
-      setPlanResult(merged);
+      setPlanResult({ ...merged, macroOverrides: {} });
       setCurrentStep(3);
       setMaxCompletedStep(3);
     } catch (error) {
@@ -293,10 +296,15 @@ export default function MealCraftPage() {
               cook_time: replacementRecipe.cook_time,
               calories: replacementRecipe.calories,
               protein: replacementRecipe.protein,
+              carbs: replacementRecipe.carbs,
+              fat: replacementRecipe.fat,
               servings: replacementRecipe.servings,
             };
           }),
         }));
+
+        const nextMacroOverrides = { ...(current.macroOverrides ?? {}) };
+        delete nextMacroOverrides[swapResult.swapped.meal_plan_item_id];
 
         return {
           ...current,
@@ -304,6 +312,7 @@ export default function MealCraftPage() {
           plan: nextPlan,
           shopping_list: swapResult.shopping_list,
           stats: computeMealPlanStats(nextPlan),
+          macroOverrides: nextMacroOverrides,
         };
       });
 
@@ -346,6 +355,81 @@ export default function MealCraftPage() {
     }
   };
 
+  const handleSaveMacros = (mealPlanItemId: string, macros: MacroOverride) => {
+    setPlanResult((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        macroOverrides: {
+          ...(current.macroOverrides ?? {}),
+          [mealPlanItemId]: {
+            calories: macros.calories,
+            protein: macros.protein,
+            carbs: macros.carbs,
+            fat: macros.fat,
+          },
+        },
+      };
+    });
+  };
+
+  const handleSaveTitle = async (mealPlanItemId: string, nextTitle: string) => {
+    const trimmedTitle = nextTitle.trim();
+    if (!trimmedTitle) return;
+
+    const matchingMeal = planResult?.plan
+      .flatMap((day) => day.meals)
+      .find((meal) => (meal.meal_plan_item_id ?? meal.id) === mealPlanItemId);
+    const previousTitle = matchingMeal?.title ?? matchingMeal?.recipe?.title ?? "Untitled meal";
+
+    setPlanResult((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        plan: current.plan.map((day) => ({
+          ...day,
+          meals: day.meals.map((meal) => {
+            if ((meal.meal_plan_item_id ?? meal.id) !== mealPlanItemId) return meal;
+            return {
+              ...meal,
+              title: trimmedTitle,
+              recipe: meal.recipe ? { ...meal.recipe, title: trimmedTitle } : meal.recipe,
+            };
+          }),
+        })),
+      };
+    });
+
+    try {
+      if (matchingMeal?.meal_plan_item_id) {
+        await pb.collection("meal_plan_items").update(matchingMeal.meal_plan_item_id, { title: trimmedTitle });
+      }
+    } catch (error) {
+      setPlanResult((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          plan: current.plan.map((day) => ({
+            ...day,
+            meals: day.meals.map((meal) => {
+              if ((meal.meal_plan_item_id ?? meal.id) !== mealPlanItemId) return meal;
+              return {
+                ...meal,
+                title: previousTitle,
+                recipe: meal.recipe ? { ...meal.recipe, title: previousTitle } : meal.recipe,
+              };
+            }),
+          })),
+        };
+      });
+
+      const message = error instanceof Error ? error.message : "Could not save recipe name.";
+      toast({ title: "Name save failed", description: message, variant: "destructive" });
+      throw error;
+    }
+  };
+
   const handleExportPdf = async () => {
     if (!planResult || !selectedClient) return;
 
@@ -354,7 +438,7 @@ export default function MealCraftPage() {
       const imageEntries = planResult.plan
         .flatMap((day) => day.meals)
         .map((meal) => ({
-          id: meal.recipe?.id || meal.recipe_id || meal.id,
+          id: meal.recipe?.id || meal.recipe_id || getMealPlanItemKey(meal),
           url: meal.image_url || meal.recipe?.image_url || "",
         }))
         .filter((entry) => entry.id && entry.url);
@@ -375,6 +459,7 @@ export default function MealCraftPage() {
           plan={planResult.plan}
           shoppingList={planResult.shopping_list}
           stats={planResult.stats}
+          macroOverrides={planResult.macroOverrides}
           images={imageMap}
         />
       ).toBlob();
@@ -501,7 +586,6 @@ export default function MealCraftPage() {
             onChange={setCriteria}
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
-            onOpenImportRecipe={() => setImportModalOpen(true)}
           />
         ) : null}
 
@@ -516,6 +600,8 @@ export default function MealCraftPage() {
             onSwapMeal={handleSwapMeal}
             isSwapping={swapMutation.isPending}
             onFeedback={handleFeedback}
+            onSaveMacros={handleSaveMacros}
+            onSaveTitle={handleSaveTitle}
           />
         ) : null}
 

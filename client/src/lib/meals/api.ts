@@ -44,6 +44,8 @@ export interface MealPlanItem {
   cook_time?: number;
   calories?: number;
   protein?: number;
+  carbs?: number;
+  fat?: number;
   servings?: number;
 }
 
@@ -64,6 +66,13 @@ export interface MealPlanStats {
   estimatedCost: string;
 }
 
+export interface MacroOverride {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}
+
 export interface MealPlanResult {
   meal_plan_id: string;
   title?: string;
@@ -76,6 +85,7 @@ export interface MealPlanResult {
   warnings?: string[];
   shopping_overlap_notes?: string;
   stats: MealPlanStats;
+  macroOverrides?: Record<string, MacroOverride>;
 }
 
 export interface GenerateMealPlanPayload {
@@ -147,6 +157,11 @@ function toNumber(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function toPositiveNumber(value: unknown): number | undefined {
+  const parsed = toNumber(value);
+  return typeof parsed === "number" && parsed > 0 ? parsed : undefined;
+}
+
 function pickImageUrl(...values: unknown[]): string {
   const match = values.find((value) => typeof value === "string" && value.trim().length > 0) as string | undefined;
   return match ? enhanceImageUrl(match.trim()) : "";
@@ -187,6 +202,34 @@ export function computeMealPlanStats(days: MealPlanDay[]): MealPlanStats {
     ingredientsCount,
     totalCookTimeMinutes,
     estimatedCost: `~£${costEstimate}`,
+  };
+}
+
+export function getMealPlanItemKey(meal: Pick<MealPlanItem, "id" | "meal_plan_item_id">): string {
+  return meal.meal_plan_item_id ?? meal.id;
+}
+
+export function getMealMacros(
+  meal: MealPlanItem,
+  macroOverrides?: Record<string, MacroOverride>
+): MacroOverride {
+  const mealKey = getMealPlanItemKey(meal);
+  const override = macroOverrides?.[mealKey];
+
+  if (override) {
+    return {
+      calories: toPositiveNumber(override.calories),
+      protein: toPositiveNumber(override.protein),
+      carbs: toPositiveNumber(override.carbs),
+      fat: toPositiveNumber(override.fat),
+    };
+  }
+
+  return {
+    calories: toPositiveNumber(meal.calories ?? meal.recipe?.calories),
+    protein: toPositiveNumber(meal.protein ?? meal.recipe?.protein),
+    carbs: toPositiveNumber(meal.carbs ?? meal.recipe?.carbs),
+    fat: toPositiveNumber(meal.fat ?? meal.recipe?.fat),
   };
 }
 
@@ -232,6 +275,8 @@ function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
     cook_time: toNumber(rawMeal.cook_time) ?? recipe?.cook_time,
     calories: toNumber(rawMeal.calories) ?? recipe?.calories,
     protein: toNumber(rawMeal.protein) ?? recipe?.protein,
+    carbs: toNumber(rawMeal.carbs) ?? recipe?.carbs,
+    fat: toNumber(rawMeal.fat) ?? recipe?.fat,
     servings: toNumber(rawMeal.servings) ?? recipe?.servings,
   };
 }
@@ -275,6 +320,7 @@ function normalizePlanResponse(raw: any): MealPlanResult {
     warnings: asArrayString(raw?.warnings),
     shopping_overlap_notes: raw?.shopping_overlap_notes ? String(raw.shopping_overlap_notes) : undefined,
     stats: computeMealPlanStats(plan),
+    macroOverrides: {},
   };
 }
 

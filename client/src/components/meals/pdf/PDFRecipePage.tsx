@@ -1,5 +1,5 @@
 import { Image, Link, Page, Text, View } from "@react-pdf/renderer";
-import type { MealPlanItem } from "@/lib/meals/api";
+import { getMealMacros, getMealPlanItemKey, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
 import { ActivityIcon, ClockIcon, LinkIcon, UsersIcon } from "@/components/pdf/PDFIcons";
 import { pdfStyles } from "./PDFStyles";
 import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
@@ -34,21 +34,28 @@ function Footer({ pageNumber }: { pageNumber: number }) {
 
 export function RecipeCard({
   recipe,
+  macroOverrides,
   images,
 }: {
   recipe: PDFRecipeItem;
+  macroOverrides?: Record<string, MacroOverride>;
   images?: Record<string, string>;
 }) {
   const title = sanitizePdfText(recipe.title ?? recipe.recipe?.title ?? "Untitled recipe");
   const ingredients = (recipe.ingredients ?? recipe.recipe?.ingredients ?? []).map(sanitizePdfText);
   const instructions = (recipe.instructions ?? recipe.recipe?.instructions ?? []).map(sanitizePdfText);
   const cookTime = recipe.cook_time ?? recipe.recipe?.cook_time;
-  const calories = recipe.calories ?? recipe.recipe?.calories;
-  const protein = recipe.protein ?? recipe.recipe?.protein;
+  const macros = getMealMacros(recipe, macroOverrides);
   const servings = recipe.servings ?? recipe.recipe?.servings;
   const sourceUrl = recipe.source_url ?? recipe.recipe?.source_url;
-  const recipeImageId = recipe.recipe?.id ?? recipe.recipe_id ?? recipe.id;
+  const recipeImageId = recipe.recipe?.id ?? recipe.recipe_id ?? getMealPlanItemKey(recipe);
   const imageData = recipeImageId ? images?.[recipeImageId] : undefined;
+  const macroItems = [
+    typeof macros.calories === "number" ? `Calories: ${Math.round(macros.calories)}kcal` : null,
+    typeof macros.protein === "number" ? `Protein: ${Math.round(macros.protein)}g` : null,
+    typeof macros.carbs === "number" ? `Carbs: ${Math.round(macros.carbs)}g` : null,
+    typeof macros.fat === "number" ? `Fat: ${Math.round(macros.fat)}g` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <View style={pdfStyles.recipeCard} wrap={false}>
@@ -80,17 +87,12 @@ export function RecipeCard({
               <ClockIcon size={9} color="#6B6B68" />
               <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{cookTime ?? 0} mins</Text></Text>
             </View>
-            {typeof calories === "number" && calories > 0 ? (
-              <View style={pdfStyles.metaItem}>
+            {macroItems.map((macroLabel) => (
+              <View key={macroLabel} style={pdfStyles.metaItem}>
                 <ActivityIcon size={9} color="#6B6B68" />
-                <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{calories} kcal</Text></Text>
+                <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{macroLabel}</Text></Text>
               </View>
-            ) : null}
-            {typeof protein === "number" && protein > 0 ? (
-              <View style={pdfStyles.metaItem}>
-                <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{protein}g protein</Text></Text>
-              </View>
-            ) : null}
+            ))}
             <View style={pdfStyles.metaItem}>
               <UsersIcon size={9} color="#6B6B68" />
               <Text style={pdfStyles.metaText}><Text style={pdfStyles.metaStrong}>{servings ?? 1} servings</Text></Text>
@@ -128,8 +130,13 @@ export function PDFRecipePage({
   dateLabel,
   pageNumber,
   recipes,
+  macroOverrides,
   images,
-}: HeaderFooterProps & { recipes: PDFRecipeItem[]; images?: Record<string, string> }) {
+}: HeaderFooterProps & {
+  recipes: PDFRecipeItem[];
+  macroOverrides?: Record<string, MacroOverride>;
+  images?: Record<string, string>;
+}) {
   return (
     <Page size="A4" style={pdfStyles.page}>
       <Header dateLabel={dateLabel} />
@@ -137,7 +144,12 @@ export function PDFRecipePage({
       <View style={pdfStyles.content}>
         <Text style={pdfStyles.sectionHeading}>Recipes</Text>
         {recipes.map((recipe) => (
-          <RecipeCard key={`${recipe.id}-${recipe.pdfDayNumber}`} recipe={recipe} images={images} />
+          <RecipeCard
+            key={`${recipe.id}-${recipe.pdfDayNumber}`}
+            recipe={recipe}
+            macroOverrides={macroOverrides}
+            images={images}
+          />
         ))}
       </View>
 

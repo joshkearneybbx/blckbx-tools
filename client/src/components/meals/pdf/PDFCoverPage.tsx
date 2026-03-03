@@ -1,5 +1,5 @@
 import { Image, Page, Text, View } from "@react-pdf/renderer";
-import type { MealPlanStats } from "@/lib/meals/api";
+import type { MacroOverride, MealPlanStats } from "@/lib/meals/api";
 import { pdfStyles } from "./PDFStyles";
 import { PDFRecipeItem, RecipeCard } from "./PDFRecipePage";
 import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
@@ -19,6 +19,7 @@ interface PDFCoverPageProps {
   stats: MealPlanStats;
   menuOverview: MenuOverviewItem[];
   firstRecipe: PDFRecipeItem | null;
+  macroOverrides?: Record<string, MacroOverride>;
   images?: Record<string, string>;
 }
 
@@ -57,6 +58,7 @@ export function PDFCoverPage({
   stats,
   menuOverview,
   firstRecipe,
+  macroOverrides,
   images,
 }: PDFCoverPageProps) {
   const subtitleTags = focusTags.slice(0, 2).map(formatTag);
@@ -114,7 +116,7 @@ export function PDFCoverPage({
         </View>
 
         <Text style={pdfStyles.sectionHeading}>Recipes</Text>
-        {firstRecipe ? <RecipeCard recipe={firstRecipe} images={images} /> : null}
+        {firstRecipe ? <RecipeCard recipe={firstRecipe} macroOverrides={macroOverrides} images={images} /> : null}
       </View>
 
       <Footer pageNumber={pageNumber} />

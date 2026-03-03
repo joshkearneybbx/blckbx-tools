@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { MealPlanResult } from "@/lib/meals/api";
+import type { MacroOverride, MealPlanResult } from "@/lib/meals/api";
 import { DaySection } from "./DaySection";
 import { PlanSummaryStats } from "./PlanSummaryStats";
 import { SwapModal } from "./SwapModal";
@@ -12,9 +12,11 @@ interface PlanReviewProps {
   onSwapMeal: (mealPlanItemId: string, payload: { mode: "suggest" | "specific"; reason?: string; replacement_recipe_id?: string }) => Promise<void>;
   isSwapping: boolean;
   onFeedback: (mealPlanItemId: string, feedback: "liked" | "disliked") => void;
+  onSaveMacros: (mealPlanItemId: string, macros: MacroOverride) => void;
+  onSaveTitle: (mealPlanItemId: string, title: string) => Promise<void> | void;
 }
 
-export function PlanReview({ planResult, onRegenerate, onNext, onSwapMeal, isSwapping, onFeedback }: PlanReviewProps) {
+export function PlanReview({ planResult, onRegenerate, onNext, onSwapMeal, isSwapping, onFeedback, onSaveMacros, onSaveTitle }: PlanReviewProps) {
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
 
   const swapOpen = useMemo(() => !!swapTargetId, [swapTargetId]);
@@ -33,8 +35,11 @@ export function PlanReview({ planResult, onRegenerate, onNext, onSwapMeal, isSwa
         <DaySection
           key={day.day_number}
           day={day}
+          macroOverrides={planResult.macroOverrides}
           onSwapClick={(mealPlanItemId) => setSwapTargetId(mealPlanItemId)}
           onFeedback={onFeedback}
+          onSaveMacros={onSaveMacros}
+          onSaveTitle={onSaveTitle}
         />
       ))}
 
