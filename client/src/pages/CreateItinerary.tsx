@@ -4,6 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft, ArrowRight, Save, Loader2, FileText, GripVertical, Send } from "lucide-react";
 import { Link } from "wouter";
 import logoUrl from "@assets/blckbx-logo.png";
@@ -607,6 +617,16 @@ const PAGE_TITLES = [
   "Review & Publish",
 ];
 
+type PublishCounts = {
+  destinations: number;
+  travellers: number;
+  accommodations: number;
+  activities: number;
+  dining: number;
+  bars: number;
+  interDestinationTravel: number;
+};
+
 const DRAFT_KEY = 'itinerary-draft';
 const AUTO_SAVE_DELAY = 3000; // 3 seconds
 const debugLog = (...args: any[]) => {
@@ -975,6 +995,8 @@ export default function CreateItinerary() {
   const [isLoadingEdit, setIsLoadingEdit] = useState(!!isEditMode);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
+  const [publishConfirmData, setPublishConfirmData] = useState<{ counts: PublishCounts; reasonSuffix: string } | null>(null);
   const [isPdfPreviewRequested, setIsPdfPreviewRequested] = useState(false);
   const [pdfPreviewSnapshot, setPdfPreviewSnapshot] = useState<FullItinerary | null>(null);
   const { toast } = useToast();
@@ -1596,9 +1618,20 @@ export default function CreateItinerary() {
     const safeActivities = wizardData.activities || [];
     const safeDining = wizardData.dining || [];
     const safeBars = wizardData.bars || [];
+    const safeInterDestinationTravel = wizardData.interDestinationTravel || [];
+    const safeAdditionalTravelSegments = wizardData.additionalTravel || [];
     const safeOutboundTravel = wizardData.outboundTravel || {};
     const safeReturnTravel = wizardData.returnTravel || {};
     const safeHelpfulInformation = wizardData.helpfulInformation || {};
+    const hasOutboundData = Object.values(safeOutboundTravel).some(val =>
+      val !== "" && val !== null && val !== undefined && (typeof val !== 'number' || val > 0)
+    );
+    const hasReturnData = Object.values(safeReturnTravel).some(val =>
+      val !== "" && val !== null && val !== undefined && (typeof val !== 'number' || val > 0)
+    );
+    const hasHelpfulInfo = Object.values(safeHelpfulInformation).some(val =>
+      val !== "" && val !== null && val !== undefined
+    );
 
     let projectId: string;
     let slug: string;
@@ -1627,15 +1660,64 @@ export default function CreateItinerary() {
       const activities = await pb.collection('blckbx_activities').getFullList({ filter: `project = "${projectId}"` });
       const dining = await pb.collection('blckbx_dining').getFullList({ filter: `project = "${projectId}"` });
       const bars = await pb.collection('blckbx_bars').getFullList({ filter: `project = "${projectId}"` });
+      const destinations = await pb.collection('blckbx_destinations').getFullList({ filter: `project = "${projectId}"` });
       const additionalTravel = await pb.collection('blckbx_inter_destination_travel').getFullList({ filter: `fromDestination.project = "${projectId}"` });
+      const outbound = await pb.collection('blckbx_outbound_travel').getFirstListItem(`project = "${projectId}"`).catch(() => null);
+      const returnT = await pb.collection('blckbx_return_travel').getFirstListItem(`project = "${projectId}"`).catch(() => null);
+      const helpfulInfo = await pb.collection('blckbx_helpful_information').getFirstListItem(`project = "${projectId}"`).catch(() => null);
+
+      const existingCounts = {
+        destinations: destinations.length,
+        travellers: travellers.length,
+        accommodations: accommodations.length,
+        activities: activities.length,
+        dining: dining.length,
+        bars: bars.length,
+        interDestinationTravel: additionalTravel.length,
+        outboundTravel: outbound ? 1 : 0,
+        returnTravel: returnT ? 1 : 0,
+        helpfulInformation: helpfulInfo ? 1 : 0,
+      };
+      const formCounts = {
+        destinations: safeDestinations.length,
+        travellers: safeTravellers.length,
+        accommodations: safeAccommodations.length,
+        activities: safeActivities.length,
+        dining: safeDining.length,
+        bars: safeBars.length,
+        interDestinationTravel: safeInterDestinationTravel.length,
+        outboundTravel: hasOutboundData ? 1 : 0,
+        returnTravel: hasReturnData ? 1 : 0,
+        helpfulInformation: hasHelpfulInfo ? 1 : 0,
+      };
+
+      debugLog("=== SAVE STATE CHECK ===", { status: statusParam, existingCounts, formCounts });
+
+      if (statusParam === "published") {
+        const riskySections = Object.keys(existingCounts).filter((key) => {
+          const existingCount = existingCounts[key as keyof typeof existingCounts];
+          const formCount = formCounts[key as keyof typeof formCounts];
+          return existingCount > 0 && formCount === 0;
+        });
+
+        if (riskySections.length > 0) {
+          const message = `Publish blocked to prevent data loss. Existing data found but empty form sections: ${riskySections.join(", ")}.`;
+          console.error(message, { existingCounts, formCounts });
+          throw new Error(message);
+        }
+      }
 
       debugLog("Found records to delete:", {
+        destinations: destinations.length,
         travellers: travellers.length,
         accommodations: accommodations.length,
         activities: activities.length,
         dining: dining.length,
         bars: bars.length,
         additionalTravel: additionalTravel.length,
+        outboundTravel: outbound ? 1 : 0,
+        returnTravel: returnT ? 1 : 0,
+        helpfulInformation: helpfulInfo ? 1 : 0,
       });
 
       // Delete all records using explicit collection names
@@ -1657,26 +1739,26 @@ export default function CreateItinerary() {
       for (const record of additionalTravel) {
         await pb.collection('blckbx_inter_destination_travel').delete(record.id);
       }
+      for (const dest of destinations) {
+        await pb.collection('blckbx_destinations').delete(dest.id);
+      }
 
       debugLog("=== Deleted all existing related data ===");
 
       // Delete outbound and return travel (single records)
-      try {
-        const outbound = await pb.collection('blckbx_outbound_travel').getFirstListItem(`project = "${projectId}"`);
+      try {        
+        if (outbound) {
         await pb.collection('blckbx_outbound_travel').delete(outbound.id);
+        }
       } catch {}
       try {
-        const returnT = await pb.collection('blckbx_return_travel').getFirstListItem(`project = "${projectId}"`);
-        await pb.collection('blckbx_return_travel').delete(returnT.id);
+        if (returnT) {
+          await pb.collection('blckbx_return_travel').delete(returnT.id);
+        }
       } catch {}
       try {
-        const helpfulInfo = await pb.collection('blckbx_helpful_information').getFirstListItem(`project = "${projectId}"`);
-        await pb.collection('blckbx_helpful_information').delete(helpfulInfo.id);
-      } catch {}
-      try {
-        const destinations = await pb.collection('blckbx_destinations').getFullList({ filter: `project = "${projectId}"` });
-        for (const dest of destinations) {
-          await pb.collection('blckbx_destinations').delete(dest.id);
+        if (helpfulInfo) {
+          await pb.collection('blckbx_helpful_information').delete(helpfulInfo.id);
         }
       } catch {}
 
@@ -1809,9 +1891,6 @@ export default function CreateItinerary() {
     }
 
     // Step 3: Create outbound travel
-    const hasOutboundData = Object.values(wizardData.outboundTravel).some(val =>
-      val !== "" && val !== null && val !== undefined && (typeof val !== 'number' || val > 0)
-    );
     if (hasOutboundData) {
       // DEBUG: Log outbound travel data being saved
       debugLog('=== SAVING OUTBOUND TRAVEL ===');
@@ -1977,7 +2056,6 @@ export default function CreateItinerary() {
     }
 
     // Step 8: Create inter-destination travel
-    const safeInterDestinationTravel = wizardData.interDestinationTravel || [];
     debugLog(`Saving ${safeInterDestinationTravel.length} inter-destination travel items`);
     for (let i = 0; i < safeInterDestinationTravel.length; i++) {
       const travel = safeInterDestinationTravel[i];
@@ -2004,9 +2082,6 @@ export default function CreateItinerary() {
     }
 
     // Step 9: Create return travel
-    const hasReturnData = Object.values(wizardData.returnTravel).some(val =>
-      val !== "" && val !== null && val !== undefined && (typeof val !== 'number' || val > 0)
-    );
     if (hasReturnData) {
       // DEBUG: Log return travel data being saved
       debugLog('=== SAVING RETURN TRAVEL ===');
@@ -2061,7 +2136,6 @@ export default function CreateItinerary() {
 
     // Step 9.5: Save new additional travel segments (from Page3Travel Additional Travel tab)
     // These are AdditionalTravelSegment[] - travel during the trip (internal flights, ferries, etc.)
-    const safeAdditionalTravelSegments = wizardData.additionalTravel || [];
     debugLog('=== ADDITIONAL TRAVEL DATA ===');
     debugLog('wizardData.additionalTravel:', JSON.stringify(safeAdditionalTravelSegments, null, 2));
     debugLog('additionalTravel count:', safeAdditionalTravelSegments.length);
@@ -2095,9 +2169,6 @@ export default function CreateItinerary() {
     }
 
     // Step 10: Create helpful information
-    const hasHelpfulInfo = Object.values(wizardData.helpfulInformation).some(val =>
-      val !== "" && val !== null && val !== undefined
-    );
     if (hasHelpfulInfo) {
       await pb.collection('blckbx_helpful_information').create({
         project: projectId,
@@ -2164,7 +2235,7 @@ export default function CreateItinerary() {
     }
   };
 
-  const handlePublish = async (publish: boolean) => {
+  const executePublish = async (publish: boolean) => {
     setIsSaving(true);
 
     try {
@@ -2195,6 +2266,49 @@ export default function CreateItinerary() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handlePublish = async (publish: boolean) => {
+    if (!publish) {
+      await executePublish(false);
+      return;
+    }
+
+    const publishCounts: PublishCounts = {
+      destinations: wizardData.destinations?.length || 0,
+      travellers: wizardData.travellers?.length || 0,
+      accommodations: wizardData.accommodations?.length || 0,
+      activities: wizardData.activities?.length || 0,
+      dining: wizardData.dining?.length || 0,
+      bars: wizardData.bars?.length || 0,
+      interDestinationTravel: wizardData.interDestinationTravel?.length || 0,
+    };
+
+    debugLog("=== PUBLISH: Form state check ===", publishCounts);
+    const hasAnyZeroSection = Object.values(publishCounts).some((count) => count === 0);
+
+    let isFirstTimePublish = !isEditMode;
+    if (isEditMode && editId) {
+      try {
+        const currentProject = await pb.collection('blckbx_projects').getOne(editId);
+        isFirstTimePublish = currentProject.status !== 'published';
+      } catch (error) {
+        debugLog("Could not determine current project status before publish confirm:", error);
+      }
+    }
+
+    if (hasAnyZeroSection || isFirstTimePublish) {
+      const reasonSuffix = [
+        isFirstTimePublish ? "first-time publish" : null,
+        hasAnyZeroSection ? "one or more sections have 0 items" : null,
+      ].filter(Boolean).join(" and ");
+
+      setPublishConfirmData({ counts: publishCounts, reasonSuffix });
+      setPublishConfirmOpen(true);
+      return;
+    }
+
+    await executePublish(true);
   };
 
   const handleFinish = async () => {
@@ -2537,6 +2651,73 @@ export default function CreateItinerary() {
           )}
         </div>
         </main>
+
+        <AlertDialog
+          open={publishConfirmOpen}
+          onOpenChange={(open) => {
+            setPublishConfirmOpen(open);
+            if (!open) {
+              setPublishConfirmData(null);
+            }
+          }}
+        >
+          <AlertDialogContent className="max-w-lg border-[#E6E5E0]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-[#1a1a1a] [font-family:Inter,sans-serif]">
+                Confirm Publish
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-[#6B6B68] [font-family:Inter,sans-serif]">
+                Review this summary before publishing.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            {publishConfirmData ? (
+              <div className="rounded-md border border-[#E6E5E0] bg-[#FAF9F8] p-3 space-y-3 text-sm [font-family:Inter,sans-serif]">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "Destinations", value: publishConfirmData.counts.destinations },
+                    { label: "Travellers", value: publishConfirmData.counts.travellers },
+                    { label: "Accommodations", value: publishConfirmData.counts.accommodations },
+                    { label: "Activities", value: publishConfirmData.counts.activities },
+                    { label: "Dining", value: publishConfirmData.counts.dining },
+                    { label: "Bars", value: publishConfirmData.counts.bars },
+                    { label: "Inter-destination Travel", value: publishConfirmData.counts.interDestinationTravel },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className={[
+                        "rounded-md border px-3 py-2 bg-white",
+                        item.value === 0 ? "border-[#E7C51C]" : "border-[#E6E5E0]",
+                      ].join(" ")}
+                    >
+                      <p className="text-[11px] uppercase tracking-wide text-[#6B6B68]">{item.label}</p>
+                      <p className="mt-0.5 text-base font-semibold text-[#1a1a1a]">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-md bg-[#FFFBE8] border border-[#E7C51C] px-2.5 py-2 text-xs text-[#424242] space-y-1">
+                  <p className="font-semibold text-[#1a1a1a]">Why this confirmation is shown</p>
+                  <p>This is {publishConfirmData.reasonSuffix}.</p>
+                </div>
+              </div>
+            ) : null}
+
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-[#E6E5E0]">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90"
+                onClick={() => {
+                  setPublishConfirmOpen(false);
+                  setPublishConfirmData(null);
+                  void executePublish(true);
+                }}
+              >
+                Publish
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

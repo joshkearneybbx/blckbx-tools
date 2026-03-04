@@ -109,7 +109,7 @@ export default function Page2Destinations({ data, updateData }: Props) {
 
       const startMonth = months[start.getMonth()];
       const startDay = start.getDate();
-      const endMonth = end.getMonth();
+      const endMonth = months[end.getMonth()];
       const endDay = end.getDate();
       const year = end.getFullYear();
 
