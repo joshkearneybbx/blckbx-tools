@@ -6,6 +6,7 @@ const TEAM_MEMBERS = [
   "Brooke",
   "Caitlin",
   "Charlotte",
+  "Charlee",
   "Cordelia",
   "Eve",
   "Fernando",
@@ -30,6 +31,7 @@ const CATEGORIES = [
 ] as const;
 
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
+const PAYMENT_TYPES = ["Stripe", "Client Card"] as const;
 
 const WEBHOOK_URL = import.meta.env.VITE_BIG_PURCHASE_WEBHOOK_URL;
 
@@ -38,6 +40,7 @@ type FormState = {
   partnerName: string;
   pointOfContact: string;
   estimatedAmount: string;
+  paymentType: string;
   purchaseDate: string;
   needBy: string;
   priority: string;
@@ -57,6 +60,7 @@ const initialFormState = (): FormState => ({
   partnerName: "",
   pointOfContact: "",
   estimatedAmount: "",
+  paymentType: "",
   purchaseDate: todayISODate(),
   needBy: "",
   priority: "Medium",
@@ -89,7 +93,9 @@ export default function BigPurchases() {
     !formState.partnerName.trim() ||
     !formState.pointOfContact.trim() ||
     !formState.estimatedAmount.trim() ||
+    !formState.paymentType ||
     !formState.purchaseDate ||
+    !formState.needBy ||
     !formState.priority ||
     !formState.category;
 
@@ -126,6 +132,7 @@ export default function BigPurchases() {
           partnerName: formState.partnerName,
           pointOfContact: formState.pointOfContact,
           estimatedAmountGBP: Number(formState.estimatedAmount),
+          payment_type: formState.paymentType,
           purchaseDate: formState.purchaseDate,
           need_by: formState.needBy,
           priority: formState.priority,
@@ -197,7 +204,7 @@ export default function BigPurchases() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label htmlFor="your-name" className="block text-sm font-medium text-[#1a1a1a] mb-2">
-                  Your Name
+                  Submitted By
                 </label>
                 <select
                   id="your-name"
@@ -206,7 +213,7 @@ export default function BigPurchases() {
                   required
                   className={getFieldClassName(showValidation && !formState.yourName)}
                 >
-                  <option value="">Select your name</option>
+                  <option value="">Select submitter...</option>
                   {TEAM_MEMBERS.map((member) => (
                     <option key={member} value={member}>
                       {member}
@@ -269,8 +276,28 @@ export default function BigPurchases() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label htmlFor="purchase-date" className="block text-sm font-medium text-[#1a1a1a] mb-2">
+              <div>
+                <label htmlFor="payment-type" className="block text-sm font-medium text-[#1a1a1a] mb-2">
+                  Payment Type
+                </label>
+                <select
+                  id="payment-type"
+                  value={formState.paymentType}
+                  onChange={(e) => updateField("paymentType", e.target.value)}
+                  required
+                  className={getFieldClassName(showValidation && !formState.paymentType)}
+                >
+                  <option value="">Select payment type...</option>
+                  {PAYMENT_TYPES.map((paymentType) => (
+                    <option key={paymentType} value={paymentType}>
+                      {paymentType}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="purchase-date" className="block text-sm font-medium text-[#1a1a1a] mb-2">
                     Today's Date
                   </label>
                   <input
@@ -292,7 +319,8 @@ export default function BigPurchases() {
                     type="date"
                     value={formState.needBy}
                     onChange={(e) => updateField("needBy", e.target.value)}
-                    className={getFieldClassName(false)}
+                    required
+                    className={getFieldClassName(showValidation && !formState.needBy)}
                   />
                 </div>
 
