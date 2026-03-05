@@ -5,6 +5,7 @@ import {
   ReceiptPoundSterling,
   LayoutDashboard,
   ShoppingBag,
+  Inbox,
 } from "lucide-react";
 import { ToolCard, type Tool } from "@/components/ToolCard";
 import logoUrl from "@assets/blckbx-logo.png";
@@ -62,6 +63,15 @@ const tools: Tool[] = [
     href: "/meals",
     status: "active",
     badge: "Testing",
+  },
+  {
+    id: "trend-inbox",
+    name: "Trend Inbox",
+    description: "Review AI-scraped trend candidates before they go live",
+    icon: Inbox,
+    href: "/trend-inbox",
+    status: "active",
+    badge: "New",
   },
 ];
 

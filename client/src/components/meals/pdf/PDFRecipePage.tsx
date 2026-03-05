@@ -1,5 +1,5 @@
 import { Image, Link, Page, Text, View } from "@react-pdf/renderer";
-import { getMealMacros, getMealPlanItemKey, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
+import { getMealMacros, getMealNote, getMealPlanItemKey, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
 import { ActivityIcon, ClockIcon, LinkIcon, UsersIcon } from "@/components/pdf/PDFIcons";
 import { pdfStyles } from "./PDFStyles";
 import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
@@ -7,6 +7,7 @@ import { sanitizePdfText } from "./textSanitizer";
 
 export interface PDFRecipeItem extends MealPlanItem {
   pdfDayNumber: number;
+  pdfNote?: string;
 }
 
 interface HeaderFooterProps {
@@ -35,10 +36,12 @@ function Footer({ pageNumber }: { pageNumber: number }) {
 export function RecipeCard({
   recipe,
   macroOverrides,
+  noteOverrides,
   images,
 }: {
   recipe: PDFRecipeItem;
   macroOverrides?: Record<string, MacroOverride>;
+  noteOverrides?: Record<string, string>;
   images?: Record<string, string>;
 }) {
   const title = sanitizePdfText(recipe.title ?? recipe.recipe?.title ?? "Untitled recipe");
@@ -50,6 +53,7 @@ export function RecipeCard({
   const sourceUrl = recipe.source_url ?? recipe.recipe?.source_url;
   const recipeImageId = recipe.recipe?.id ?? recipe.recipe_id ?? getMealPlanItemKey(recipe);
   const imageData = recipeImageId ? images?.[recipeImageId] : undefined;
+  const note = sanitizePdfText(recipe.pdfNote ?? getMealNote(recipe, noteOverrides));
   const macroItems = [
     typeof macros.calories === "number" ? `Calories: ${Math.round(macros.calories)}kcal` : null,
     typeof macros.protein === "number" ? `Protein: ${Math.round(macros.protein)}g` : null,
@@ -121,6 +125,13 @@ export function RecipeCard({
             ))}
           </View>
         </View>
+
+        {note ? (
+          <View style={pdfStyles.recipeNoteBox}>
+            <Text style={pdfStyles.recipeNoteLabel}>Note</Text>
+            <Text style={pdfStyles.recipeNoteText}>{note}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -131,10 +142,12 @@ export function PDFRecipePage({
   pageNumber,
   recipes,
   macroOverrides,
+  noteOverrides,
   images,
 }: HeaderFooterProps & {
   recipes: PDFRecipeItem[];
   macroOverrides?: Record<string, MacroOverride>;
+  noteOverrides?: Record<string, string>;
   images?: Record<string, string>;
 }) {
   return (
@@ -148,6 +161,7 @@ export function PDFRecipePage({
             key={`${recipe.id}-${recipe.pdfDayNumber}`}
             recipe={recipe}
             macroOverrides={macroOverrides}
+            noteOverrides={noteOverrides}
             images={images}
           />
         ))}

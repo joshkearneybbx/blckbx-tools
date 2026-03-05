@@ -4,13 +4,24 @@ import { MealCard } from "./MealCard";
 interface DaySectionProps {
   day: MealPlanDay;
   macroOverrides?: Record<string, MacroOverride>;
+  noteOverrides?: Record<string, string>;
   onSwapClick: (mealPlanItemId: string) => void;
   onFeedback: (mealPlanItemId: string, feedback: "liked" | "disliked") => void;
   onSaveMacros: (mealPlanItemId: string, macros: MacroOverride) => void;
+  onSaveNote: (mealPlanItemId: string, note: string) => Promise<void> | void;
   onSaveTitle: (mealPlanItemId: string, title: string) => Promise<void> | void;
 }
 
-export function DaySection({ day, macroOverrides, onSwapClick, onFeedback, onSaveMacros, onSaveTitle }: DaySectionProps) {
+export function DaySection({
+  day,
+  macroOverrides,
+  noteOverrides,
+  onSwapClick,
+  onFeedback,
+  onSaveMacros,
+  onSaveNote,
+  onSaveTitle,
+}: DaySectionProps) {
   const totalCalories = day.meals.reduce(
     (sum, meal) => sum + (getMealMacros(meal, macroOverrides).calories ?? 0),
     0
@@ -44,9 +55,11 @@ export function DaySection({ day, macroOverrides, onSwapClick, onFeedback, onSav
             key={meal.id}
             item={meal}
             macroOverride={macroOverrides?.[meal.meal_plan_item_id ?? meal.id]}
+            noteOverride={noteOverrides?.[meal.meal_plan_item_id ?? meal.id]}
             onSwap={() => onSwapClick(meal.meal_plan_item_id ?? meal.id)}
             onFeedback={(feedback) => onFeedback(meal.meal_plan_item_id ?? meal.id, feedback)}
             onSaveMacros={(macros) => onSaveMacros(meal.meal_plan_item_id ?? meal.id, macros)}
+            onSaveNote={(note) => onSaveNote(meal.meal_plan_item_id ?? meal.id, note)}
             onSaveTitle={(title) => onSaveTitle(meal.meal_plan_item_id ?? meal.id, title)}
           />
         ))}

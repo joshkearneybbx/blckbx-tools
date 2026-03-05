@@ -277,6 +277,27 @@ export const pdfStyles = StyleSheet.create({
   recipeColumns: {
     flexDirection: "row",
   },
+  recipeNoteBox: {
+    marginTop: 6,
+    borderRadius: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: pdfColors.ctaYellow,
+    backgroundColor: pdfColors.sand300,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+  },
+  recipeNoteLabel: {
+    fontSize: 7,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    color: pdfColors.grey500,
+    marginBottom: 2,
+  },
+  recipeNoteText: {
+    fontSize: 8,
+    color: pdfColors.grey600,
+    lineHeight: 1.35,
+  },
   ingredientsCol: {
     width: "40%",
     paddingRight: 8,

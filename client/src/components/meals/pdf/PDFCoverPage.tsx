@@ -20,6 +20,7 @@ interface PDFCoverPageProps {
   menuOverview: MenuOverviewItem[];
   firstRecipe: PDFRecipeItem | null;
   macroOverrides?: Record<string, MacroOverride>;
+  noteOverrides?: Record<string, string>;
   images?: Record<string, string>;
 }
 
@@ -59,6 +60,7 @@ export function PDFCoverPage({
   menuOverview,
   firstRecipe,
   macroOverrides,
+  noteOverrides,
   images,
 }: PDFCoverPageProps) {
   const subtitleTags = focusTags.slice(0, 2).map(formatTag);
@@ -116,7 +118,14 @@ export function PDFCoverPage({
         </View>
 
         <Text style={pdfStyles.sectionHeading}>Recipes</Text>
-        {firstRecipe ? <RecipeCard recipe={firstRecipe} macroOverrides={macroOverrides} images={images} /> : null}
+        {firstRecipe ? (
+          <RecipeCard
+            recipe={firstRecipe}
+            macroOverrides={macroOverrides}
+            noteOverrides={noteOverrides}
+            images={images}
+          />
+        ) : null}
       </View>
 
       <Footer pageNumber={pageNumber} />

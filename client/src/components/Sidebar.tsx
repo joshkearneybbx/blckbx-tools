@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -96,6 +96,13 @@ export function Sidebar() {
           icon={ReceiptPoundSterling}
           label="Big Purchases"
           active={location.startsWith("/big-purchases")}
+        />
+        <SidebarLink
+          to="/trend-inbox"
+          icon={Inbox}
+          label="Trend Inbox"
+          active={location.startsWith("/trend-inbox")}
+          badge="New"
         />
         <SidebarLink
           to="https://bxgig.blckbx.co.uk/purchase-logger"

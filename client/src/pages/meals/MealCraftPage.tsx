@@ -97,6 +97,7 @@ function mapRecipeRecord(record: any): MealCraftRecipe {
 
 function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): MealPlanResult {
   const dayMap = new Map<number, MealPlanItem[]>();
+  const noteOverrides: Record<string, string> = {};
 
   itemRecords.forEach((item) => {
     const dayNumber = Number(item.day_number ?? 0);
@@ -126,6 +127,11 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
       servings: recipe?.servings,
     };
 
+    const clientNote = typeof item.client_note === "string" ? item.client_note.trim() : "";
+    if (clientNote) {
+      noteOverrides[meal.meal_plan_item_id ?? meal.id] = clientNote;
+    }
+
     const dayMeals = dayMap.get(dayNumber) ?? [];
     dayMeals.push(meal);
     dayMap.set(dayNumber, dayMeals);
@@ -149,6 +155,7 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
     shopping_list: normalizeShoppingList(planRecord.shopping_list),
     stats: computeMealPlanStats(plan),
     macroOverrides: {},
+    noteOverrides,
   };
 }
 
@@ -190,7 +197,11 @@ export default function MealCraftPage() {
       ]);
 
       const loadedPlan = buildPlanResultFromPocketBase(planRecord, itemRecords);
-      setPlanResult({ ...loadedPlan, macroOverrides: loadedPlan.macroOverrides ?? {} });
+      setPlanResult({
+        ...loadedPlan,
+        macroOverrides: loadedPlan.macroOverrides ?? {},
+        noteOverrides: loadedPlan.noteOverrides ?? {},
+      });
 
       const clientFromPlan = planRecord.expand?.client
         ? {
@@ -248,7 +259,7 @@ export default function MealCraftPage() {
       });
 
       const merged = mergeDailySummary(generated);
-      setPlanResult({ ...merged, macroOverrides: {} });
+      setPlanResult({ ...merged, macroOverrides: {}, noteOverrides: {} });
       setCurrentStep(3);
       setMaxCompletedStep(3);
     } catch (error) {
@@ -304,7 +315,9 @@ export default function MealCraftPage() {
         }));
 
         const nextMacroOverrides = { ...(current.macroOverrides ?? {}) };
+        const nextNoteOverrides = { ...(current.noteOverrides ?? {}) };
         delete nextMacroOverrides[swapResult.swapped.meal_plan_item_id];
+        delete nextNoteOverrides[swapResult.swapped.meal_plan_item_id];
 
         return {
           ...current,
@@ -313,6 +326,7 @@ export default function MealCraftPage() {
           shopping_list: swapResult.shopping_list,
           stats: computeMealPlanStats(nextPlan),
           macroOverrides: nextMacroOverrides,
+          noteOverrides: nextNoteOverrides,
         };
       });
 
@@ -320,6 +334,14 @@ export default function MealCraftPage() {
         ? `Plan updated. ${swapResult.swapped.reasoning}`
         : "Plan and shopping list updated.";
       toast({ title: "Meal swapped", description });
+
+      try {
+        await pb.collection("meal_plan_items").update(swapResult.swapped.meal_plan_item_id, {
+          client_note: "",
+        });
+      } catch (error) {
+        console.warn("Failed to clear swapped meal note in PocketBase:", error);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to swap meal";
       toast({ title: "Swap failed", description: message, variant: "destructive" });
@@ -372,6 +394,68 @@ export default function MealCraftPage() {
         },
       };
     });
+  };
+
+  const handleSaveNote = async (mealPlanItemId: string, note: string) => {
+    const trimmedNote = note.trim();
+    const previousNote = (planResult?.noteOverrides?.[mealPlanItemId] ?? "").trim();
+    const matchingMeal = planResult?.plan
+      .flatMap((day) => day.meals)
+      .find((meal) => (meal.meal_plan_item_id ?? meal.id) === mealPlanItemId);
+
+    if (trimmedNote === previousNote) {
+      return;
+    }
+
+    setPlanResult((current) => {
+      if (!current) return current;
+
+      const nextNoteOverrides = { ...(current.noteOverrides ?? {}) };
+
+      if (trimmedNote) {
+        nextNoteOverrides[mealPlanItemId] = trimmedNote;
+      } else {
+        delete nextNoteOverrides[mealPlanItemId];
+      }
+
+      return {
+        ...current,
+        noteOverrides: nextNoteOverrides,
+      };
+    });
+
+    if (!matchingMeal?.meal_plan_item_id) {
+      return;
+    }
+
+    try {
+      await pb.collection("meal_plan_items").update(matchingMeal.meal_plan_item_id, {
+        client_note: trimmedNote,
+      });
+      toast({
+        title: "Note saved",
+        description: trimmedNote ? "Client note updated." : "Client note removed.",
+      });
+    } catch (error) {
+      setPlanResult((current) => {
+        if (!current) return current;
+
+        const nextNoteOverrides = { ...(current.noteOverrides ?? {}) };
+        if (previousNote) {
+          nextNoteOverrides[mealPlanItemId] = previousNote;
+        } else {
+          delete nextNoteOverrides[mealPlanItemId];
+        }
+
+        return {
+          ...current,
+          noteOverrides: nextNoteOverrides,
+        };
+      });
+
+      const message = error instanceof Error ? error.message : "Could not save note.";
+      toast({ title: "Note save failed", description: message, variant: "destructive" });
+    }
   };
 
   const handleSaveTitle = async (mealPlanItemId: string, nextTitle: string) => {
@@ -460,6 +544,7 @@ export default function MealCraftPage() {
           shoppingList={planResult.shopping_list}
           stats={planResult.stats}
           macroOverrides={planResult.macroOverrides}
+          noteOverrides={planResult.noteOverrides}
           images={imageMap}
         />
       ).toBlob();
@@ -601,6 +686,7 @@ export default function MealCraftPage() {
             isSwapping={swapMutation.isPending}
             onFeedback={handleFeedback}
             onSaveMacros={handleSaveMacros}
+            onSaveNote={handleSaveNote}
             onSaveTitle={handleSaveTitle}
           />
         ) : null}

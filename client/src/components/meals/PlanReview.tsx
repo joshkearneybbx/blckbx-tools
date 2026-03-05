@@ -13,10 +13,21 @@ interface PlanReviewProps {
   isSwapping: boolean;
   onFeedback: (mealPlanItemId: string, feedback: "liked" | "disliked") => void;
   onSaveMacros: (mealPlanItemId: string, macros: MacroOverride) => void;
+  onSaveNote: (mealPlanItemId: string, note: string) => Promise<void> | void;
   onSaveTitle: (mealPlanItemId: string, title: string) => Promise<void> | void;
 }
 
-export function PlanReview({ planResult, onRegenerate, onNext, onSwapMeal, isSwapping, onFeedback, onSaveMacros, onSaveTitle }: PlanReviewProps) {
+export function PlanReview({
+  planResult,
+  onRegenerate,
+  onNext,
+  onSwapMeal,
+  isSwapping,
+  onFeedback,
+  onSaveMacros,
+  onSaveNote,
+  onSaveTitle,
+}: PlanReviewProps) {
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
 
   const swapOpen = useMemo(() => !!swapTargetId, [swapTargetId]);
@@ -36,9 +47,11 @@ export function PlanReview({ planResult, onRegenerate, onNext, onSwapMeal, isSwa
           key={day.day_number}
           day={day}
           macroOverrides={planResult.macroOverrides}
+          noteOverrides={planResult.noteOverrides}
           onSwapClick={(mealPlanItemId) => setSwapTargetId(mealPlanItemId)}
           onFeedback={onFeedback}
           onSaveMacros={onSaveMacros}
+          onSaveNote={onSaveNote}
           onSaveTitle={onSaveTitle}
         />
       ))}

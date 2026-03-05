@@ -10,6 +10,7 @@ import SectionBuilder from "@/pages/SectionBuilder";
 import PreviewArrange from "@/pages/PreviewArrange";
 import ListEditor from "@/pages/ListEditor";
 import BigPurchases from "@/pages/BigPurchases";
+import TrendInbox from "@/pages/TrendInbox";
 import TaskGuidePage from "@/pages/task-guide/TaskGuidePage";
 import Login from "@/pages/Login";
 import OAuthCallback from "@/pages/OAuthCallback";
@@ -124,6 +125,15 @@ function Router() {
           {() => (
             <ProtectedRoute>
               <BigPurchases />
+            </ProtectedRoute>
+          )}
+        </Route>
+
+        {/* Trend Inbox Tool */}
+        <Route path="/trend-inbox">
+          {() => (
+            <ProtectedRoute>
+              <TrendInbox />
             </ProtectedRoute>
           )}
         </Route>

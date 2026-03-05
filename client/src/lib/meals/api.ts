@@ -86,6 +86,7 @@ export interface MealPlanResult {
   shopping_overlap_notes?: string;
   stats: MealPlanStats;
   macroOverrides?: Record<string, MacroOverride>;
+  noteOverrides?: Record<string, string>;
 }
 
 export interface GenerateMealPlanPayload {
@@ -233,6 +234,14 @@ export function getMealMacros(
   };
 }
 
+export function getMealNote(
+  meal: Pick<MealPlanItem, "id" | "meal_plan_item_id">,
+  noteOverrides?: Record<string, string>
+): string {
+  const mealKey = getMealPlanItemKey(meal);
+  return (noteOverrides?.[mealKey] ?? "").trim();
+}
+
 function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
   const recipe = rawMeal.recipe
     ? {
@@ -321,6 +330,7 @@ function normalizePlanResponse(raw: any): MealPlanResult {
     shopping_overlap_notes: raw?.shopping_overlap_notes ? String(raw.shopping_overlap_notes) : undefined,
     stats: computeMealPlanStats(plan),
     macroOverrides: {},
+    noteOverrides: {},
   };
 }
 

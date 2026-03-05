@@ -1,5 +1,5 @@
 import { Document } from "@react-pdf/renderer";
-import { getMealMacros, type MacroOverride, type MealPlanDay, type MealPlanStats, type ShoppingList } from "@/lib/meals/api";
+import { getMealMacros, getMealPlanItemKey, type MacroOverride, type MealPlanDay, type MealPlanStats, type ShoppingList } from "@/lib/meals/api";
 import { PDFCoverPage } from "./PDFCoverPage";
 import { PDFRecipeItem, PDFRecipePage } from "./PDFRecipePage";
 import { PDFShoppingPage } from "./PDFShoppingPage";
@@ -14,6 +14,7 @@ interface MealPlanPDFProps {
   shoppingList: ShoppingList;
   stats: MealPlanStats;
   macroOverrides?: Record<string, MacroOverride>;
+  noteOverrides?: Record<string, string>;
   images?: Record<string, string>;
 }
 
@@ -47,6 +48,7 @@ export function MealPlanPDF({
   shoppingList,
   stats,
   macroOverrides,
+  noteOverrides,
   images,
 }: MealPlanPDFProps) {
   const dateLabel = formatDate(generatedAt);
@@ -55,6 +57,7 @@ export function MealPlanPDF({
     day.meals.map((meal) => ({
       ...meal,
       pdfDayNumber: meal.day_number || day.day_number,
+      pdfNote: (noteOverrides?.[getMealPlanItemKey(meal)] ?? "").trim(),
     }))
   );
 
@@ -86,6 +89,7 @@ export function MealPlanPDF({
         menuOverview={menuOverview}
         firstRecipe={firstRecipe}
         macroOverrides={macroOverrides}
+        noteOverrides={noteOverrides}
         images={images}
       />
 
@@ -96,6 +100,7 @@ export function MealPlanPDF({
           pageNumber={index + 2}
           recipes={recipesChunk}
           macroOverrides={macroOverrides}
+          noteOverrides={noteOverrides}
           images={images}
         />
       ))}

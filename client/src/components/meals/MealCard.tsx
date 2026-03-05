@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, Pencil, RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ChevronDown, ChevronUp, MessageSquare, Pencil, RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 import { enhanceImageUrl, getMealMacros, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
 
 interface MealCardProps {
   item: MealPlanItem;
   macroOverride?: MacroOverride;
+  noteOverride?: string;
   onSwap: () => void;
   onFeedback: (feedback: "liked" | "disliked") => void;
   onSaveMacros: (macros: MacroOverride) => void;
+  onSaveNote: (note: string) => Promise<void> | void;
   onSaveTitle: (title: string) => Promise<void> | void;
 }
 
@@ -29,10 +31,20 @@ function parseMacroInput(value: string): number | undefined {
   return parsed;
 }
 
-export function MealCard({ item, macroOverride, onSwap, onFeedback, onSaveMacros, onSaveTitle }: MealCardProps) {
+export function MealCard({
+  item,
+  macroOverride,
+  noteOverride,
+  onSwap,
+  onFeedback,
+  onSaveMacros,
+  onSaveNote,
+  onSaveTitle,
+}: MealCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isEditingMacros, setIsEditingMacros] = useState(false);
+  const [isEditingNote, setIsEditingNote] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
 
@@ -42,6 +54,8 @@ export function MealCard({ item, macroOverride, onSwap, onFeedback, onSaveMacros
   const ingredients = item.ingredients ?? item.recipe?.ingredients ?? [];
   const instructions = item.instructions ?? item.recipe?.instructions ?? [];
   const imageUrl = enhanceImageUrl(item.image_url || item.recipe?.image_url || "");
+  const noteText = (noteOverride ?? "").trim();
+  const [noteDraft, setNoteDraft] = useState(noteText);
   const macros = getMealMacros(item, macroOverride ? { [item.meal_plan_item_id ?? item.id]: macroOverride } : undefined);
   const [macroDraft, setMacroDraft] = useState({
     calories: toInputValue(macros.calories),
@@ -70,6 +84,12 @@ export function MealCard({ item, macroOverride, onSwap, onFeedback, onSaveMacros
       });
     }
   }, [isEditingMacros, macros.calories, macros.protein, macros.carbs, macros.fat]);
+
+  useEffect(() => {
+    if (!isEditingNote) {
+      setNoteDraft(noteText);
+    }
+  }, [isEditingNote, noteText]);
 
   const macroMetaItems = [
     typeof macros.calories === "number" ? `${Math.round(macros.calories)} kcal` : null,
@@ -211,6 +231,14 @@ export function MealCard({ item, macroOverride, onSwap, onFeedback, onSaveMacros
             <Pencil className="h-3 w-3" />
             Edit Macros
           </button>
+          <button
+            type="button"
+            onClick={() => setIsEditingNote((prev) => !prev)}
+            className="inline-flex items-center gap-1 rounded-md border border-[#E6E5E0] px-2 py-1 text-xs font-medium text-[#6B6B68]"
+          >
+            <MessageSquare className="h-3 w-3" />
+            {noteText ? "Edit Note" : "Add Note"}
+          </button>
         </div>
       </div>
 
@@ -303,6 +331,43 @@ export function MealCard({ item, macroOverride, onSwap, onFeedback, onSaveMacros
         </div>
       ) : null}
 
+      {isEditingNote ? (
+        <div className="mt-2 rounded-md border border-[#E6E5E0] bg-[#FAF9F8] p-3">
+          <label className="block text-[11px] text-[#6B6B68] mb-1.5">
+            Note for client
+          </label>
+          <textarea
+            value={noteDraft}
+            onChange={(event) => setNoteDraft(event.target.value)}
+            rows={3}
+            placeholder="Add a note for the client (e.g. serving suggestions, substitutions, tips)..."
+            className="w-full rounded-md border border-[#E6E5E0] bg-white px-2.5 py-2 text-xs text-[#1a1a1a] resize-y focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setNoteDraft(noteText);
+                setIsEditingNote(false);
+              }}
+              className="rounded-md border border-[#E6E5E0] px-2.5 py-1 text-xs font-medium text-[#6B6B68]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSaveNote(noteDraft);
+                setIsEditingNote(false);
+              }}
+              className="rounded-md bg-[#E7C51C] px-2.5 py-1 text-xs font-semibold text-black hover:bg-[#d4b419]"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {expanded ? (
         <div className="mt-3 border-t border-[#E6E5E0] pt-3 text-xs [font-family:Inter,sans-serif]">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -326,6 +391,27 @@ export function MealCard({ item, macroOverride, onSwap, onFeedback, onSaveMacros
                   View source
                 </a>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {noteText ? (
+        <div className="mt-3 rounded-md border border-[#E6E5E0] bg-[#FAF9F8] px-3 py-2">
+          <div className="flex items-start gap-2 text-xs [font-family:Inter,sans-serif]">
+            <MessageSquare className="mt-0.5 h-3.5 w-3.5 text-[#6B6B68] shrink-0" />
+            <div className="w-full">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold text-[#424242]">Note</p>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingNote(true)}
+                  className="text-[11px] font-medium text-[#6B6B68] underline underline-offset-2"
+                >
+                  Edit
+                </button>
+              </div>
+              <p className="text-[#6B6B68] italic whitespace-pre-wrap">{noteText}</p>
             </div>
           </div>
         </div>
