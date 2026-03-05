@@ -53,7 +53,7 @@ const tools: Tool[] = [
     icon: ShoppingBag,
     href: "https://bxgig.blckbx.co.uk/purchase-logger",
     status: "active",
-    badge: "New",
+    badge: "Testing",
   },
   {
     id: "meals",
@@ -71,7 +71,7 @@ const tools: Tool[] = [
     icon: Inbox,
     href: "/trend-inbox",
     status: "active",
-    badge: "New",
+    badge: "Testing",
   },
 ];
 

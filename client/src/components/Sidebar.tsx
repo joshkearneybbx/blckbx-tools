@@ -102,14 +102,14 @@ export function Sidebar() {
           icon={Inbox}
           label="Trend Inbox"
           active={location.startsWith("/trend-inbox")}
-          badge="New"
+          badge="Testing"
         />
         <SidebarLink
           to="https://bxgig.blckbx.co.uk/purchase-logger"
           icon={ShoppingBag}
           label="Purchase Logger"
           active={false}
-          badge="New"
+          badge="Testing"
         />
         <SidebarLink
           to="/task-guide"
