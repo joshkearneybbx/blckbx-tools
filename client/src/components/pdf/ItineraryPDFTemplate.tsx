@@ -1458,12 +1458,28 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
     const company = item.company || details?.company || '';
     const contactDetails = item.contactDetails || item.contact || details?.contactDetails || details?.contact || '';
 
-    if (isConnecting && Array.isArray(legs) && legs.length > 0) {
+    const hasLegs = Array.isArray(legs) && legs.length > 0;
+    const hasLegContent = hasLegs && legs.some((leg: any) => (
+      leg?.departureAirport ||
+      leg?.arrivalAirport ||
+      leg?.departureStation ||
+      leg?.arrivalStation ||
+      leg?.fromLocation ||
+      leg?.toLocation ||
+      leg?.departureTime ||
+      leg?.arrivalTime ||
+      leg?.flightNumber ||
+      leg?.company ||
+      leg?.airline
+    ));
+    const shouldExpandLegs = !!(hasLegContent && (isConnecting || legs.length > 1));
+
+    if (shouldExpandLegs) {
       return legs.map((leg: any, idx: number): TravelSegment => ({
         id: `${item.id || fallbackId}-leg-${idx}`,
         type,
-        fromLocation: leg.departureAirport || leg.departureStation || details?.fromLocation || item.fromLocation || '',
-        toLocation: leg.arrivalAirport || leg.arrivalStation || details?.toLocation || item.toLocation || '',
+        fromLocation: leg.departureAirport || leg.departureStation || leg.fromLocation || details?.fromLocation || item.fromLocation || '',
+        toLocation: leg.arrivalAirport || leg.arrivalStation || leg.toLocation || details?.toLocation || item.toLocation || '',
         date: leg.date || item.date || details?.date || item.flightDate || '',
         departureTime: leg.departureTime || item.departureTime || '',
         arrivalTime: leg.arrivalTime || item.arrivalTime || '',
@@ -1497,15 +1513,34 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
 
   const getTravelForDestination = (destination: any, destIndex: number): TravelSegment[] => {
     const additionalDestinationSegments = (additionalTravel || [])
-      .filter((item, idx) =>
+      .filter((item) =>
         matchesDestination(item?.destinationId, destination) ||
         matchesDestination(item?.toDestination, destination)
       )
       .flatMap((item, idx) => parseAdditionalTravelItem(item, `additional-${idx}`));
 
+    const destinationAssignedAdditionalIds = new Set(
+      (additionalTravel || [])
+        .filter((item) =>
+          sortedDestinations.some((dest) =>
+            matchesDestination(item?.destinationId, dest) ||
+            matchesDestination(item?.toDestination, dest)
+          )
+        )
+        .map((item) => String(item?.id))
+    );
+
+    const fallbackAdditionalSegments = (additionalTravel || [])
+      .filter((item) => {
+        if (!item) return false;
+        if (!item.id) return true;
+        return !destinationAssignedAdditionalIds.has(String(item.id));
+      })
+      .flatMap((item, idx) => parseAdditionalTravelItem(item, `additional-fallback-${idx}`));
+
     if (destIndex === 0) {
-      // First destination: show outbound journey
-      return [...(outboundJourney || []), ...additionalDestinationSegments];
+      // First destination: show outbound journey and any unassigned additional travel.
+      return [...(outboundJourney || []), ...additionalDestinationSegments, ...fallbackAdditionalSegments];
     }
 
     // Subsequent destinations: include all inter-destination records that arrive at this destination.
