@@ -624,30 +624,43 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottom: "1 solid #E5E7EB",
     borderBottomStyle: "solid",
+    flexDirection: "column",
+    alignItems: "stretch",
+    position: "relative",
   },
 
   itemTitleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
     marginBottom: 8,
+    flexDirection: "column",
+    alignItems: "stretch",
   },
 
   itemName: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#1a1a1a",
-    flex: 1,
+    marginTop: 0,
   },
 
-  itemPrice: {
-    fontSize: 10,
-    fontWeight: "bold",
+  itemPriceContainer: {
+    width: "100%",
+    backgroundColor: "#F5C518",
+    borderRadius: 8,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 12,
+    paddingRight: 12,
+    maxWidth: "100%",
+    position: "relative",
+    marginBottom: 8,
+    alignSelf: "stretch",
+  },
+
+  itemPriceLine: {
+    fontSize: 11,
     color: "#1a1a1a",
-    backgroundColor: "#E7C51C",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    fontWeight: 500,
+    lineHeight: 1.35,
   },
 
   itemDescription: {
@@ -675,6 +688,12 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     marginBottom: 12,
+  },
+
+  itemFooterContent: {
+    padding: 16,
+    flexDirection: "column",
+    alignItems: "stretch",
   },
 
   detailRow: {
@@ -1052,48 +1071,33 @@ const ItemCard = ({
 
   const typeSpecificFields = getTypeSpecificFields();
   const priceBadge = item.priceRange || (type === 'activity' ? item.price : '');
+  const priceParts = String(priceBadge || '')
+    .split(/\s*\|\s*|,\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 
   return (
     <View style={styles.itemCard} wrap={false}>
       <View style={styles.itemCardHeader}>
         <View style={styles.itemTitleRow}>
           <Text style={styles.itemName}>{item.name}</Text>
-          {priceBadge && <Text style={styles.itemPrice}>{priceBadge}</Text>}
         </View>
+
+        {priceParts.length > 0 && (
+          <View style={styles.itemPriceContainer}>
+            {priceParts.map((pricePart, index) => (
+              <Text key={`${pricePart}-${index}`} style={styles.itemPriceLine}>
+                {priceParts.length > 1 ? `• ${pricePart}` : pricePart}
+              </Text>
+            ))}
+          </View>
+        )}
 
         {item.description && (
           <Text style={styles.itemDescription}>{item.description}</Text>
         )}
 
-        {item.address && (
-          <View style={styles.itemAddressRow}>
-            <LocationIcon size={11} color="#666666" />
-            <Text style={styles.itemAddressText}>{item.address}</Text>
-          </View>
-        )}
-
-        {(item.websiteUrl || item.googleMapsLink) && (
-          <View style={styles.linksRow}>
-            {item.googleMapsLink && (
-              <Link src={item.googleMapsLink}>
-                <View style={styles.linkButton}>
-                  <MapIcon size={10} color="#232220" />
-                  <Text style={styles.linkText}>View on Maps</Text>
-                </View>
-              </Link>
-            )}
-            {item.websiteUrl && (
-              <Link src={item.websiteUrl}>
-                <View style={styles.linkButton}>
-                  <LinkIcon size={10} color="#232220" />
-                  <Text style={styles.linkText}>View Website</Text>
-                </View>
-              </Link>
-            )}
-          </View>
-        )}
-
-        {(typeSpecificFields.length > 0 || item.notes || item.bookingReference) && (
+        {(typeSpecificFields.length > 0 || item.bookingReference) && (
           <View style={styles.itemDetailsBox}>
             {typeSpecificFields.map((field: any, index) => {
               const normalizedValue = field.label === 'Check-in'
@@ -1108,14 +1112,6 @@ const ItemCard = ({
                 </View>
               );
             })}
-            {item.notes && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLine}>
-                  <Text style={styles.detailLineLabel}>Notes:</Text>{' '}
-                  {item.notes}
-                </Text>
-              </View>
-            )}
           </View>
         )}
       </View>
@@ -1123,6 +1119,47 @@ const ItemCard = ({
       {hasValidImage && proxiedImageUrl && (
         <View style={styles.itemImageContainer}>
           <Image src={proxiedImageUrl} style={styles.itemImage} />
+        </View>
+      )}
+
+      {(item.address || item.websiteUrl || item.googleMapsLink || item.notes) && (
+        <View style={styles.itemFooterContent}>
+          {item.address && (
+            <View style={styles.itemAddressRow}>
+              <LocationIcon size={11} color="#666666" />
+              <Text style={styles.itemAddressText}>{item.address}</Text>
+            </View>
+          )}
+
+          {(item.websiteUrl || item.googleMapsLink) && (
+            <View style={styles.linksRow}>
+              {item.googleMapsLink && (
+                <Link src={item.googleMapsLink}>
+                  <View style={styles.linkButton}>
+                    <MapIcon size={10} color="#232220" />
+                    <Text style={styles.linkText}>View on Maps</Text>
+                  </View>
+                </Link>
+              )}
+              {item.websiteUrl && (
+                <Link src={item.websiteUrl}>
+                  <View style={styles.linkButton}>
+                    <LinkIcon size={10} color="#232220" />
+                    <Text style={styles.linkText}>View Website</Text>
+                  </View>
+                </Link>
+              )}
+            </View>
+          )}
+
+          {item.notes && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLine}>
+                <Text style={styles.detailLineLabel}>Notes:</Text>{' '}
+                {item.notes}
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </View>

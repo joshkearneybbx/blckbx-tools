@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -116,6 +116,12 @@ export function Sidebar() {
           icon={ClipboardList}
           label="Task Guide"
           active={location.startsWith("/task-guide")}
+        />
+        <SidebarLink
+          to="/pdf-import"
+          icon={FileText}
+          label="PDF Import"
+          active={location.startsWith("/pdf-import")}
         />
       </nav>
       {isAuthenticated && (

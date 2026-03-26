@@ -12,6 +12,7 @@ import ListEditor from "@/pages/ListEditor";
 import BigPurchases from "@/pages/BigPurchases";
 import TrendInbox from "@/pages/TrendInbox";
 import TaskGuidePage from "@/pages/task-guide/TaskGuidePage";
+import PDFImport from "@/pages/PDFImport";
 import Login from "@/pages/Login";
 import OAuthCallback from "@/pages/OAuthCallback";
 import NotFound from "@/pages/not-found";
@@ -143,6 +144,15 @@ function Router() {
           {() => (
             <ProtectedRoute>
               <TaskGuidePage />
+            </ProtectedRoute>
+          )}
+        </Route>
+
+        {/* PDF Import Tool */}
+        <Route path="/pdf-import">
+          {() => (
+            <ProtectedRoute>
+              <PDFImport />
             </ProtectedRoute>
           )}
         </Route>
