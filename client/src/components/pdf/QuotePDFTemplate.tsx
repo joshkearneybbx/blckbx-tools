@@ -58,7 +58,8 @@ export interface QuoteData {
   outboundTravel: {
     airline: string;
     flightNumber: string;
-    flightDate: string;
+    departureDate: string;
+    arrivalDate: string;
     departureAirport: string;
     departureAirportCode?: string;
     arrivalAirport: string;
@@ -71,7 +72,8 @@ export interface QuoteData {
   returnTravel: {
     airline: string;
     flightNumber: string;
-    flightDate: string;
+    departureDate: string;
+    arrivalDate: string;
     departureAirport: string;
     departureAirportCode?: string;
     arrivalAirport: string;
@@ -314,6 +316,16 @@ const styles = StyleSheet.create({
     color: "#1a1a1a",
     marginTop: 2,
   },
+  flightDateText: {
+    fontSize: 8,
+    color: "#888888",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  nextDayIndicator: {
+    fontSize: 8,
+    color: "#888888",
+  },
   flightPathContainer: {
     flex: 1,
     flexDirection: "row",
@@ -524,6 +536,13 @@ const styles = StyleSheet.create({
     color: "#888888",
     marginTop: 2,
   },
+  pricingDisclaimer: {
+    fontSize: 8,
+    color: "#888888",
+    fontStyle: "italic",
+    marginTop: 12,
+    lineHeight: 1.4,
+  },
 
   // Payment / Contact section
   contactCard: {
@@ -618,6 +637,14 @@ const FlightCard = ({
   const toCode = (flight.arrivalAirportCode || "").trim() || extractAirportCode(flight.arrivalAirport);
   const fromName = getLocationName(flight.departureAirport);
   const toName = getLocationName(flight.arrivalAirport);
+  const departureDate = flight.departureDate || "";
+  const arrivalDate = flight.arrivalDate || departureDate;
+  const arrivesNextDay = Boolean(
+    departureDate &&
+      flight.arrivalDate &&
+      arrivalDate &&
+      departureDate !== arrivalDate
+  );
 
   return (
     <View style={styles.flightCard} wrap={false}>
@@ -634,12 +661,15 @@ const FlightCard = ({
       </View>
 
       <View style={styles.flightCardBody}>
-        <View style={styles.flightRoute}>
-          <View style={styles.airportColumn}>
-            <Text style={styles.airportCode}>{fromCode}</Text>
-            <Text style={styles.airportName}>{fromName}</Text>
-            <Text style={styles.flightTime}>{flight.departureTime || "--:--"}</Text>
-          </View>
+          <View style={styles.flightRoute}>
+            <View style={styles.airportColumn}>
+              <Text style={styles.airportCode}>{fromCode}</Text>
+              <Text style={styles.airportName}>{fromName}</Text>
+              <Text style={styles.flightTime}>{flight.departureTime || "--:--"}</Text>
+              {departureDate ? (
+                <Text style={styles.flightDateText}>{departureDate}</Text>
+              ) : null}
+            </View>
 
           <View style={styles.flightPathContainer}>
             <View style={styles.flightPathLine} />
@@ -650,15 +680,19 @@ const FlightCard = ({
           <View style={styles.airportColumn}>
             <Text style={styles.airportCode}>{toCode}</Text>
             <Text style={styles.airportName}>{toName}</Text>
-            <Text style={styles.flightTime}>{flight.arrivalTime || "--:--"}</Text>
+            <Text style={styles.flightTime}>
+              {flight.arrivalTime || "--:--"}
+              {arrivesNextDay ? (
+                <Text style={styles.nextDayIndicator}> +1</Text>
+              ) : null}
+            </Text>
+            {arrivalDate ? (
+              <Text style={styles.flightDateText}>{arrivalDate}</Text>
+            ) : null}
           </View>
         </View>
 
         <View style={styles.flightMetaRow}>
-          <View style={styles.metaItem}>
-            <CalendarIcon size={11} color="#666666" />
-            <Text style={styles.metaText}>{flight.flightDate}</Text>
-          </View>
           <View style={styles.metaItem}>
             <UsersIcon size={11} color="#666666" />
             <Text style={styles.metaText}>{travellers.total} passengers</Text>
@@ -929,6 +963,10 @@ export function QuotePDFTemplate({
                 </View>
                 <Text style={styles.pricingValue}>{pricing.balance}</Text>
               </View>
+
+              <Text style={styles.pricingDisclaimer}>
+                Prices are subject to availability and may change until booking is confirmed. Contact your travel assistant to secure this rate.
+              </Text>
             </View>
           </View>
 

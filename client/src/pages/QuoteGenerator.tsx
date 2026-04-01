@@ -138,7 +138,10 @@ function normalizeQuoteData(payload: unknown): QuoteData {
     outboundTravel: {
       airline: sanitizeValue(outboundTravel.airline),
       flightNumber: sanitizeValue(outboundTravel.flightNumber),
-      flightDate: sanitizeValue(outboundTravel.flightDate),
+      departureDate:
+        sanitizeValue(outboundTravel.departureDate) ||
+        sanitizeValue(outboundTravel.flightDate),
+      arrivalDate: sanitizeValue(outboundTravel.arrivalDate),
       departureAirport: sanitizeValue(outboundTravel.departureAirport),
       departureAirportCode: sanitizeValue(outboundTravel.departureAirportCode),
       arrivalAirport: sanitizeValue(outboundTravel.arrivalAirport),
@@ -151,7 +154,10 @@ function normalizeQuoteData(payload: unknown): QuoteData {
     returnTravel: {
       airline: sanitizeValue(returnTravel.airline),
       flightNumber: sanitizeValue(returnTravel.flightNumber),
-      flightDate: sanitizeValue(returnTravel.flightDate),
+      departureDate:
+        sanitizeValue(returnTravel.departureDate) ||
+        sanitizeValue(returnTravel.flightDate),
+      arrivalDate: sanitizeValue(returnTravel.arrivalDate),
       departureAirport: sanitizeValue(returnTravel.departureAirport),
       departureAirportCode: sanitizeValue(returnTravel.departureAirportCode),
       arrivalAirport: sanitizeValue(returnTravel.arrivalAirport),
@@ -1258,9 +1264,14 @@ export default function QuoteGenerator() {
                 onChange={(value) => updateTravelField("outboundTravel", "arrivalTime", value)}
               />
               <EditableRow
-                label="Flight Date"
-                value={quoteData.outboundTravel.flightDate}
-                onChange={(value) => updateTravelField("outboundTravel", "flightDate", value)}
+                label="Departure Date"
+                value={quoteData.outboundTravel.departureDate}
+                onChange={(value) => updateTravelField("outboundTravel", "departureDate", value)}
+              />
+              <EditableRow
+                label="Arrival Date"
+                value={quoteData.outboundTravel.arrivalDate}
+                onChange={(value) => updateTravelField("outboundTravel", "arrivalDate", value)}
               />
               <EditableRow
                 label="Class"
@@ -1322,9 +1333,14 @@ export default function QuoteGenerator() {
                 onChange={(value) => updateTravelField("returnTravel", "arrivalTime", value)}
               />
               <EditableRow
-                label="Flight Date"
-                value={quoteData.returnTravel.flightDate}
-                onChange={(value) => updateTravelField("returnTravel", "flightDate", value)}
+                label="Departure Date"
+                value={quoteData.returnTravel.departureDate}
+                onChange={(value) => updateTravelField("returnTravel", "departureDate", value)}
+              />
+              <EditableRow
+                label="Arrival Date"
+                value={quoteData.returnTravel.arrivalDate}
+                onChange={(value) => updateTravelField("returnTravel", "arrivalDate", value)}
               />
               <EditableRow
                 label="Class"
