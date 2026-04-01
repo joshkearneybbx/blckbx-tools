@@ -357,6 +357,7 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
 
   // Build legs from flight segments
   const legs = flights.map((f, index) => ({
+    date: f.date || '',
     departureAirport: f.fromLocation,
     arrivalAirport: f.toLocation,
     departureTime: f.departureTime || '',
@@ -782,6 +783,7 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
   const lastFlight = flights[flights.length - 1];
 
   const legs = flights.map((f, index) => ({
+    date: f.date || '',
     departureAirport: f.fromLocation,
     arrivalAirport: f.toLocation,
     departureTime: f.departureTime || '',

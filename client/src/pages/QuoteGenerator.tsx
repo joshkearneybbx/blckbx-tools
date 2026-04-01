@@ -1,6 +1,7 @@
 import type { ChangeEvent, ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
+import { Link, useLocation, useRoute } from "wouter";
 import {
   FileOutput,
   Loader2,
@@ -14,6 +15,8 @@ import {
   Wallet,
   Users,
   Camera,
+  ArrowLeft,
+  Save,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { pb } from "@/lib/pocketbase";
 import {
   QuotePDFTemplate,
   type PassengerDetail,
@@ -135,7 +140,9 @@ function normalizeQuoteData(payload: unknown): QuoteData {
       flightNumber: sanitizeValue(outboundTravel.flightNumber),
       flightDate: sanitizeValue(outboundTravel.flightDate),
       departureAirport: sanitizeValue(outboundTravel.departureAirport),
+      departureAirportCode: sanitizeValue(outboundTravel.departureAirportCode),
       arrivalAirport: sanitizeValue(outboundTravel.arrivalAirport),
+      arrivalAirportCode: sanitizeValue(outboundTravel.arrivalAirportCode),
       departureTime: sanitizeValue(outboundTravel.departureTime),
       arrivalTime: sanitizeValue(outboundTravel.arrivalTime),
       class: sanitizeValue(outboundTravel.class),
@@ -146,7 +153,9 @@ function normalizeQuoteData(payload: unknown): QuoteData {
       flightNumber: sanitizeValue(returnTravel.flightNumber),
       flightDate: sanitizeValue(returnTravel.flightDate),
       departureAirport: sanitizeValue(returnTravel.departureAirport),
+      departureAirportCode: sanitizeValue(returnTravel.departureAirportCode),
       arrivalAirport: sanitizeValue(returnTravel.arrivalAirport),
+      arrivalAirportCode: sanitizeValue(returnTravel.arrivalAirportCode),
       departureTime: sanitizeValue(returnTravel.departureTime),
       arrivalTime: sanitizeValue(returnTravel.arrivalTime),
       class: sanitizeValue(returnTravel.class),
@@ -236,6 +245,63 @@ function createPassenger(): PassengerDetail {
   };
 }
 
+function base64ToFile(base64: string, filename: string): File {
+  const parts = base64.split(",");
+  const mime = parts[0]?.match(/:(.*?);/)?.[1] || "image/jpeg";
+  const binary = atob(parts[1] || "");
+  let index = binary.length;
+  const bytes = new Uint8Array(index);
+  while (index--) bytes[index] = binary.charCodeAt(index);
+  return new File([bytes], filename, { type: mime });
+}
+
+function parseStoredQuoteData(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function normalizeStoredPassengers(payload: unknown, total: QuoteData["travellers"]["total"]): PassengerDetail[] {
+  const source = parseStoredQuoteData(payload);
+  const passengers = Array.isArray(source.passengers) ? source.passengers : [];
+  const normalized = passengers
+    .map((passenger) => {
+      if (!passenger || typeof passenger !== "object") return null;
+      const nextPassenger = passenger as Record<string, unknown>;
+      return {
+        name: sanitizeValue(nextPassenger.name),
+        dateOfBirth: sanitizeValue(nextPassenger.dateOfBirth),
+        type: sanitizeValue(nextPassenger.type) === "child" ? "child" : "adult",
+      } as PassengerDetail;
+    })
+    .filter((passenger): passenger is PassengerDetail => Boolean(passenger));
+
+  if (normalized.length > 0) return normalized;
+  return Array.from({ length: getPassengerCount(total) }, () => createPassenger());
+}
+
+async function fileUrlToDataUrl(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load image (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to read image"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function getPassengerCount(total: QuoteData["travellers"]["total"]): number {
   const parsed = Number.parseInt(String(total), 10);
   if (Number.isNaN(parsed) || parsed < 1) return 1;
@@ -298,6 +364,9 @@ function EditableRow({
 }
 
 export default function QuoteGenerator() {
+  const [, setLocation] = useLocation();
+  const [routeMatch, routeParams] = useRoute("/travel/quote-generator/:id");
+  const { user } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [status, setStatus] = useState<Status>("upload");
@@ -308,10 +377,15 @@ export default function QuoteGenerator() {
   const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
   const [tripPhotos, setTripPhotos] = useState<string[]>([]);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
+  const [quoteRecordStatus, setQuoteRecordStatus] = useState<"draft" | "sent">("draft");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const tripPhotosInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
+  const quoteId = routeMatch ? routeParams?.id : undefined;
 
   const hasOptionalSections = useMemo(() => {
     if (!quoteData) return false;
@@ -353,10 +427,160 @@ export default function QuoteGenerator() {
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
     setTripPhotos([]);
+    setSavedRecordId(null);
+    setQuoteRecordStatus("draft");
     if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
     if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
     setIsDragging(false);
   };
+
+  const handleUploadAnother = () => {
+    resetState();
+    if (quoteId) {
+      setLocation("/travel/quote-generator");
+    }
+  };
+
+  const buildStoredPayload = (currentQuoteData: QuoteData) => ({
+    ...currentQuoteData,
+    clientName: clientName.trim(),
+    passengers,
+  });
+
+  const persistQuote = async ({
+    silent = false,
+    nextStatus,
+  }: {
+    silent?: boolean;
+    nextStatus?: "draft" | "sent";
+  } = {}): Promise<boolean> => {
+    if (!quoteData || !user?.id) return false;
+
+    setIsSaving(true);
+    const statusToSave = nextStatus || quoteRecordStatus;
+
+    try {
+      const formData = new FormData();
+      formData.append("user", user.id);
+      formData.append("tripName", quoteData.project.name || "Untitled Quote");
+      formData.append("quoteReference", quoteData.project.quoteReference || "");
+      formData.append("clientName", clientName.trim());
+      formData.append("destination", quoteData.destination.name || "");
+      formData.append("dates", quoteData.destination.dates || "");
+      formData.append("status", statusToSave);
+      formData.append("quoteData", JSON.stringify(buildStoredPayload(quoteData)));
+
+      if (coverPhoto) {
+        formData.append("coverPhoto", base64ToFile(coverPhoto, "cover-photo.jpg"));
+      }
+
+      if (tripPhotos.length > 0) {
+        tripPhotos.forEach((photo, index) => {
+          formData.append("tripPhotos", base64ToFile(photo, `trip-photo-${index + 1}.jpg`));
+        });
+      }
+
+      if (savedRecordId) {
+        await pb.collection("blckbx_quotes").update(savedRecordId, formData);
+      } else {
+        const record = await pb.collection("blckbx_quotes").create(formData);
+        setSavedRecordId(record.id);
+      }
+
+      setQuoteRecordStatus(statusToSave);
+      if (!silent) {
+        toast({
+          title: "Quote saved",
+          description: statusToSave === "sent" ? "Quote marked as sent." : "Draft saved to Quotes.",
+        });
+      }
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save quote.";
+      if (!silent) {
+        toast({
+          title: "Save failed",
+          description: message,
+          variant: "destructive",
+        });
+      }
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!quoteId) {
+      setIsLoadingQuote(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadQuote = async () => {
+      setIsLoadingQuote(true);
+      setStatus("processing");
+      setError(null);
+
+      try {
+        const record = await pb.collection("blckbx_quotes").getOne(quoteId);
+        if (cancelled) return;
+
+        const storedPayload = parseStoredQuoteData(record.quoteData);
+        const normalized = normalizeQuoteData(storedPayload);
+        const normalizedPassengers = normalizeStoredPassengers(storedPayload, normalized.travellers.total);
+        const resolvedQuoteData = syncTravellersFromPassengers(normalizedPassengers, normalized) || normalized;
+
+        let nextCoverPhoto: string | null = null;
+        if (record.coverPhoto) {
+          nextCoverPhoto = await fileUrlToDataUrl(pb.files.getUrl(record, record.coverPhoto));
+        }
+
+        let nextTripPhotos: string[] = [];
+        if (Array.isArray(record.tripPhotos) && record.tripPhotos.length > 0) {
+          nextTripPhotos = await Promise.all(
+            record.tripPhotos.map((filename: string) =>
+              fileUrlToDataUrl(pb.files.getUrl(record, filename))
+            )
+          );
+        }
+
+        if (cancelled) return;
+
+        setSelectedFile(null);
+        setQuoteData(resolvedQuoteData);
+        setClientName(
+          sanitizeValue(record.clientName) ||
+            normalizeClientName(storedPayload)
+        );
+        setPassengers(normalizedPassengers);
+        setCoverPhoto(nextCoverPhoto);
+        setTripPhotos(nextTripPhotos);
+        setSavedRecordId(record.id);
+        setQuoteRecordStatus(record.status === "sent" ? "sent" : "draft");
+        setStatus("result");
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : "Failed to load quote.";
+        setError(message);
+        setStatus("error");
+        toast({
+          title: "Quote load failed",
+          description: message,
+          variant: "destructive",
+        });
+      } finally {
+        if (!cancelled) {
+          setIsLoadingQuote(false);
+        }
+      }
+    };
+
+    loadQuote();
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteId, toast]);
 
   const handleFilePicked = (file: File | null) => {
     if (!file) return;
@@ -382,6 +606,8 @@ export default function QuoteGenerator() {
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
     setTripPhotos([]);
+    setSavedRecordId(null);
+    setQuoteRecordStatus("draft");
     if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
     if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
   };
@@ -419,6 +645,8 @@ export default function QuoteGenerator() {
       setPassengers(initialPassengers);
       setCoverPhoto(null);
       setTripPhotos([]);
+      setSavedRecordId(null);
+      setQuoteRecordStatus("draft");
       if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
       if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
       setStatus("result");
@@ -435,6 +663,8 @@ export default function QuoteGenerator() {
       setPassengers([createPassenger()]);
       setCoverPhoto(null);
       setTripPhotos([]);
+      setSavedRecordId(null);
+      setQuoteRecordStatus("draft");
       if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
       if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
       setStatus("error");
@@ -451,6 +681,7 @@ export default function QuoteGenerator() {
 
     setIsDownloading(true);
     try {
+      await persistQuote({ silent: true });
       const blob = await pdf(
         <QuotePDFTemplate
           data={quoteData}
@@ -481,6 +712,19 @@ export default function QuoteGenerator() {
       });
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    await persistQuote({ silent: false, nextStatus: quoteRecordStatus || "draft" });
+  };
+
+  const handleStatusToggle = async () => {
+    const nextStatus = quoteRecordStatus === "draft" ? "sent" : "draft";
+    setQuoteRecordStatus(nextStatus);
+    const saved = await persistQuote({ silent: false, nextStatus });
+    if (!saved) {
+      setQuoteRecordStatus((current) => (current === "draft" ? "sent" : "draft"));
     }
   };
 
@@ -660,74 +904,92 @@ export default function QuoteGenerator() {
     return (
       <div className="min-h-screen bg-[#E8E4DE] px-4 py-10 md:px-8">
         <div className="mx-auto max-w-5xl space-y-6">
+          <div>
+            <Link href="/travel/quotes">
+              <Button
+                type="button"
+                variant="ghost"
+                className="px-0 text-[#6B6B68] hover:bg-transparent hover:text-[#1A1A1A]"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Quotes
+              </Button>
+            </Link>
+          </div>
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#6B6B68]">
               Travel
             </p>
             <h1 className="text-3xl font-semibold text-[#1A1A1A]">Quote Generator</h1>
             <p className="max-w-2xl text-sm text-[#6B6B68]">
-              Upload a PTS quote PDF to generate a professionally branded BLCK BX
-              document for download.
+              {isLoadingQuote
+                ? "Loading your saved quote..."
+                : "Upload a PTS quote PDF to generate a professionally branded BLCK BX document for download."}
             </p>
           </div>
 
           <Card className="border-[#E6E5E0] bg-white">
             <CardHeader>
-              <CardTitle className="text-[#1A1A1A]">Upload PTS Quote</CardTitle>
+              <CardTitle className="text-[#1A1A1A]">
+                {isLoadingQuote ? "Loading Quote" : "Upload PTS Quote"}
+              </CardTitle>
               <CardDescription>
-                Drag in a PDF or browse your files, then extract the quote data and
-                generate a branded PDF.
+                {isLoadingQuote
+                  ? "Fetching your saved quote data and images from PocketBase."
+                  : "Drag in a PDF or browse your files, then extract the quote data and generate a branded PDF."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  if (status !== "processing") fileInputRef.current?.click();
-                }}
-                onKeyDown={(event) => {
-                  if ((event.key === "Enter" || event.key === " ") && status !== "processing") {
+              {!isLoadingQuote && (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (status !== "processing") fileInputRef.current?.click();
+                  }}
+                  onKeyDown={(event) => {
+                    if ((event.key === "Enter" || event.key === " ") && status !== "processing") {
+                      event.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  onDragOver={(event) => {
                     event.preventDefault();
-                    fileInputRef.current?.click();
-                  }
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  if (status !== "processing") setIsDragging(true);
-                }}
-                onDragLeave={(event) => {
-                  event.preventDefault();
-                  setIsDragging(false);
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setIsDragging(false);
-                  if (status === "processing") return;
-                  handleFilePicked(event.dataTransfer.files?.[0] || null);
-                }}
-                className={`rounded-2xl border-2 border-dashed p-10 text-center transition-colors ${
-                  status === "processing"
-                    ? "cursor-not-allowed border-[#E6E5E0] bg-[#F6F4EF] opacity-70"
-                    : isDragging
-                      ? "cursor-pointer border-[#F5C518] bg-[#FBF4DA]"
-                      : "cursor-pointer border-[#E6E5E0] bg-[#FAF9F8] hover:bg-[#F6F4EF]"
-                }`}
-                data-testid="quote-generator-dropzone"
-              >
-                <Upload className="mx-auto mb-3 h-8 w-8 text-[#6B6B68]" />
-                <p className="text-sm font-medium text-[#1A1A1A]">
-                  Drag &amp; drop your PTS PDF here
-                </p>
-                <p className="mt-1 text-xs text-[#6B6B68]">or click to browse</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  className="hidden"
-                  onChange={(event) => handleFilePicked(event.target.files?.[0] || null)}
-                />
-              </div>
+                    if (status !== "processing") setIsDragging(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+                    setIsDragging(false);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDragging(false);
+                    if (status === "processing") return;
+                    handleFilePicked(event.dataTransfer.files?.[0] || null);
+                  }}
+                  className={`rounded-2xl border-2 border-dashed p-10 text-center transition-colors ${
+                    status === "processing"
+                      ? "cursor-not-allowed border-[#E6E5E0] bg-[#F6F4EF] opacity-70"
+                      : isDragging
+                        ? "cursor-pointer border-[#F5C518] bg-[#FBF4DA]"
+                        : "cursor-pointer border-[#E6E5E0] bg-[#FAF9F8] hover:bg-[#F6F4EF]"
+                  }`}
+                  data-testid="quote-generator-dropzone"
+                >
+                  <Upload className="mx-auto mb-3 h-8 w-8 text-[#6B6B68]" />
+                  <p className="text-sm font-medium text-[#1A1A1A]">
+                    Drag &amp; drop your PTS PDF here
+                  </p>
+                  <p className="mt-1 text-xs text-[#6B6B68]">or click to browse</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={(event) => handleFilePicked(event.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
 
               {selectedFile && (
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#E6E5E0] bg-[#FAF9F8] px-4 py-3">
@@ -740,7 +1002,7 @@ export default function QuoteGenerator() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9 rounded-full text-[#6B6B68] hover:bg-[#ECE8DF] hover:text-[#1A1A1A]"
-                    onClick={resetState}
+                    onClick={handleUploadAnother}
                     disabled={status === "processing"}
                     data-testid="button-remove-selected-quote-file"
                   >
@@ -754,8 +1016,14 @@ export default function QuoteGenerator() {
                   <div className="flex items-center gap-3 text-sm text-[#4A4946]">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <div className="space-y-1">
-                      <p className="font-medium text-[#1A1A1A]">Extracting quote data...</p>
-                      <p className="text-xs text-[#6B6B68]">Generating your quote preview...</p>
+                      <p className="font-medium text-[#1A1A1A]">
+                        {isLoadingQuote ? "Loading quote..." : "Extracting quote data..."}
+                      </p>
+                      <p className="text-xs text-[#6B6B68]">
+                        {isLoadingQuote
+                          ? "Fetching saved content and restoring your edit state..."
+                          : "Generating your quote preview..."}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -768,7 +1036,8 @@ export default function QuoteGenerator() {
                 </Alert>
               )}
 
-              <div className="flex flex-wrap items-center gap-3">
+              {!isLoadingQuote && (
+                <div className="flex flex-wrap items-center gap-3">
                 <Button
                   onClick={handleUpload}
                   disabled={!selectedFile || status === "processing"}
@@ -790,13 +1059,14 @@ export default function QuoteGenerator() {
                     type="button"
                     variant="outline"
                     className="border-[#D8D2C8] bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"
-                    onClick={resetState}
+                    onClick={handleUploadAnother}
                   >
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Upload Another
                   </Button>
                 )}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -807,6 +1077,18 @@ export default function QuoteGenerator() {
   return (
     <div className="min-h-screen bg-[#E8E4DE] px-4 py-10 md:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
+        <div>
+          <Link href="/travel/quotes">
+            <Button
+              type="button"
+              variant="ghost"
+              className="px-0 text-[#6B6B68] hover:bg-transparent hover:text-[#1A1A1A]"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Quotes
+            </Button>
+          </Link>
+        </div>
         <div className="space-y-2">
           <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#6B6B68]">
             Travel
@@ -827,35 +1109,37 @@ export default function QuoteGenerator() {
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                  className="bg-[#F5C518] text-[#1A1A1A] hover:bg-[#E3B90C]"
-                  data-testid="button-download-quote-pdf"
+                <button
+                  type="button"
+                  onClick={handleStatusToggle}
+                  disabled={isSaving}
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    quoteRecordStatus === "sent"
+                      ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                      : "bg-stone-200 text-stone-700 hover:bg-stone-300"
+                  }`}
                 >
-                  {isDownloading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Preparing Download...
-                    </>
-                  ) : (
-                    <>
-                      <FileOutput className="mr-2 h-4 w-4" />
-                      Download Quote PDF
-                    </>
-                  )}
-                </Button>
+                  {quoteRecordStatus === "sent" ? "Sent" : "Draft"}
+                </button>
                 <Button
                   type="button"
                   variant="outline"
                   className="border-[#D8D2C8] bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"
                   onClick={resetState}
-                >
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Upload Another
-                </Button>
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Upload Another
+                  </Button>
               </div>
             </CardHeader>
+            <CardContent className="pt-0">
+              <p className="text-sm text-[#6B6B68]">
+                Quote reference:{" "}
+                <span className="font-medium text-[#1A1A1A]">
+                  {quoteData.project.quoteReference || "Not set"}
+                </span>
+              </p>
+            </CardContent>
           </Card>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -943,10 +1227,24 @@ export default function QuoteGenerator() {
                 }
               />
               <EditableRow
+                label="Departure Code"
+                value={quoteData.outboundTravel.departureAirportCode || ""}
+                onChange={(value) =>
+                  updateTravelField("outboundTravel", "departureAirportCode", value.toUpperCase())
+                }
+              />
+              <EditableRow
                 label="Arrival Airport"
                 value={quoteData.outboundTravel.arrivalAirport}
                 onChange={(value) =>
                   updateTravelField("outboundTravel", "arrivalAirport", value)
+                }
+              />
+              <EditableRow
+                label="Arrival Code"
+                value={quoteData.outboundTravel.arrivalAirportCode || ""}
+                onChange={(value) =>
+                  updateTravelField("outboundTravel", "arrivalAirportCode", value.toUpperCase())
                 }
               />
               <EditableRow
@@ -995,9 +1293,23 @@ export default function QuoteGenerator() {
                 }
               />
               <EditableRow
+                label="Departure Code"
+                value={quoteData.returnTravel.departureAirportCode || ""}
+                onChange={(value) =>
+                  updateTravelField("returnTravel", "departureAirportCode", value.toUpperCase())
+                }
+              />
+              <EditableRow
                 label="Arrival Airport"
                 value={quoteData.returnTravel.arrivalAirport}
                 onChange={(value) => updateTravelField("returnTravel", "arrivalAirport", value)}
+              />
+              <EditableRow
+                label="Arrival Code"
+                value={quoteData.returnTravel.arrivalAirportCode || ""}
+                onChange={(value) =>
+                  updateTravelField("returnTravel", "arrivalAirportCode", value.toUpperCase())
+                }
               />
               <EditableRow
                 label="Departure Time"
@@ -1329,6 +1641,48 @@ export default function QuoteGenerator() {
               </div>
             </PreviewSection>
           )}
+
+          <Card className="border-[#E6E5E0] bg-white">
+            <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-[#D8D2C8] bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"
+                onClick={handleSaveDraft}
+                disabled={isSaving || isDownloading}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Draft
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleDownload}
+                disabled={isDownloading || isSaving}
+                className="bg-[#F5C518] text-[#1A1A1A] hover:bg-[#E3B90C]"
+                data-testid="button-download-quote-pdf"
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Preparing Download...
+                  </>
+                ) : (
+                  <>
+                    <FileOutput className="mr-2 h-4 w-4" />
+                    Download Quote PDF
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

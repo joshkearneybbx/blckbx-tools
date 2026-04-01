@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { Plane, Map, FileOutput, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox, FileText } from "lucide-react";
+import { Plane, Map, FileOutput, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox, FileText, FolderOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -119,9 +119,15 @@ export function Sidebar() {
             active={location.startsWith("/itinerary")}
           />
           <SidebarSubLink
+            to="/travel/quotes"
+            icon={FolderOpen}
+            label="Quotes"
+            active={location.startsWith("/travel/quotes")}
+          />
+          <SidebarSubLink
             to="/travel/quote-generator"
             icon={FileOutput}
-            label="Quote Generator"
+            label="New Quote"
             active={location.startsWith("/travel/quote-generator")}
           />
         </div>

@@ -218,6 +218,7 @@ export default function Page3Travel({
         .map((seg, idx) => ({
           id: seg.id || generateId(),
           legNumber: idx + 1,
+          date: seg.date || '',
           flightNumber: seg.flightNumber,
           airline: seg.airline,
           departureAirport: isFlight ? seg.fromLocation : undefined,
@@ -329,7 +330,7 @@ export default function Page3Travel({
           id: leg.id || generateId(),
           role: 'main',
           type: mt.type,
-          date: mt.date,
+          date: leg.date || mt.date,
           fromLocation: isFlight ? leg.departureAirport : leg.departureStation,
           toLocation: isFlight ? leg.arrivalAirport : leg.arrivalStation,
           departureTime: leg.departureTime,

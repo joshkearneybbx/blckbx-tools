@@ -4,6 +4,7 @@ import {
   Text,
   View,
   Image,
+  Link,
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
@@ -59,7 +60,9 @@ export interface QuoteData {
     flightNumber: string;
     flightDate: string;
     departureAirport: string;
+    departureAirportCode?: string;
     arrivalAirport: string;
+    arrivalAirportCode?: string;
     departureTime: string;
     arrivalTime: string;
     class: string;
@@ -70,7 +73,9 @@ export interface QuoteData {
     flightNumber: string;
     flightDate: string;
     departureAirport: string;
+    departureAirportCode?: string;
     arrivalAirport: string;
+    arrivalAirportCode?: string;
     departureTime: string;
     arrivalTime: string;
     class: string;
@@ -542,6 +547,25 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     lineHeight: 1.3,
   },
+  tcSection: {
+    marginTop: 20,
+  },
+  tcHeading: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#1a1a1a",
+    marginBottom: 4,
+  },
+  tcText: {
+    fontSize: 9,
+    color: "#666666",
+    lineHeight: 1.4,
+  },
+  tcLink: {
+    fontSize: 9,
+    color: "#2563EB",
+    textDecoration: "underline",
+  },
   photoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -590,8 +614,8 @@ const FlightCard = ({
   flight: QuoteData["outboundTravel"];
   travellers: QuoteData["travellers"];
 }) => {
-  const fromCode = extractAirportCode(flight.departureAirport);
-  const toCode = extractAirportCode(flight.arrivalAirport);
+  const fromCode = (flight.departureAirportCode || "").trim() || extractAirportCode(flight.departureAirport);
+  const toCode = (flight.arrivalAirportCode || "").trim() || extractAirportCode(flight.arrivalAirport);
   const fromName = getLocationName(flight.departureAirport);
   const toName = getLocationName(flight.arrivalAirport);
 
@@ -914,6 +938,17 @@ export function QuotePDFTemplate({
           <View style={styles.contactCard} wrap={false}>
             <Text style={styles.contactHeading}>Ready to book?</Text>
             <Text style={styles.contactSubtext}>• Let your assistant know in the app</Text>
+          </View>
+
+          <View style={styles.tcSection}>
+            <Text style={styles.tcHeading}>Terms &amp; Conditions</Text>
+            <Text style={styles.tcText}>
+              By proceeding with this booking, you agree to our{" "}
+              <Link src="https://tools.blckbx.co.uk/blckbx-travel-terms-and-conditions.pdf">
+                <Text style={styles.tcLink}>terms and conditions</Text>
+              </Link>
+              .
+            </Text>
           </View>
         </View>
       </Page>

@@ -198,6 +198,20 @@ export function MainTransportForm({ transport, onChange }: MainTransportFormProp
 
                 {/* Leg Content */}
                 <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Date</Label>
+                      <Input
+                        type="date"
+                        value={index === 0 ? (leg.date || transport.date || '') : (leg.date || '')}
+                        onChange={(e) => handleLegChange(index, 'date', e.target.value)}
+                      />
+                      {!leg.date && index > 0 && (
+                        <p className="text-[10px] text-stone-400">Auto-calculated if left blank</p>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Flight-specific fields */}
                   {isFlight && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

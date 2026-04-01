@@ -12,10 +12,10 @@ const travelTools: Tool[] = [
   },
   {
     id: "travel-quote-generator",
-    name: "Quote Generator",
-    description: "Convert PTS quotes into professionally branded BLCK BX documents",
+    name: "Quotes",
+    description: "Manage saved BLCK BX quotes or start a new quote from your library",
     icon: FileOutput,
-    href: "/travel/quote-generator",
+    href: "/travel/quotes",
     status: "active",
   },
 ];

@@ -29,6 +29,7 @@ export interface TransferSegment {
 export interface TransportLeg {
   id: string;
   legNumber: number;
+  date?: string;
   // Flight fields
   flightNumber?: string;
   airline?: string;
@@ -118,6 +119,7 @@ export function createEmptyLeg(legNumber: number): TransportLeg {
   return {
     id: generateId(),
     legNumber,
+    date: '',
     departureTime: '',
     arrivalTime: '',
     arrivalNextDay: false,
@@ -125,6 +127,7 @@ export function createEmptyLeg(legNumber: number): TransportLeg {
 }
 
 type FlightTimingLike = {
+  date?: string;
   departureTime?: string;
   arrivalTime?: string;
   arrivalNextDay?: boolean;
@@ -148,13 +151,20 @@ const toTimeMinutes = (value: string | undefined): number | null => {
   return hours * 60 + minutes;
 };
 
-const toDateOnly = (value: string | undefined): Date | null => {
-  if (!value) return null;
-  const clean = value.split('T')[0].split(' ')[0];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(clean)) return null;
-  const date = new Date(`${clean}T00:00:00`);
+function parseDateString(dateStr: string | undefined): Date | null {
+  if (!dateStr) return null;
+  const clean = dateStr.split('T')[0].split(' ')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return null;
+
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
+
+  const date = new Date(y, m, d);
   return Number.isNaN(date.getTime()) ? null : date;
-};
+}
 
 export function inferArrivalNextDay(departureTime?: string, arrivalTime?: string): boolean {
   const departureMinutes = toTimeMinutes(departureTime);
@@ -165,7 +175,7 @@ export function inferArrivalNextDay(departureTime?: string, arrivalTime?: string
 }
 
 export function addDaysToDateString(dateString: string | undefined, days: number): string {
-  const baseDate = toDateOnly(dateString);
+  const baseDate = parseDateString(dateString);
   if (!baseDate) return dateString || '';
 
   const result = new Date(baseDate);
@@ -182,23 +192,36 @@ export function resolveFlightLegDates<T extends FlightTimingLike>(
   legs: T[]
 ): ResolvedLegDate[] {
   let cumulativeDays = 0;
+  const parsedBaseDate = parseDateString(baseDate);
 
   return legs.map((leg, index) => {
     const arrivalNextDay = !!leg?.arrivalNextDay;
-    const departureDayOffset = cumulativeDays;
+    let departureDayOffset = cumulativeDays;
+    const explicitLegDate = parseDateString(leg?.date);
+
+    if (explicitLegDate && parsedBaseDate) {
+      departureDayOffset = Math.round(
+        (explicitLegDate.getTime() - parsedBaseDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+    }
+
     const arrivalDayOffset = departureDayOffset + (arrivalNextDay ? 1 : 0);
 
     const nextLeg = legs[index + 1];
     let layoverCrossesMidnight = false;
-    if (nextLeg && leg.arrivalTime && nextLeg.departureTime) {
+    if (nextLeg && !nextLeg.date && leg.arrivalTime && nextLeg.departureTime) {
       if (nextLeg.departureTime < leg.arrivalTime && !arrivalNextDay) {
         layoverCrossesMidnight = true;
       }
     }
 
     const resolved = {
-      departureDate: addDaysToDateString(baseDate, departureDayOffset),
-      arrivalDate: addDaysToDateString(baseDate, arrivalDayOffset),
+      departureDate: explicitLegDate
+        ? addDaysToDateString(leg.date, 0)
+        : addDaysToDateString(baseDate, departureDayOffset),
+      arrivalDate: explicitLegDate
+        ? addDaysToDateString(leg.date, arrivalNextDay ? 1 : 0)
+        : addDaysToDateString(baseDate, arrivalDayOffset),
       departureDayOffset,
       arrivalDayOffset,
       arrivalNextDay,

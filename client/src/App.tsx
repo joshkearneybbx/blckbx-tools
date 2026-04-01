@@ -22,6 +22,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import MealCraftPage from "@/pages/meals/MealCraftPage";
 import QuoteGenerator from "@/pages/QuoteGenerator";
+import QuotesList from "@/pages/QuotesList";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -74,7 +75,22 @@ function Router() {
           )}
         </Route>
 
+        <Route path="/travel/quotes">
+          {() => (
+            <ProtectedRoute>
+              <QuotesList />
+            </ProtectedRoute>
+          )}
+        </Route>
+
         {/* Quote Generator */}
+        <Route path="/travel/quote-generator/:id">
+          {() => (
+            <ProtectedRoute>
+              <QuoteGenerator />
+            </ProtectedRoute>
+          )}
+        </Route>
         <Route path="/travel/quote-generator">
           {() => (
             <ProtectedRoute>

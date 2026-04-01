@@ -43,6 +43,7 @@ import WizardNavigation, { type PageStatus } from "@/components/wizard/WizardNav
 
 // Flight leg type for multi-leg/connecting flights
 export type FlightLeg = {
+  date?: string;
   departureAirport: string;
   departureTime: string;
   arrivalAirport: string;
@@ -396,6 +397,7 @@ const parseJsonArray = (value: any): any[] => {
 
 const normalizeFlightLegs = (value: any): FlightLeg[] =>
   parseJsonArray(value).map((leg: any) => ({
+    date: leg?.date || "",
     departureAirport: leg?.departureAirport || "",
     departureTime: leg?.departureTime || "",
     arrivalAirport: leg?.arrivalAirport || "",
