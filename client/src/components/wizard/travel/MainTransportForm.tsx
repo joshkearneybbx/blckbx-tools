@@ -63,6 +63,18 @@ export function MainTransportForm({ transport, onChange }: MainTransportFormProp
   const handleLegChange = (legIndex: number, field: keyof TransportLeg, value: string) => {
     const newLegs = [...transport.legs];
     newLegs[legIndex] = { ...newLegs[legIndex], [field]: value };
+
+    if (field === "departureTime" || field === "arrivalTime") {
+      const departureTime = newLegs[legIndex].departureTime;
+      const arrivalTime = newLegs[legIndex].arrivalTime;
+
+      if (departureTime && arrivalTime) {
+        newLegs[legIndex].arrivalNextDay = arrivalTime < departureTime;
+      } else {
+        newLegs[legIndex].arrivalNextDay = false;
+      }
+    }
+
     onChange({ ...transport, legs: newLegs });
   };
 
@@ -263,7 +275,27 @@ export function MainTransportForm({ transport, onChange }: MainTransportFormProp
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs">Arrival Time</Label>
+                      <div className="flex items-center justify-between gap-2">
+                        <Label className="text-xs">Arrival Time</Label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedLegs = [...transport.legs];
+                            updatedLegs[index] = {
+                              ...updatedLegs[index],
+                              arrivalNextDay: !updatedLegs[index].arrivalNextDay,
+                            };
+                            onChange({ ...transport, legs: updatedLegs });
+                          }}
+                          className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-medium transition-colors ${
+                            leg.arrivalNextDay
+                              ? "bg-[#E7C51C] text-[#232220]"
+                              : "border border-stone-300 bg-white text-stone-400 hover:bg-stone-100 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-500"
+                          }`}
+                        >
+                          +1 day
+                        </button>
+                      </div>
                       <Input
                         type="time"
                         value={leg.arrivalTime}

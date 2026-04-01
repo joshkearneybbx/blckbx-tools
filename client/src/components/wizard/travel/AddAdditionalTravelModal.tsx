@@ -404,6 +404,14 @@ export function AddAdditionalTravelModal({
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Arrival Date <span className="text-stone-400 font-normal">(if different)</span></Label>
+                <Input
+                  type="date"
+                  value={segment.arrivalDate || ''}
+                  onChange={(e) => handleFieldChange('arrivalDate', e.target.value)}
+                />
+              </div>
             </div>
           )}
 

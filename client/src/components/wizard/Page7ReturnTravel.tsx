@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Car, Train } from "lucide-react";
 import { nanoid } from "nanoid";
 import type { WizardData, FlightLeg, TaxiTransfer, TrainTransfer } from "@/pages/CreateItinerary";
+import { inferArrivalNextDay } from "@/lib/travel-types";
 
 type Props = {
   data: WizardData;
@@ -94,6 +95,7 @@ export default function Page7ReturnTravel({ data, updateData }: Props) {
       departureTime: "",
       arrivalAirport: "",
       arrivalTime: "",
+      arrivalNextDay: false,
       flightNumber: "",
       layoverDuration: "",
     };
@@ -102,7 +104,27 @@ export default function Page7ReturnTravel({ data, updateData }: Props) {
 
   const updateFlightLeg = (index: number, field: keyof FlightLeg, value: string) => {
     const updatedLegs = [...(data.returnTravel.legs || [])];
-    updatedLegs[index] = { ...updatedLegs[index], [field]: value };
+    const updatedLeg = { ...updatedLegs[index], [field]: value };
+
+    if (field === "departureTime" || field === "arrivalTime") {
+      updatedLeg.arrivalNextDay = (
+        updatedLeg.departureTime && updatedLeg.arrivalTime
+          ? inferArrivalNextDay(updatedLeg.departureTime, updatedLeg.arrivalTime)
+          : false
+      );
+    }
+
+    updatedLegs[index] = updatedLeg;
+    updateReturn("legs", updatedLegs);
+  };
+
+  const toggleFlightLegArrivalNextDay = (index: number) => {
+    const updatedLegs = [...(data.returnTravel.legs || [])];
+    const currentLeg = updatedLegs[index];
+    updatedLegs[index] = {
+      ...currentLeg,
+      arrivalNextDay: !currentLeg?.arrivalNextDay,
+    };
     updateReturn("legs", updatedLegs);
   };
 
@@ -120,6 +142,7 @@ export default function Page7ReturnTravel({ data, updateData }: Props) {
           departureTime: data.returnTravel.departureTime || "",
           arrivalAirport: "",
           arrivalTime: "",
+          arrivalNextDay: false,
           flightNumber: data.returnTravel.flightNumber || "",
           layoverDuration: "",
         };
@@ -128,6 +151,7 @@ export default function Page7ReturnTravel({ data, updateData }: Props) {
           departureTime: "",
           arrivalAirport: data.returnTravel.arrivalAirport || "",
           arrivalTime: data.returnTravel.arrivalTime || "",
+          arrivalNextDay: false,
           flightNumber: "",
           layoverDuration: "",
         };
@@ -538,7 +562,21 @@ export default function Page7ReturnTravel({ data, updateData }: Props) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Arrival Time</Label>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label>Arrival Time</Label>
+                      <button
+                        type="button"
+                        onClick={() => toggleFlightLegArrivalNextDay(index)}
+                        className={`inline-flex h-6 items-center rounded-full px-2.5 text-xs font-medium transition-colors ${
+                          leg.arrivalNextDay
+                            ? "bg-[#E7C51C] text-[#232220]"
+                            : "border border-border bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                        data-testid={`button-return-leg-arrival-next-day-${index}`}
+                      >
+                        +1 day
+                      </button>
+                    </div>
                     <Input
                       value={leg.arrivalTime}
                       onChange={(e) => updateFlightLeg(index, "arrivalTime", e.target.value)}

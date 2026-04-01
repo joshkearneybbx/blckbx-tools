@@ -1,5 +1,6 @@
+import type { MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox, FileText } from "lucide-react";
+import { Plane, Map, FileOutput, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,10 +39,10 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
   }
 
   return (
-    <Link
+      <Link
       href={disabled ? "#" : to}
       className={className}
-      onClick={disabled ? (e: React.MouseEvent) => e.preventDefault() : undefined}
+      onClick={disabled ? (e: MouseEvent) => e.preventDefault() : undefined}
     >
       <Icon className="w-5 h-5 flex-shrink-0" />
       <span className="text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
@@ -56,9 +57,34 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
   );
 }
 
+interface SidebarSubLinkProps {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+}
+
+function SidebarSubLink({ to, icon: Icon, label, active }: SidebarSubLinkProps) {
+  return (
+    <Link
+      href={to}
+      className={`
+        ml-2 flex items-center gap-3 px-4 py-2 transition-colors
+        ${active ? "bg-gray-800/80 border-l-2 border-[#E7C51C]" : "hover:bg-gray-800/70"}
+      `}
+    >
+      <Icon className="h-4 w-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <span className="text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+        {label}
+      </span>
+    </Link>
+  );
+}
+
 export function Sidebar() {
   const [location, setLocation] = useLocation();
   const { logout, isAuthenticated } = useAuth();
+  const travelActive = location.startsWith("/travel") || location.startsWith("/itinerary");
 
   if (location === "/") return null;
 
@@ -80,11 +106,25 @@ export function Sidebar() {
 
       <nav className="mt-4">
         <SidebarLink
-          to="/itinerary"
-          icon={Map}
-          label="Itinerary Maker"
-          active={location.startsWith("/itinerary")}
+          to="/travel"
+          icon={Plane}
+          label="Travel"
+          active={travelActive}
         />
+        <div className="pb-2">
+          <SidebarSubLink
+            to="/itinerary"
+            icon={Map}
+            label="Itinerary Maker"
+            active={location.startsWith("/itinerary")}
+          />
+          <SidebarSubLink
+            to="/travel/quote-generator"
+            icon={FileOutput}
+            label="Quote Generator"
+            active={location.startsWith("/travel/quote-generator")}
+          />
+        </div>
         <SidebarLink
           to="/meals"
           icon={UtensilsCrossed}

@@ -41,6 +41,7 @@ export interface TransportLeg {
   // Common
   departureTime: string;
   arrivalTime: string;
+  arrivalNextDay?: boolean;
 }
 
 // Main transport types
@@ -119,7 +120,93 @@ export function createEmptyLeg(legNumber: number): TransportLeg {
     legNumber,
     departureTime: '',
     arrivalTime: '',
+    arrivalNextDay: false,
   };
+}
+
+type FlightTimingLike = {
+  departureTime?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+};
+
+export interface ResolvedLegDate {
+  departureDate: string;
+  arrivalDate: string;
+  departureDayOffset: number;
+  arrivalDayOffset: number;
+  arrivalNextDay: boolean;
+}
+
+const isValidTimeString = (value: string | undefined): value is string =>
+  !!value && /^\d{2}:\d{2}$/.test(value);
+
+const toTimeMinutes = (value: string | undefined): number | null => {
+  if (!isValidTimeString(value)) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+  return hours * 60 + minutes;
+};
+
+const toDateOnly = (value: string | undefined): Date | null => {
+  if (!value) return null;
+  const clean = value.split('T')[0].split(' ')[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(clean)) return null;
+  const date = new Date(`${clean}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+export function inferArrivalNextDay(departureTime?: string, arrivalTime?: string): boolean {
+  const departureMinutes = toTimeMinutes(departureTime);
+  const arrivalMinutes = toTimeMinutes(arrivalTime);
+
+  if (departureMinutes === null || arrivalMinutes === null) return false;
+  return arrivalMinutes < departureMinutes;
+}
+
+export function addDaysToDateString(dateString: string | undefined, days: number): string {
+  const baseDate = toDateOnly(dateString);
+  if (!baseDate) return dateString || '';
+
+  const result = new Date(baseDate);
+  result.setDate(result.getDate() + days);
+
+  const year = result.getFullYear();
+  const month = String(result.getMonth() + 1).padStart(2, '0');
+  const day = String(result.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function resolveFlightLegDates<T extends FlightTimingLike>(
+  baseDate: string | undefined,
+  legs: T[]
+): ResolvedLegDate[] {
+  let cumulativeDays = 0;
+
+  return legs.map((leg, index) => {
+    const arrivalNextDay = !!leg?.arrivalNextDay;
+    const departureDayOffset = cumulativeDays;
+    const arrivalDayOffset = departureDayOffset + (arrivalNextDay ? 1 : 0);
+
+    const nextLeg = legs[index + 1];
+    let layoverCrossesMidnight = false;
+    if (nextLeg && leg.arrivalTime && nextLeg.departureTime) {
+      if (nextLeg.departureTime < leg.arrivalTime && !arrivalNextDay) {
+        layoverCrossesMidnight = true;
+      }
+    }
+
+    const resolved = {
+      departureDate: addDaysToDateString(baseDate, departureDayOffset),
+      arrivalDate: addDaysToDateString(baseDate, arrivalDayOffset),
+      departureDayOffset,
+      arrivalDayOffset,
+      arrivalNextDay,
+    };
+
+    cumulativeDays = arrivalDayOffset + (layoverCrossesMidnight ? 1 : 0);
+    return resolved;
+  });
 }
 
 export function createEmptyMainTransport(): MainTransport {
@@ -202,22 +289,41 @@ export function getTransportIcon(type: MainTransportType | AdditionalTransportTy
 }
 
 // Calculate layover duration between two legs
-export function calculateLayover(leg1ArrivalTime: string, leg2DepartureTime: string): string {
+export function calculateLayover(
+  leg1ArrivalTime: string,
+  leg2DepartureTime: string,
+  options?: {
+    arrivalDate?: string;
+    departureDate?: string;
+  }
+): string {
   if (!leg1ArrivalTime || !leg2DepartureTime) return '';
 
   try {
-    // Parse times (format: HH:mm)
-    const [arr1Hours, arr1Mins] = leg1ArrivalTime.split(':').map(Number);
-    const [dep2Hours, dep2Mins] = leg2DepartureTime.split(':').map(Number);
+    let diffMinutes: number;
+    const arrivalDate = toDateOnly(options?.arrivalDate);
+    const departureDate = toDateOnly(options?.departureDate);
 
-    // Convert to minutes
-    const arrivalMinutes = arr1Hours * 60 + arr1Mins;
-    const departureMinutes = dep2Hours * 60 + dep2Mins;
+    if (arrivalDate && departureDate && isValidTimeString(leg1ArrivalTime) && isValidTimeString(leg2DepartureTime)) {
+      const arrival = new Date(arrivalDate);
+      const departure = new Date(departureDate);
+      const [arrHours, arrMins] = leg1ArrivalTime.split(':').map(Number);
+      const [depHours, depMins] = leg2DepartureTime.split(':').map(Number);
+      arrival.setHours(arrHours, arrMins, 0, 0);
+      departure.setHours(depHours, depMins, 0, 0);
+      diffMinutes = Math.round((departure.getTime() - arrival.getTime()) / 60000);
+    } else {
+      const arrivalMinutes = toTimeMinutes(leg1ArrivalTime);
+      const departureMinutes = toTimeMinutes(leg2DepartureTime);
+      if (arrivalMinutes === null || departureMinutes === null) return '';
+      diffMinutes = departureMinutes - arrivalMinutes;
+      if (diffMinutes < 0) {
+        diffMinutes += 24 * 60;
+      }
+    }
 
-    // Calculate difference (handle overnight layovers)
-    let diffMinutes = departureMinutes - arrivalMinutes;
     if (diffMinutes < 0) {
-      diffMinutes += 24 * 60; // Add 24 hours if crossing midnight
+      diffMinutes += 24 * 60;
     }
 
     const hours = Math.floor(diffMinutes / 60);

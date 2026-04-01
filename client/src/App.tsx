@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
+import Travel from "@/pages/Travel";
 import Dashboard from "@/pages/Dashboard";
 import CreateItinerary from "@/pages/CreateItinerary";
 import ViewItinerary from "@/pages/ViewItinerary";
@@ -20,6 +21,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import MealCraftPage from "@/pages/meals/MealCraftPage";
+import QuoteGenerator from "@/pages/QuoteGenerator";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -62,6 +64,24 @@ function Router() {
         {/* Public routes */}
         <Route path="/login" component={Login} />
         <Route path="/oauth/callback" component={OAuthCallback} />
+
+        {/* Travel landing page */}
+        <Route path="/travel">
+          {() => (
+            <ProtectedRoute>
+              <Travel />
+            </ProtectedRoute>
+          )}
+        </Route>
+
+        {/* Quote Generator */}
+        <Route path="/travel/quote-generator">
+          {() => (
+            <ProtectedRoute>
+              <QuoteGenerator />
+            </ProtectedRoute>
+          )}
+        </Route>
 
         {/* Itinerary Tool - protected routes (before :slug wildcard) */}
         <Route path="/itinerary/create">

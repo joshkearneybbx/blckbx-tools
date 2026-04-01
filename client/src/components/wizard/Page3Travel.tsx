@@ -227,6 +227,7 @@ export default function Page3Travel({
           company: seg.company,
           departureTime: seg.departureTime || '',
           arrivalTime: seg.arrivalTime || '',
+          arrivalNextDay: !!seg.arrivalNextDay,
         }));
 
       debugLog('Built legs:', JSON.stringify(legs, null, 2));
@@ -335,6 +336,7 @@ export default function Page3Travel({
           arrivalTime: leg.arrivalTime,
           flightNumber: leg.flightNumber,
           airline: leg.airline,
+          arrivalNextDay: !!leg.arrivalNextDay,
           company: leg.company,
           // Only include booking/notes on first leg to avoid duplication
           confirmationNumber: idx === 0 ? mt.passengersAndSeats : undefined,

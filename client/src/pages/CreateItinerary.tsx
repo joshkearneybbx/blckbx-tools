@@ -47,6 +47,8 @@ export type FlightLeg = {
   departureTime: string;
   arrivalAirport: string;
   arrivalTime: string;
+  arrivalNextDay?: boolean;
+  airline?: string;
   flightNumber?: string;
   layoverDuration?: string;
 };
@@ -392,6 +394,18 @@ const parseJsonArray = (value: any): any[] => {
   return [];
 };
 
+const normalizeFlightLegs = (value: any): FlightLeg[] =>
+  parseJsonArray(value).map((leg: any) => ({
+    departureAirport: leg?.departureAirport || "",
+    departureTime: leg?.departureTime || "",
+    arrivalAirport: leg?.arrivalAirport || "",
+    arrivalTime: leg?.arrivalTime || "",
+    arrivalNextDay: !!leg?.arrivalNextDay,
+    airline: leg?.airline || "",
+    flightNumber: leg?.flightNumber || "",
+    layoverDuration: leg?.layoverDuration || "",
+  }));
+
 const inferTransferDetailsType = (details: any[]): "none" | "taxi" | "train" => {
   if (!Array.isArray(details) || details.length === 0) return "none";
   const first = details.find(Boolean) || {};
@@ -661,7 +675,7 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
 
   const detailsToAirport = parseJsonArray(data.transferToAirportDetails);
   const detailsToAccom = parseJsonArray(data.transferToAccomDetails);
-  const legs = parseJsonArray(data.legs);
+  const legs = normalizeFlightLegs(data.legs);
   const transferToAirportTaxisRaw = parseJsonArray(data.transferToAirportTaxis);
   const transferToAirportTrainsRaw = parseJsonArray(data.transferToAirportTrains);
   const transferToAccomTaxisRaw = parseJsonArray(data.transferToAccomTaxis);
@@ -764,7 +778,7 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
 
   const detailsToAirport = parseJsonArray(data.transferToAirportDetails);
   const detailsHome = parseJsonArray(data.transferHomeDetails);
-  const legs = parseJsonArray(data.legs);
+  const legs = normalizeFlightLegs(data.legs);
   const transferToAirportTaxisRaw = parseJsonArray(data.transferToAirportTaxis);
   const transferToAirportTrainsRaw = parseJsonArray(data.transferToAirportTrains);
   const transferHomeTaxisRaw = parseJsonArray(data.transferHomeTaxis);

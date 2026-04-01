@@ -8,6 +8,7 @@
 import type { TravelSegment } from './travel-segments';
 import { generateSegmentId } from './travel-segments';
 import type { WizardData } from '@/pages/CreateItinerary';
+import { calculateLayover, resolveFlightLegDates } from './travel-types';
 
 const debugLog = (...args: any[]) => {
   if (import.meta.env.DEV) {
@@ -83,6 +84,13 @@ const isTransferSegment = (segment: TravelSegment): boolean => {
   if (segment.role === 'main' || segment.role === 'additional') return false;
   // Backward compatibility for older records without role metadata.
   return ['taxi', 'private_car', 'shuttle', 'bus', 'train', 'other'].includes(segment.type);
+};
+
+const inferSegmentArrivalNextDay = (segment: TravelSegment): boolean => {
+  if (typeof segment.arrivalNextDay !== 'undefined') return !!segment.arrivalNextDay;
+  const departureDate = segment.departureDate || segment.date;
+  const arrivalDate = segment.arrivalDate || departureDate;
+  return !!departureDate && !!arrivalDate && departureDate !== arrivalDate;
 };
 
 /**
@@ -191,24 +199,39 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
   // Check isMultiLeg as truthy (handles both boolean true and number 1)
   if (outbound.isMultiLeg && outbound.legs && outbound.legs.length > 0) {
     // Multi-leg flight
+    const resolvedLegDates = resolveFlightLegDates(flightDate, outbound.legs);
     outbound.legs.forEach((leg, index) => {
+      const resolvedLegDate = resolvedLegDates[index];
+      const nextLeg = outbound.legs[index + 1];
+      const nextLegDate = resolvedLegDates[index + 1];
+      const layoverDuration = leg.layoverDuration || (
+        nextLeg
+          ? calculateLayover(leg.arrivalTime || '', nextLeg.departureTime || '', {
+              arrivalDate: resolvedLegDate?.arrivalDate,
+              departureDate: nextLegDate?.departureDate,
+            })
+          : ''
+      );
       segments.push({
         id: generateSegmentId(),
         type: 'flight',
         role: 'main',
         fromLocation: leg.departureAirport || '',
         toLocation: leg.arrivalAirport || '',
-        date: flightDate,
+        date: resolvedLegDate?.departureDate || flightDate,
+        departureDate: resolvedLegDate?.departureDate || flightDate,
+        arrivalDate: resolvedLegDate?.arrivalDate || resolvedLegDate?.departureDate || flightDate,
         departureTime: leg.departureTime || undefined,
         arrivalTime: leg.arrivalTime || undefined,
+        arrivalNextDay: !!leg.arrivalNextDay,
         flightNumber: leg.flightNumber || outbound.flightNumber || '',
         airline: leg.airline || outbound.airline || '',
         confirmationNumber: index === 0 ? (outbound.passengersSeats || '') : '',
         bookingReference: outbound.bookingReference || '',
         contactDetails: outbound.contact || '',
         notes: index === 0
-          ? (outbound.thingsToRemember || (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''))
-          : (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''),
+          ? (outbound.thingsToRemember || (layoverDuration ? `Layover: ${layoverDuration}` : ''))
+          : (layoverDuration ? `Layover: ${layoverDuration}` : ''),
       });
     });
   } else {
@@ -333,13 +356,22 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
   const lastFlight = flights[flights.length - 1];
 
   // Build legs from flight segments
-  const legs = flights.map(f => ({
+  const legs = flights.map((f, index) => ({
     departureAirport: f.fromLocation,
     arrivalAirport: f.toLocation,
     departureTime: f.departureTime || '',
     arrivalTime: f.arrivalTime || '',
+    arrivalNextDay: inferSegmentArrivalNextDay(f),
+    airline: f.airline || '',
     flightNumber: f.flightNumber || '',
-    layoverDuration: extractLayoverFromNotes(f.notes),
+    layoverDuration: extractLayoverFromNotes(f.notes) || (
+      flights[index + 1]
+        ? calculateLayover(f.arrivalTime || '', flights[index + 1].departureTime || '', {
+            arrivalDate: f.arrivalDate || f.departureDate || f.date,
+            departureDate: flights[index + 1].departureDate || flights[index + 1].date,
+          })
+        : ''
+    ),
   }));
 
   const firstMainIndex = segments.findIndex(isMainSegment);
@@ -583,24 +615,39 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
   // Check isMultiLeg as truthy (handles both boolean true and number 1)
   if (returnTravel.isMultiLeg && returnTravel.legs && returnTravel.legs.length > 0) {
     // Multi-leg flight
+    const resolvedLegDates = resolveFlightLegDates(flightDate, returnTravel.legs);
     returnTravel.legs.forEach((leg, index) => {
+      const resolvedLegDate = resolvedLegDates[index];
+      const nextLeg = returnTravel.legs[index + 1];
+      const nextLegDate = resolvedLegDates[index + 1];
+      const layoverDuration = leg.layoverDuration || (
+        nextLeg
+          ? calculateLayover(leg.arrivalTime || '', nextLeg.departureTime || '', {
+              arrivalDate: resolvedLegDate?.arrivalDate,
+              departureDate: nextLegDate?.departureDate,
+            })
+          : ''
+      );
       segments.push({
         id: generateSegmentId(),
         type: 'flight',
         role: 'main',
         fromLocation: leg.departureAirport || '',
         toLocation: leg.arrivalAirport || '',
-        date: flightDate,
+        date: resolvedLegDate?.departureDate || flightDate,
+        departureDate: resolvedLegDate?.departureDate || flightDate,
+        arrivalDate: resolvedLegDate?.arrivalDate || resolvedLegDate?.departureDate || flightDate,
         departureTime: leg.departureTime || '',
         arrivalTime: leg.arrivalTime || '',
+        arrivalNextDay: !!leg.arrivalNextDay,
         flightNumber: leg.flightNumber || '',
         airline: leg.airline || returnTravel.airline || '',
         confirmationNumber: index === 0 ? (returnTravel.passengersSeats || '') : '',
         bookingReference: returnTravel.bookingReference || '',
         contactDetails: returnTravel.contact || '',
         notes: index === 0
-          ? (returnTravel.thingsToRemember || (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''))
-          : (leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : ''),
+          ? (returnTravel.thingsToRemember || (layoverDuration ? `Layover: ${layoverDuration}` : ''))
+          : (layoverDuration ? `Layover: ${layoverDuration}` : ''),
       });
     });
   } else {
@@ -734,13 +781,22 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
   const firstFlight = flights[0];
   const lastFlight = flights[flights.length - 1];
 
-  const legs = flights.map(f => ({
+  const legs = flights.map((f, index) => ({
     departureAirport: f.fromLocation,
     arrivalAirport: f.toLocation,
     departureTime: f.departureTime || '',
     arrivalTime: f.arrivalTime || '',
+    arrivalNextDay: inferSegmentArrivalNextDay(f),
+    airline: f.airline || '',
     flightNumber: f.flightNumber || '',
-    layoverDuration: extractLayoverFromNotes(f.notes),
+    layoverDuration: extractLayoverFromNotes(f.notes) || (
+      flights[index + 1]
+        ? calculateLayover(f.arrivalTime || '', flights[index + 1].departureTime || '', {
+            arrivalDate: f.arrivalDate || f.departureDate || f.date,
+            departureDate: flights[index + 1].departureDate || flights[index + 1].date,
+          })
+        : ''
+    ),
   }));
 
   const firstMainIndex = segments.findIndex(isMainSegment);

@@ -1,5 +1,5 @@
 import {
-  Map,
+  Plane,
   UtensilsCrossed,
   ClipboardList,
   ReceiptPoundSterling,
@@ -31,11 +31,11 @@ const tools: Tool[] = [
     badge: "Testing",
   },
   {
-    id: "itinerary",
-    name: "Itinerary Maker",
-    description: "Create professional travel itineraries & PDF documents",
-    icon: Map,
-    href: "/itinerary",
+    id: "travel",
+    name: "Travel",
+    description: "Open travel tools for itineraries and branded quote generation",
+    icon: Plane,
+    href: "/travel",
     status: "active",
   },
   {

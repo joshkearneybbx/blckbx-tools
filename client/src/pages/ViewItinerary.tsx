@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { pb } from "@/lib/pocketbase";
 import { outboundToSegments, returnToSegments } from "@/lib/travel-migration";
 import type { TravelSegment } from "@/lib/travel-segments";
+import { calculateLayover, resolveFlightLegDates } from "@/lib/travel-types";
 import {
   DndContext,
   closestCenter,
@@ -37,6 +38,54 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const clean = dateStr.split('T')[0].split(' ')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return dateStr;
+  const year = parts[0];
+  const month = parseInt(parts[1], 10);
+  const day = parseInt(parts[2], 10);
+  if (Number.isNaN(month) || Number.isNaN(day) || month < 1 || month > 12) return dateStr;
+  return `${day} ${months[month - 1]} ${year}`;
+}
+
+const buildFlightLegSegments = (
+  legs: any[],
+  baseDate: string,
+  buildSegment: (leg: any, idx: number, meta: {
+    departureDate: string;
+    arrivalDate: string;
+    arrivalNextDay: boolean;
+    layoverDuration: string;
+  }) => TravelSegment
+): TravelSegment[] => {
+  const safeLegs = Array.isArray(legs) ? legs : [];
+  const resolvedLegDates = resolveFlightLegDates(baseDate, safeLegs);
+
+  return safeLegs.map((leg: any, idx: number) => {
+    const nextLeg = safeLegs[idx + 1];
+    const currentDates = resolvedLegDates[idx];
+    const nextDates = resolvedLegDates[idx + 1];
+    const layoverDuration = leg?.layoverDuration || (
+      nextLeg
+        ? calculateLayover(leg?.arrivalTime || '', nextLeg?.departureTime || '', {
+            arrivalDate: currentDates?.arrivalDate,
+            departureDate: nextDates?.departureDate,
+          })
+        : ''
+    );
+
+    return buildSegment(leg, idx, {
+      departureDate: currentDates?.departureDate || baseDate || '',
+      arrivalDate: currentDates?.arrivalDate || currentDates?.departureDate || baseDate || '',
+      arrivalNextDay: !!leg?.arrivalNextDay,
+      layoverDuration,
+    });
+  });
+};
 
 // Sortable Travel Item component for drag-and-drop
 // Supports both legacy AdditionalTravel format and new AdditionalTravelSegment format
@@ -78,6 +127,7 @@ function SortableTravelItem({
       if (type === 'flight') {
         // Handle multi-leg/connecting flights
         if (isConnecting && legs && legs.length > 1) {
+          const resolvedLegDates = resolveFlightLegDates(date || '', legs);
           return (
             <div className="space-y-4">
               <h4 className="font-medium text-sm text-muted-foreground">Connecting Flights</h4>
@@ -86,10 +136,13 @@ function SortableTravelItem({
                   <FlightCard
                     flightNumber={leg.flightNumber || ''}
                     date={date || ''}
+                    departureDate={resolvedLegDates[idx]?.departureDate || date || ''}
+                    arrivalDate={resolvedLegDates[idx]?.arrivalDate || resolvedLegDates[idx]?.departureDate || date || ''}
                     departureAirport={leg.departureAirport || ''}
                     departureTime={leg.departureTime || ''}
                     arrivalAirport={leg.arrivalAirport || ''}
                     arrivalTime={leg.arrivalTime || ''}
+                    arrivalNextDay={!!leg.arrivalNextDay}
                     airline={leg.airline || airline || ''}
                     bookingReference={bookingReference || ''}
                     company={leg.company || company || ''}
@@ -99,9 +152,15 @@ function SortableTravelItem({
                     totalLegs={legs.length}
                     notes={notes || undefined}
                   />
-                  {idx < legs.length - 1 && leg.layoverDuration && (
+                  {idx < legs.length - 1 && (leg.layoverDuration || calculateLayover(leg.arrivalTime || '', legs[idx + 1]?.departureTime || '', {
+                    arrivalDate: resolvedLegDates[idx]?.arrivalDate,
+                    departureDate: resolvedLegDates[idx + 1]?.departureDate,
+                  })) && (
                     <div className="px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm flex items-center gap-2">
-                      <span className="font-medium">Layover:</span> {leg.layoverDuration}
+                      <span className="font-medium">Layover:</span> {leg.layoverDuration || calculateLayover(leg.arrivalTime || '', legs[idx + 1]?.departureTime || '', {
+                        arrivalDate: resolvedLegDates[idx]?.arrivalDate,
+                        departureDate: resolvedLegDates[idx + 1]?.departureDate,
+                      })}
                     </div>
                   )}
                 </div>
@@ -114,10 +173,13 @@ function SortableTravelItem({
           <FlightCard
             flightNumber={flightNumber || ''}
             date={date || ''}
+            departureDate={travel.departureDate || date || ''}
+            arrivalDate={travel.arrivalDate || travel.departureDate || date || ''}
             departureAirport={fromLocation || ''}
             departureTime={departureTime || ''}
             arrivalAirport={toLocation || ''}
             arrivalTime={arrivalTime || ''}
+            arrivalNextDay={!!travel.arrivalNextDay}
             airline={airline || ''}
             bookingReference={bookingReference || ''}
             company={company || ''}
@@ -132,7 +194,7 @@ function SortableTravelItem({
         <div className="space-y-2 text-sm">
           {fromLocation && <p><span className="font-medium">From:</span> {fromLocation}</p>}
           {toLocation && <p><span className="font-medium">To:</span> {toLocation}</p>}
-          {date && <p><span className="font-medium">Date:</span> {date}</p>}
+          {date && <p><span className="font-medium">Date:</span> {formatDate(date)}</p>}
           {departureTime && <p><span className="font-medium">Departure:</span> {departureTime}</p>}
           {arrivalTime && <p><span className="font-medium">Arrival:</span> {arrivalTime}</p>}
           {company && <p><span className="font-medium">Company:</span> {company}</p>}
@@ -148,6 +210,8 @@ function SortableTravelItem({
         <FlightCard
           flightNumber={travel.flightNumber}
           date={travel.flightDate || ''}
+          departureDate={travel.flightDate || ''}
+          arrivalDate={travel.flightDate || ''}
           departureAirport={travel.flightDepartureAirport || ''}
           departureTime={travel.flightDepartureTime || ''}
           arrivalAirport={travel.flightArrivalAirport || ''}
@@ -172,7 +236,7 @@ function SortableTravelItem({
           <>
             {travel.ferryDepartingFrom && <p><span className="font-medium">From:</span> {travel.ferryDepartingFrom}</p>}
             {travel.ferryDestination && <p><span className="font-medium">To:</span> {travel.ferryDestination}</p>}
-            {travel.ferryDate && <p><span className="font-medium">Date:</span> {travel.ferryDate}</p>}
+            {travel.ferryDate && <p><span className="font-medium">Date:</span> {formatDate(travel.ferryDate)}</p>}
             {travel.ferryPrice && <p><span className="font-medium">Price:</span> {travel.ferryPrice}</p>}
             {travel.ferryContactDetails && <p><span className="font-medium">Contact:</span> {travel.ferryContactDetails}</p>}
             {travel.ferryBookingReference && <p><span className="font-medium">Booking Ref:</span> {travel.ferryBookingReference}</p>}
@@ -183,7 +247,7 @@ function SortableTravelItem({
           <>
             {travel.trainDepartingFrom && <p><span className="font-medium">From:</span> {travel.trainDepartingFrom}</p>}
             {travel.trainDestination && <p><span className="font-medium">To:</span> {travel.trainDestination}</p>}
-            {travel.trainDate && <p><span className="font-medium">Date:</span> {travel.trainDate}</p>}
+            {travel.trainDate && <p><span className="font-medium">Date:</span> {formatDate(travel.trainDate)}</p>}
             {travel.trainPrice && <p><span className="font-medium">Price:</span> {travel.trainPrice}</p>}
             {travel.trainContactDetails && <p><span className="font-medium">Contact:</span> {travel.trainContactDetails}</p>}
             {travel.trainBookingReference && <p><span className="font-medium">Booking Ref:</span> {travel.trainBookingReference}</p>}
@@ -225,7 +289,7 @@ function SortableTravelItem({
         )}
         <h3 className="font-semibold text-lg">{displayType}</h3>
         {travel.date && (
-          <span className="text-sm text-muted-foreground ml-auto">{travel.date}</span>
+          <span className="text-sm text-muted-foreground ml-auto">{formatDate(travel.date)}</span>
         )}
       </div>
 
@@ -477,10 +541,13 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
       <FlightCard
         flightNumber={segment.flightNumber || ''}
         date={segment.date || ''}
+        departureDate={segment.departureDate || segment.date || ''}
+        arrivalDate={segment.arrivalDate || segment.departureDate || segment.date || ''}
         departureAirport={segment.fromLocation || ''}
         departureTime={segment.departureTime || ''}
         arrivalAirport={segment.toLocation || ''}
         arrivalTime={segment.arrivalTime || ''}
+        arrivalNextDay={!!segment.arrivalNextDay}
         passengers={travellers?.map(t => t.name).join(', ') || undefined}
         notes={segment.notes || undefined}
         airline={segment.airline || ''}
@@ -497,7 +564,7 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
         {getSegmentIcon()}
         <h4 className="font-semibold">{getSegmentLabel()}</h4>
         {segment.date && (
-          <span className="text-sm text-muted-foreground ml-auto">{segment.date}</span>
+          <span className="text-sm text-muted-foreground ml-auto">{formatDate(segment.date)}</span>
         )}
       </div>
       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1096,18 +1163,21 @@ export default function ViewItinerary() {
 
     // Truthy check for isMultiLeg by design: supports bool/number/string-y values from stored JSON.
     if (details && details.isMultiLeg && Array.isArray(details.legs) && details.legs.length > 0) {
-      return details.legs.map((leg: any, idx: number): TravelSegment => ({
+      return buildFlightLegSegments(details.legs, details.date || '', (leg, idx, meta) => ({
         id: `${travelRecord.id || 'travel'}-leg-${idx}`,
         type: travelRecord.travelType || 'flight',
         fromLocation: leg.departureAirport || leg.fromLocation || details.departureAirport || details.fromLocation || '',
         toLocation: leg.arrivalAirport || leg.toLocation || details.arrivalAirport || details.toLocation || '',
-        date: leg.date || details.date || '',
+        date: meta.departureDate || leg.date || details.date || '',
+        departureDate: meta.departureDate || leg.date || details.date || '',
+        arrivalDate: meta.arrivalDate || meta.departureDate || leg.date || details.date || '',
         departureTime: leg.departureTime || '',
         arrivalTime: leg.arrivalTime || '',
+        arrivalNextDay: meta.arrivalNextDay,
         flightNumber: leg.flightNumber || details.flightNumber || '',
         airline: leg.airline || details.airline || '',
         bookingReference: leg.bookingReference || details.bookingReference || '',
-        notes: leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : (leg.notes || details.notes || ''),
+        notes: meta.layoverDuration ? `Layover: ${meta.layoverDuration}` : (leg.notes || details.notes || ''),
       })).filter(hasSegmentContent);
     }
 
@@ -1151,20 +1221,23 @@ export default function ViewItinerary() {
     const contactDetails = item.contactDetails || item.contact || details?.contactDetails || details?.contact || '';
 
     if (isConnecting && Array.isArray(legs) && legs.length > 0) {
-      return legs.map((leg: any, idx: number): TravelSegment => ({
+      return buildFlightLegSegments(legs, item.date || details?.date || item.flightDate || '', (leg, idx, meta) => ({
         id: `${item.id || fallbackId}-leg-${idx}`,
         type,
-        fromLocation: leg.departureAirport || leg.departureStation || details?.fromLocation || item.fromLocation || '',
-        toLocation: leg.arrivalAirport || leg.arrivalStation || details?.toLocation || item.toLocation || '',
-        date: leg.date || item.date || details?.date || item.flightDate || '',
+        fromLocation: leg.departureAirport || leg.departureStation || leg.fromLocation || details?.fromLocation || item.fromLocation || '',
+        toLocation: leg.arrivalAirport || leg.arrivalStation || leg.toLocation || details?.toLocation || item.toLocation || '',
+        date: meta.departureDate || leg.date || item.date || details?.date || item.flightDate || '',
+        departureDate: meta.departureDate || leg.date || item.date || details?.date || item.flightDate || '',
+        arrivalDate: meta.arrivalDate || meta.departureDate || leg.date || item.date || details?.date || item.flightDate || '',
         departureTime: leg.departureTime || item.departureTime || '',
         arrivalTime: leg.arrivalTime || item.arrivalTime || '',
+        arrivalNextDay: meta.arrivalNextDay,
         flightNumber: leg.flightNumber || item.flightNumber || '',
         airline: leg.airline || airline,
         company: leg.company || company,
         bookingReference,
         contactDetails,
-        notes: leg.notes || item.notes || details?.notes || '',
+        notes: leg.notes || (meta.layoverDuration ? `Layover: ${meta.layoverDuration}` : '') || item.notes || details?.notes || '',
       })).filter(hasSegmentContent);
     }
 
@@ -1315,19 +1388,22 @@ export default function ViewItinerary() {
     if (resolvedReturnJourney.length > 0) return [];
 
     if (returnTravel.isMultiLeg && Array.isArray(returnTravel.legs) && returnTravel.legs.length > 0) {
-      return returnTravel.legs.map((leg: any, idx: number) => ({
+      return buildFlightLegSegments(returnTravel.legs, returnTravel.flightDate || '', (leg, idx, meta) => ({
         id: `return-leg-${idx}`,
         type: 'flight',
         fromLocation: leg.departureAirport || '',
         toLocation: leg.arrivalAirport || '',
-        date: returnTravel.flightDate || '',
+        date: meta.departureDate || returnTravel.flightDate || '',
+        departureDate: meta.departureDate || returnTravel.flightDate || '',
+        arrivalDate: meta.arrivalDate || meta.departureDate || returnTravel.flightDate || '',
         departureTime: leg.departureTime || '',
         arrivalTime: leg.arrivalTime || '',
+        arrivalNextDay: meta.arrivalNextDay,
         flightNumber: leg.flightNumber || '',
         airline: leg.airline || returnTravel.airline || '',
         bookingReference: returnTravel.bookingReference || '',
         contactDetails: returnTravel.contact || '',
-        notes: returnTravel.thingsToRemember || '',
+        notes: returnTravel.thingsToRemember || (meta.layoverDuration ? `Layover: ${meta.layoverDuration}` : ''),
       }));
     }
 

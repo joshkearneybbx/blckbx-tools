@@ -12,8 +12,11 @@ export interface TravelSegment {
   fromLocation: string;
   toLocation: string;
   date: string;
+  departureDate?: string;
+  arrivalDate?: string;
   departureTime?: string;
   arrivalTime?: string;
+  arrivalNextDay?: boolean;
   // Flight specific
   flightNumber?: string;
   airline?: string;

@@ -1,11 +1,27 @@
 import { ExternalLink, Plane, Calendar, Users, AlertCircle, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const clean = dateStr.split('T')[0].split(' ')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return dateStr;
+  const year = parts[0];
+  const month = parseInt(parts[1], 10);
+  const day = parseInt(parts[2], 10);
+  if (Number.isNaN(month) || Number.isNaN(day) || month < 1 || month > 12) return dateStr;
+  return `${day} ${months[month - 1]} ${year}`;
+}
+
 interface FlightLeg {
   departureAirport: string;
   departureTime: string;
   arrivalAirport: string;
   arrivalTime: string;
+  departureDate?: string;
+  arrivalDate?: string;
+  arrivalNextDay?: boolean;
   flightNumber?: string;
   layoverDuration?: string;
 }
@@ -13,10 +29,13 @@ interface FlightLeg {
 interface FlightCardProps {
   flightNumber: string;
   date: string;
+  departureDate?: string;
+  arrivalDate?: string;
   departureAirport: string;
   departureTime: string;
   arrivalAirport: string;
   arrivalTime: string;
+  arrivalNextDay?: boolean;
   passengers?: string;
   notes?: string;
   duration?: string;
@@ -34,10 +53,13 @@ interface FlightCardProps {
 export function FlightCard({
   flightNumber,
   date,
+  departureDate,
+  arrivalDate,
   departureAirport,
   departureTime,
   arrivalAirport,
   arrivalTime,
+  arrivalNextDay,
   passengers,
   notes,
   duration,
@@ -62,6 +84,8 @@ export function FlightCard({
 
   const depCode = getAirportCode(departureAirport);
   const arrCode = getAirportCode(arrivalAirport);
+  const resolvedDepartureDate = departureDate || date;
+  const resolvedArrivalDate = arrivalDate || resolvedDepartureDate;
   const routeLabel = isConnecting
     ? (legNumber && totalLegs ? `Leg ${legNumber} of ${totalLegs}` : 'Connecting')
     : (duration || 'Direct');
@@ -82,6 +106,9 @@ export function FlightCard({
           <div className="flex items-center justify-between">
             <div className="text-center flex-1">
               <div className="text-3xl font-bold text-foreground">{depCode}</div>
+              {resolvedDepartureDate && (
+                <div className="text-xs text-foreground-subtle mt-1">{formatDate(resolvedDepartureDate)}</div>
+              )}
               <div className="text-xl font-semibold text-foreground mt-1">{departureTime}</div>
               <div className="text-sm text-foreground-muted mt-1 max-w-[120px] mx-auto truncate">{departureAirport}</div>
             </div>
@@ -102,6 +129,12 @@ export function FlightCard({
 
             <div className="text-center flex-1">
               <div className="text-3xl font-bold text-foreground">{arrCode}</div>
+              {resolvedArrivalDate && (
+                <div className="text-xs text-foreground-subtle mt-1">
+                  {formatDate(resolvedArrivalDate)}
+                  {arrivalNextDay ? ' (+1 day)' : ''}
+                </div>
+              )}
               <div className="text-xl font-semibold text-foreground mt-1">{arrivalTime}</div>
               <div className="text-sm text-foreground-muted mt-1 max-w-[120px] mx-auto truncate">{arrivalAirport}</div>
             </div>
@@ -118,6 +151,9 @@ export function FlightCard({
               <div className="flex items-center justify-between py-4">
                 <div className="text-center flex-1">
                   <div className="text-2xl font-bold text-foreground">{getAirportCode(leg.departureAirport)}</div>
+                  {leg.departureDate && (
+                    <div className="text-xs text-foreground-subtle mt-1">{formatDate(leg.departureDate)}</div>
+                  )}
                   <div className="text-lg font-semibold text-foreground mt-1">{leg.departureTime}</div>
                   <div className="text-xs text-foreground-subtle mt-1 max-w-[100px] mx-auto truncate">{leg.departureAirport}</div>
                 </div>
@@ -137,6 +173,12 @@ export function FlightCard({
 
                 <div className="text-center flex-1">
                   <div className="text-2xl font-bold text-foreground">{getAirportCode(leg.arrivalAirport)}</div>
+                  {(leg.arrivalDate || leg.departureDate) && (
+                    <div className="text-xs text-foreground-subtle mt-1">
+                      {formatDate(leg.arrivalDate || leg.departureDate || '')}
+                      {leg.arrivalNextDay ? ' (+1 day)' : ''}
+                    </div>
+                  )}
                   <div className="text-lg font-semibold text-foreground mt-1">{leg.arrivalTime}</div>
                   <div className="text-xs text-foreground-subtle mt-1 max-w-[100px] mx-auto truncate">{leg.arrivalAirport}</div>
                 </div>
@@ -163,7 +205,7 @@ export function FlightCard({
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-foreground-subtle" />
-            <span className="text-foreground">{date}</span>
+            <span className="text-foreground">{formatDate(date)}</span>
           </div>
           {passengers && (
             <div className="flex items-center gap-2">

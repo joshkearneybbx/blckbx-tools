@@ -16,6 +16,7 @@ import notoSerifItalic from "@assets/Noto_Serif/static/NotoSerif-Italic.ttf";
 import notoSerifBoldItalic from "@assets/Noto_Serif/static/NotoSerif-BoldItalic.ttf";
 import { getProxiedImageUrl } from "@/lib/imageProxy";
 import type { TravelSegment } from "@/lib/travel-segments";
+import { calculateLayover, resolveFlightLegDates } from "@/lib/travel-types";
 import {
   LocationIcon,
   CalendarIcon,
@@ -139,6 +140,41 @@ const getSupportedImageUrl = (item: any): string | null => {
   const candidates = [item?.primaryImage, ...(item?.images || [])].filter(Boolean);
   const supported = candidates.find((url: string) => isSupportedPdfImage(url));
   return supported || null;
+};
+
+const buildFlightLegSegments = (
+  legs: any[],
+  baseDate: string,
+  buildSegment: (leg: any, idx: number, meta: {
+    departureDate: string;
+    arrivalDate: string;
+    arrivalNextDay: boolean;
+    layoverDuration: string;
+  }) => TravelSegment
+): TravelSegment[] => {
+  const safeLegs = Array.isArray(legs) ? legs : [];
+  const resolvedLegDates = resolveFlightLegDates(baseDate, safeLegs);
+
+  return safeLegs.map((leg: any, idx: number) => {
+    const nextLeg = safeLegs[idx + 1];
+    const currentDates = resolvedLegDates[idx];
+    const nextDates = resolvedLegDates[idx + 1];
+    const layoverDuration = leg?.layoverDuration || (
+      nextLeg
+        ? calculateLayover(leg?.arrivalTime || '', nextLeg?.departureTime || '', {
+            arrivalDate: currentDates?.arrivalDate,
+            departureDate: nextDates?.departureDate,
+          })
+        : ''
+    );
+
+    return buildSegment(leg, idx, {
+      departureDate: currentDates?.departureDate || baseDate || '',
+      arrivalDate: currentDates?.arrivalDate || currentDates?.departureDate || baseDate || '',
+      arrivalNextDay: !!leg?.arrivalNextDay,
+      layoverDuration,
+    });
+  });
 };
 
 // Dynamic font size for title based on length to prevent mid-word breaks
@@ -852,6 +888,8 @@ const TravelSegmentCard = ({
   travellers?: any[];
 }) => {
   const passengerNames = getPassengerNames(travellers);
+  const departureDate = segment.departureDate || segment.date;
+  const arrivalDate = segment.arrivalDate || departureDate;
 
   if (segment.type === 'flight') {
     return (
@@ -880,6 +918,9 @@ const TravelSegmentCard = ({
               <Text style={styles.airportCode}>
                 {extractAirportCode(segment.fromLocation)}
               </Text>
+              {departureDate && (
+                <Text style={styles.airportName}>{formatDate(departureDate)}</Text>
+              )}
               <Text style={styles.airportName}>{getLocationName(segment.fromLocation)}</Text>
               <Text style={styles.flightTime}>{segment.departureTime || '--:--'}</Text>
             </View>
@@ -896,6 +937,12 @@ const TravelSegmentCard = ({
               <Text style={styles.airportCode}>
                 {extractAirportCode(segment.toLocation)}
               </Text>
+              {arrivalDate && (
+                <Text style={styles.airportName}>
+                  {formatDate(arrivalDate)}
+                  {segment.arrivalNextDay ? ' (+1 day)' : ''}
+                </Text>
+              )}
               <Text style={styles.airportName}>{getLocationName(segment.toLocation)}</Text>
               <Text style={styles.flightTime}>{segment.arrivalTime || '--:--'}</Text>
             </View>
@@ -905,7 +952,7 @@ const TravelSegmentCard = ({
           <View style={styles.flightMetaRow}>
             <View style={styles.metaItem}>
               <CalendarIcon size={11} color="#666666" />
-              <Text style={styles.metaText}>{formatDate(segment.date)}</Text>
+              <Text style={styles.metaText}>{formatDate(departureDate)}</Text>
             </View>
             {passengerNames && (
               <View style={styles.metaItem}>
@@ -1441,18 +1488,21 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
 
     // Truthy check for isMultiLeg by design: supports bool/number/string-y values from stored JSON.
     if (details && details.isMultiLeg && Array.isArray(details.legs) && details.legs.length > 0) {
-      return details.legs.map((leg: any, idx: number): TravelSegment => ({
+      return buildFlightLegSegments(details.legs, details.date || '', (leg, idx, meta) => ({
         id: `${travelRecord.id || 'travel'}-leg-${idx}`,
         type: travelRecord.travelType || 'flight',
         fromLocation: leg.departureAirport || leg.fromLocation || details.departureAirport || details.fromLocation || '',
         toLocation: leg.arrivalAirport || leg.toLocation || details.arrivalAirport || details.toLocation || '',
-        date: leg.date || details.date || '',
+        date: meta.departureDate || leg.date || details.date || '',
+        departureDate: meta.departureDate || leg.date || details.date || '',
+        arrivalDate: meta.arrivalDate || meta.departureDate || leg.date || details.date || '',
         departureTime: leg.departureTime || '',
         arrivalTime: leg.arrivalTime || '',
+        arrivalNextDay: meta.arrivalNextDay,
         flightNumber: leg.flightNumber || details.flightNumber || '',
         airline: leg.airline || details.airline || '',
         bookingReference: leg.bookingReference || details.bookingReference || '',
-        notes: leg.layoverDuration ? `Layover: ${leg.layoverDuration}` : (leg.notes || details.notes || ''),
+        notes: meta.layoverDuration ? `Layover: ${meta.layoverDuration}` : (leg.notes || details.notes || ''),
       })).filter(hasSegmentContent);
     }
 
@@ -1512,20 +1562,23 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
     const shouldExpandLegs = !!(hasLegContent && (isConnecting || legs.length > 1));
 
     if (shouldExpandLegs) {
-      return legs.map((leg: any, idx: number): TravelSegment => ({
+      return buildFlightLegSegments(legs, item.date || details?.date || item.flightDate || '', (leg, idx, meta) => ({
         id: `${item.id || fallbackId}-leg-${idx}`,
         type,
         fromLocation: leg.departureAirport || leg.departureStation || leg.fromLocation || details?.fromLocation || item.fromLocation || '',
         toLocation: leg.arrivalAirport || leg.arrivalStation || leg.toLocation || details?.toLocation || item.toLocation || '',
-        date: leg.date || item.date || details?.date || item.flightDate || '',
+        date: meta.departureDate || leg.date || item.date || details?.date || item.flightDate || '',
+        departureDate: meta.departureDate || leg.date || item.date || details?.date || item.flightDate || '',
+        arrivalDate: meta.arrivalDate || meta.departureDate || leg.date || item.date || details?.date || item.flightDate || '',
         departureTime: leg.departureTime || item.departureTime || '',
         arrivalTime: leg.arrivalTime || item.arrivalTime || '',
+        arrivalNextDay: meta.arrivalNextDay,
         flightNumber: leg.flightNumber || item.flightNumber || '',
         airline: leg.airline || airline,
         company: leg.company || company,
         bookingReference,
         contactDetails,
-        notes: leg.notes || item.notes || details?.notes || '',
+        notes: leg.notes || (meta.layoverDuration ? `Layover: ${meta.layoverDuration}` : '') || item.notes || details?.notes || '',
       })).filter(hasSegmentContent);
     }
 
