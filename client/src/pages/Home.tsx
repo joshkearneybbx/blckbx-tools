@@ -4,8 +4,6 @@ import {
   ClipboardList,
   ReceiptPoundSterling,
   LayoutDashboard,
-  ShoppingBag,
-  Inbox,
 } from "lucide-react";
 import { ToolCard, type Tool } from "@/components/ToolCard";
 import logoUrl from "@assets/blckbx-logo.png";
@@ -47,29 +45,11 @@ const tools: Tool[] = [
     status: "active",
   },
   {
-    id: "purchase-logger",
-    name: "Purchase Logger",
-    description: "Log recipient purchases and track gifting signals",
-    icon: ShoppingBag,
-    href: "https://bxgig.blckbx.co.uk/purchase-logger",
-    status: "active",
-    badge: "Testing",
-  },
-  {
     id: "meals",
     name: "Meal Planner",
     description: "AI-powered meal planning with smart shopping lists",
     icon: UtensilsCrossed,
     href: "/meals",
-    status: "active",
-    badge: "Testing",
-  },
-  {
-    id: "trend-inbox",
-    name: "Trend Inbox",
-    description: "Review AI-scraped trend candidates before they go live",
-    icon: Inbox,
-    href: "/trend-inbox",
     status: "active",
     badge: "Testing",
   },

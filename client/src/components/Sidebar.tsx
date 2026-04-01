@@ -73,7 +73,7 @@ function SidebarSubLink({ to, icon: Icon, label, active }: SidebarSubLinkProps) 
         ${active ? "bg-gray-800/80 border-l-2 border-[#E7C51C]" : "hover:bg-gray-800/70"}
       `}
     >
-      <Icon className="h-4 w-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Icon className="h-4 w-4 flex-shrink-0" />
       <span className="text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
         {label}
       </span>
