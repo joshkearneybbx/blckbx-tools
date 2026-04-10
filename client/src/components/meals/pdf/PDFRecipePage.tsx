@@ -2,7 +2,7 @@ import { Image, Link, Page, Text, View } from "@react-pdf/renderer";
 import { getMealMacros, getMealNote, getMealPlanItemKey, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
 import { ActivityIcon, ClockIcon, LinkIcon, UsersIcon } from "@/components/pdf/PDFIcons";
 import { pdfStyles } from "./PDFStyles";
-import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
+import logoUrl from "@assets/blckbx-logo-white.png";
 import { sanitizePdfText } from "./textSanitizer";
 
 export interface PDFRecipeItem extends MealPlanItem {

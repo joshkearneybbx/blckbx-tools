@@ -58,8 +58,8 @@ export function MapModal({ open, onClose, villas, selectedVillaId }: MapModalPro
           .addTo(mapRef.current!);
         
         marker.bindPopup(`
-          <div style="font-family: 'Maison Neue', sans-serif; min-width: 200px;">
-            <h3 style="font-family: 'Maison Neue', sans-serif; font-size: 16px; font-weight: 700; margin: 0 0 8px 0;">${villa.name}</h3>
+          <div style="min-width: 200px;">
+            <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 8px 0;">${villa.name}</h3>
             <p style="font-size: 14px; margin: 4px 0; color: #64748b;">${villa.bedrooms} bedrooms</p>
             <p style="font-size: 16px; font-weight: 700; margin: 8px 0 0 0;">£${villa.price.toLocaleString()}</p>
           </div>
@@ -72,8 +72,8 @@ export function MapModal({ open, onClose, villas, selectedVillaId }: MapModalPro
           ).addTo(mapRef.current!);
           
           restMarker.bindPopup(`
-            <div style="font-family: 'Maison Neue', sans-serif; min-width: 180px;">
-              <h3 style="font-family: 'Maison Neue', sans-serif; font-size: 15px; font-weight: 700; margin: 0 0 6px 0;">${villa.restaurant.name}</h3>
+            <div style="min-width: 180px;">
+              <h3 style="font-size: 15px; font-weight: 700; margin: 0 0 6px 0;">${villa.restaurant.name}</h3>
               <p style="font-size: 12px; line-height: 1.4; color: #64748b;">Near ${villa.name}</p>
             </div>
           `);

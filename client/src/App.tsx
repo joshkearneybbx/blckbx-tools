@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
-import Travel from "@/pages/Travel";
 import Dashboard from "@/pages/Dashboard";
 import CreateItinerary from "@/pages/CreateItinerary";
 import ViewItinerary from "@/pages/ViewItinerary";
@@ -11,18 +10,23 @@ import SectionBuilder from "@/pages/SectionBuilder";
 import PreviewArrange from "@/pages/PreviewArrange";
 import ListEditor from "@/pages/ListEditor";
 import BigPurchases from "@/pages/BigPurchases";
-import TrendInbox from "@/pages/TrendInbox";
 import TaskGuidePage from "@/pages/task-guide/TaskGuidePage";
-import PDFImport from "@/pages/PDFImport";
 import Login from "@/pages/Login";
 import OAuthCallback from "@/pages/OAuthCallback";
-import NotFound from "@/pages/not-found";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ToolGuard from "@/components/ToolGuard";
+import { ComingSoon } from "@/components/ComingSoon";
 import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import MealCraftPage from "@/pages/meals/MealCraftPage";
-import QuoteGenerator from "@/pages/QuoteGenerator";
-import QuotesList from "@/pages/QuotesList";
+import { ResearchLayout } from "@/features/research/ResearchLayout";
+import ResearchAddItem from "@/features/research/pages/ResearchAddItem";
+import ResearchSearch from "@/features/research/pages/ResearchSearch";
+import ResearchTaskMatcher from "@/features/research/pages/ResearchTaskMatcher";
+import ResearchLists from "@/features/research/pages/ResearchLists";
+import ResearchListDetail from "@/features/research/pages/ResearchListDetail";
+import ApprovalPage from "@/features/approval/ApprovalPage";
+import TravelHubPage from "@/features/travel-hub/TravelHubPage";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -66,73 +70,40 @@ function Router() {
         <Route path="/login" component={Login} />
         <Route path="/oauth/callback" component={OAuthCallback} />
 
-        {/* Travel landing page */}
-        <Route path="/travel">
-          {() => (
-            <ProtectedRoute>
-              <Travel />
-            </ProtectedRoute>
-          )}
-        </Route>
-
-        <Route path="/travel/quotes">
-          {() => (
-            <ProtectedRoute>
-              <QuotesList />
-            </ProtectedRoute>
-          )}
-        </Route>
-
-        {/* Quote Generator */}
-        <Route path="/travel/quote-generator/:id">
-          {() => (
-            <ProtectedRoute>
-              <QuoteGenerator />
-            </ProtectedRoute>
-          )}
-        </Route>
-        <Route path="/travel/quote-generator">
-          {() => (
-            <ProtectedRoute>
-              <QuoteGenerator />
-            </ProtectedRoute>
-          )}
-        </Route>
-
         {/* Itinerary Tool - protected routes (before :slug wildcard) */}
         <Route path="/itinerary/create">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="itinerary">
               <CreateItinerary />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
         <Route path="/itinerary/section-builder">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="itinerary">
               <SectionBuilder />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
         <Route path="/itinerary/preview/:id">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="itinerary">
               <PreviewArrange />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
         <Route path="/itinerary/edit/:id">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="itinerary">
               <CreateItinerary />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
         <Route path="/itinerary/list/:id">
           {(params) => (
-            <ProtectedRoute>
+            <ToolGuard slug="itinerary">
               <ListEditor projectId={params.id} />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
 
@@ -142,54 +113,128 @@ function Router() {
         {/* Itinerary dashboard */}
         <Route path="/itinerary">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="itinerary">
               <Dashboard />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
 
         {/* Meals Tool */}
         <Route path="/meals">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="meals">
               <MealCraftPage />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
 
         {/* Big Purchases Tool */}
         <Route path="/big-purchases">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="big-purchases">
               <BigPurchases />
-            </ProtectedRoute>
-          )}
-        </Route>
-
-        {/* Trend Inbox Tool */}
-        <Route path="/trend-inbox">
-          {() => (
-            <ProtectedRoute>
-              <TrendInbox />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
 
         {/* Task Guide Tool */}
         <Route path="/task-guide">
           {() => (
-            <ProtectedRoute>
+            <ToolGuard slug="task-guide">
               <TaskGuidePage />
-            </ProtectedRoute>
+            </ToolGuard>
           )}
         </Route>
 
-        {/* PDF Import Tool */}
-        <Route path="/pdf-import">
+        {/* Placeholder hubs */}
+        <Route path="/foh">
           {() => (
-            <ProtectedRoute>
-              <PDFImport />
-            </ProtectedRoute>
+            <ToolGuard slug="foh">
+              <ComingSoon
+                title="FOH Dashboard"
+                description="Front of House dashboard tools will be available here."
+              />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/approval">
+          {() => (
+            <ToolGuard slug="approval">
+              <ApprovalPage />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/approval/:rest*">
+          {() => (
+            <ToolGuard slug="approval">
+              <Redirect to="/approval" replace />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research/lists/:key">
+          {() => (
+            <ToolGuard slug="research">
+              <ResearchLayout>
+                <ResearchListDetail />
+              </ResearchLayout>
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research/lists">
+          {() => (
+            <ToolGuard slug="research">
+              <ResearchLayout>
+                <ResearchLists />
+              </ResearchLayout>
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research/search">
+          {() => (
+            <ToolGuard slug="research">
+              <ResearchLayout>
+                <ResearchSearch />
+              </ResearchLayout>
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research/task-matcher">
+          {() => (
+            <ToolGuard slug="research">
+              <ResearchLayout>
+                <ResearchTaskMatcher />
+              </ResearchLayout>
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research/add-link">
+          {() => (
+            <ToolGuard slug="research">
+              <Redirect to="/research" replace />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research">
+          {() => (
+            <ToolGuard slug="research">
+              <ResearchLayout>
+                <ResearchAddItem />
+              </ResearchLayout>
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/travel-hub">
+          {() => (
+            <ToolGuard slug="travel-hub">
+              <TravelHubPage />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/travel-hub/:rest*">
+          {() => (
+            <ToolGuard slug="travel-hub">
+              <Redirect to="/travel-hub" replace />
+            </ToolGuard>
           )}
         </Route>
 

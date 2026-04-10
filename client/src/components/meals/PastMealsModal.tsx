@@ -49,26 +49,26 @@ export function PastMealsModal({ open, onOpenChange, clientId, clientName }: Pas
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[500px] border-[#E6E5E0] bg-white p-0">
         <DialogHeader className="border-b border-[#E6E5E0] px-5 py-4 text-left">
-          <DialogTitle className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">
+          <DialogTitle className="text-sm font-bold text-[#1a1a1a]">
             {clientName} - Past Meals
           </DialogTitle>
-          <DialogDescription className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
+          <DialogDescription className="text-xs text-[#6B6B68]">
             Unique recipes from this client&apos;s meal plan history.
           </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[420px] space-y-2 overflow-auto px-5 py-4">
           {isLoading || isFetching ? (
-            <p className="text-sm text-[#6B6B68] [font-family:Inter,sans-serif]">Loading past meals...</p>
+            <p className="text-sm text-[#6B6B68]">Loading past meals...</p>
           ) : pastMeals.length === 0 ? (
-            <div className="rounded-md border border-[#E6E5E0] bg-[#FAF9F8] p-4 text-sm text-[#6B6B68] [font-family:Inter,sans-serif]">
+            <div className="rounded-md border border-[#E6E5E0] bg-[#FAF9F8] p-4 text-sm text-[#6B6B68]">
               No meal plans yet for this client.
             </div>
           ) : (
             pastMeals.map((meal) => (
               <div key={meal.recipeId} className="rounded-md border border-[#E6E5E0] bg-white p-3 shadow-sm">
                 <div className="mb-1 flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-[#1a1a1a] [font-family:Inter,sans-serif]">{meal.title}</p>
+                  <p className="text-sm font-semibold text-[#1a1a1a]">{meal.title}</p>
                   <div className="flex items-center gap-1">
                     {meal.totalCount > 1 ? (
                       <span className="rounded-full bg-[#E6E5E0] px-2 py-0.5 text-[10px] font-semibold text-[#424242]">
@@ -83,7 +83,7 @@ export function PastMealsModal({ open, onOpenChange, clientId, clientName }: Pas
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6B6B68]">
                   <span>Last planned: {formatDate(meal.latestPlannedAt)}</span>
                   <span>{formatSource(meal.source)}</span>
                 </div>

@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Eye, Pencil, Trash2, Loader2, Search, Copy, BookTemplate, List, MapPin, ChevronsUpDown, FileText } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Loader2, Search, Copy, BookTemplate, List, MapPin, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useProjects, useDeleteProject, useDuplicateProject, useSaveAsTemplate, usePublishProject, type Project } from "@/hooks/useProjects";
@@ -228,12 +228,6 @@ export default function Dashboard() {
             <p className="text-foreground-subtle">Manage your itineraries and lists</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/pdf-import">
-              <Button size="lg" variant="outline" className="gap-2" data-testid="button-import-pdf">
-                <FileText className="w-5 h-5" />
-                Import PDF
-              </Button>
-            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="lg" className="gap-2 shadow-md" data-testid="button-create-project">

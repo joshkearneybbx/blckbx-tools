@@ -27,8 +27,8 @@ export function ShoppingList({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-[#E6E5E0] bg-white px-5 py-4 shadow-sm">
         <div>
-          <h3 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Shopping List</h3>
-          <p className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">Categorised by aisle to speed up shopping.</p>
+          <h3 className="text-sm font-bold text-[#1a1a1a]">Shopping List</h3>
+          <p className="text-xs text-[#6B6B68]">Categorised by aisle to speed up shopping.</p>
         </div>
         <div className="flex items-center gap-2">
           {onMarkAsSent ? (
@@ -54,7 +54,7 @@ export function ShoppingList({
         ))}
       </div>
 
-      <div className="rounded-md border-l-4 border-[#E7C51C] bg-white p-4 text-xs text-[#424242] [font-family:Inter,sans-serif]">
+      <div className="rounded-md border-l-4 border-[#E7C51C] bg-white p-4 text-xs text-[#424242]">
         <p className="font-semibold text-[#1a1a1a]">Shopping tips</p>
         <p>Check your cupboards first and buy produce last to keep it fresh. Batch-cook proteins to save time.</p>
       </div>

@@ -591,11 +591,11 @@ export default function MealCraftPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#E6E5E0] [font-family:Inter,sans-serif]">
+    <div className="min-h-screen bg-[#E6E5E0]">
       <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8">
         <div className="mb-6 flex items-center justify-between rounded-[10px] border border-[#E6E5E0] bg-white px-5 py-3 shadow-sm">
           <div className="flex items-center gap-2">
-            <h1 className="text-[15px] font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">MealCraft</h1>
+            <h1 className="text-[15px] font-bold text-[#1a1a1a]">MealCraft</h1>
           </div>
         </div>
 

@@ -1,0 +1,153 @@
+.travel-hub {
+  --black: #0a0a0a;
+  --white: #fafaf8;
+  --sand-100: #f5f3f0;
+  --sand-200: #e8e5e0;
+  --sand-300: #d4d0cb;
+  --sand-400: #b8b3ad;
+  --sand-900: #6b6865;
+  --success: #1ea868;
+  --error: #e33737;
+  --approved-green: #5ba95f;
+  --rejected-red: #c0564a;
+  --approved-bg: #edf7ef;
+  --approved-text: #1b6e2d;
+  --rejected-bg: #fdf0ee;
+  --rejected-text: #9b3a2f;
+  --radius: 0;
+
+  min-height: 100vh;
+  background: var(--sand-200);
+  color: var(--black);
+  font-family: var(--font-sans);
+}
+
+.travel-hub *,
+.travel-hub *::before,
+.travel-hub *::after {
+  box-sizing: border-box;
+  border-radius: 0 !important;
+}
+
+.travel-hub a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.travel-hub button,
+.travel-hub input,
+.travel-hub textarea,
+.travel-hub select {
+  font: inherit;
+}
+
+.travel-hub input,
+.travel-hub textarea,
+.travel-hub select {
+  border: 1px solid var(--sand-300);
+  background: var(--white);
+  padding: 8px 12px;
+  color: var(--black);
+}
+
+.travel-hub input:focus,
+.travel-hub textarea:focus,
+.travel-hub select:focus {
+  border-color: var(--black);
+  outline: none;
+  box-shadow: none;
+}
+
+.travel-hub textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.travel-hub button {
+  cursor: pointer;
+}
+
+.travel-hub ::selection {
+  background: rgba(10, 10, 10, 0.16);
+}
+
+.travel-hub .bb-panel {
+  border: 1px solid var(--sand-300);
+  background: var(--white);
+  box-shadow: none;
+}
+
+.travel-hub .bb-panel-soft {
+  border: 1px solid var(--sand-300);
+  background: var(--sand-100);
+  box-shadow: none;
+}
+
+.travel-hub .bb-card {
+  border: 1px solid var(--sand-300);
+  background: var(--white);
+  box-shadow: none;
+  transition: border-color 160ms ease;
+}
+
+.travel-hub .bb-card:hover {
+  border-color: var(--black);
+}
+
+.travel-hub .bb-hairline {
+  border-color: var(--sand-300);
+}
+
+.travel-hub .bb-muted {
+  color: var(--sand-900);
+}
+
+.travel-hub .bb-meta {
+  color: var(--sand-400);
+}
+
+.travel-hub button[class*="bg-[var(--black)]"] {
+  background-color: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fafaf8 !important;
+}
+
+.travel-hub button[class*="bg-[#0a0a0a]"] {
+  background-color: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fafaf8 !important;
+}
+
+/* === Style isolation for embedded Tools-app components (Quotes, Bookings) === */
+/* Reverts Travel Hub's global border-radius:0 and form resets for shadcn components */
+
+.travel-hub .tools-app-styles,
+.travel-hub .tools-app-styles *,
+.travel-hub .tools-app-styles *::before,
+.travel-hub .tools-app-styles *::after {
+  border-radius: revert !important;
+}
+
+.travel-hub .tools-app-styles input,
+.travel-hub .tools-app-styles textarea,
+.travel-hub .tools-app-styles select {
+  all: revert;
+  box-sizing: border-box !important;
+  font: inherit;
+  color: inherit;
+}
+
+.travel-hub .tools-app-styles .hidden {
+  display: none !important;
+}
+
+.travel-hub .tools-app-styles textarea {
+  resize: none !important;
+}
+
+/* Ensure shadcn Select dropdowns and AlertDialog overlays render correctly */
+.travel-hub .tools-app-styles [data-radix-popper-content-wrapper],
+.travel-hub .tools-app-styles [role="dialog"],
+.travel-hub .tools-app-styles [role="alertdialog"] {
+  border-radius: revert !important;
+}

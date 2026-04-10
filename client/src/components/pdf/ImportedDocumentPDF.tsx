@@ -11,7 +11,7 @@ import notoSerifRegular from "@assets/Noto_Serif/static/NotoSerif-Regular.ttf";
 import notoSerifBold from "@assets/Noto_Serif/static/NotoSerif-Bold.ttf";
 import notoSerifItalic from "@assets/Noto_Serif/static/NotoSerif-Italic.ttf";
 import notoSerifBoldItalic from "@assets/Noto_Serif/static/NotoSerif-BoldItalic.ttf";
-import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
+import logoUrl from "@assets/blckbx-logo-white.png";
 import { PlaneIcon } from "./PDFIcons";
 
 Font.register({

@@ -1,0 +1,65 @@
+.approval-catalogue {
+  --background: #e8e5e0;
+  --surface: #fafaf8;
+  --text: #0a0a0a;
+  --black: #0a0a0a;
+  --white: #fafaf8;
+  --sand-100: #f5f3f0;
+  --sand-200: #e8e5e0;
+  --sand-300: #d4d0cb;
+  --sand-400: #b8b3ad;
+  --sand-500: #b8b3ad;
+  --sand-700: #6b6865;
+  --sand-900: #6b6865;
+  --success: #1ea868;
+  --error: #e33737;
+  --error-light: #fdf0ee;
+  --approved-green: #5ba95f;
+  --rejected-red: #c0564a;
+  --approved-bg: #edf7ef;
+  --approved-text: #1b6e2d;
+  --rejected-bg: #fdf0ee;
+  --rejected-text: #9b3a2f;
+  --list-background: #f5f3f0;
+  --list-border: #d4d0cb;
+  --list-text: #0a0a0a;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(250, 250, 248, 0.9), rgba(250, 250, 248, 0.9)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 63px,
+      rgba(10, 10, 10, 0.03) 63px,
+      rgba(10, 10, 10, 0.03) 64px
+    ),
+    var(--background);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.approval-catalogue * {
+  box-sizing: border-box;
+  border-radius: 0 !important;
+}
+
+.approval-catalogue a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.approval-catalogue button,
+.approval-catalogue input,
+.approval-catalogue textarea,
+.approval-catalogue select {
+  font: inherit;
+}
+
+.approval-catalogue .shadow-soft,
+.approval-catalogue .shadow-sm {
+  box-shadow: none !important;
+}
+
+.approval-catalogue ::selection {
+  background: rgba(10, 10, 10, 0.16);
+}

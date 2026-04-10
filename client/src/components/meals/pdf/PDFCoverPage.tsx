@@ -2,7 +2,7 @@ import { Image, Page, Text, View } from "@react-pdf/renderer";
 import type { MacroOverride, MealPlanStats } from "@/lib/meals/api";
 import { pdfStyles } from "./PDFStyles";
 import { PDFRecipeItem, RecipeCard } from "./PDFRecipePage";
-import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
+import logoUrl from "@assets/blckbx-logo-white.png";
 
 interface MenuOverviewItem {
   dayLabel: string;

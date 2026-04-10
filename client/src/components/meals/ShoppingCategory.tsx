@@ -31,9 +31,9 @@ export function ShoppingCategory({ category, items }: ShoppingCategoryProps) {
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg">{categoryIcon(category)}</span>
-          <h4 className="text-sm font-semibold text-[#1a1a1a] [font-family:Inter,sans-serif]">{category}</h4>
+          <h4 className="text-sm font-semibold text-[#1a1a1a]">{category}</h4>
         </div>
-        <span className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">{items.length} items</span>
+        <span className="text-xs text-[#6B6B68]">{items.length} items</span>
       </div>
 
       <div className="space-y-2">
@@ -50,7 +50,7 @@ export function ShoppingCategory({ category, items }: ShoppingCategoryProps) {
               />
               <span
                 className={[
-                  "text-sm text-[#424242] [font-family:Inter,sans-serif]",
+                  "text-sm text-[#424242]",
                   isChecked ? "text-[#9B9797] line-through" : "",
                 ].join(" ")}
               >

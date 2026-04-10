@@ -43,8 +43,8 @@ export function SwapModal({ open, onOpenChange, onConfirm, isSwapping }: SwapMod
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[440px] border-[#E6E5E0] p-0">
         <DialogHeader className="border-b border-[#E6E5E0] px-5 py-4 text-left">
-          <DialogTitle className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Swap Meal</DialogTitle>
-          <DialogDescription className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
+          <DialogTitle className="text-sm font-bold text-[#1a1a1a]">Swap Meal</DialogTitle>
+          <DialogDescription className="text-xs text-[#6B6B68]">
             Choose AI suggest mode, pick from the recipe library, or import a recipe URL.
           </DialogDescription>
         </DialogHeader>

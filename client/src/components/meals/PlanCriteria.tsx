@@ -58,25 +58,25 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
     <div className="rounded-[14px] border border-[#E6E5E0] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#E6E5E0] px-5 py-4">
         <div>
-          <h3 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Plan Criteria</h3>
-          <p className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">Client: {client.name}</p>
+          <h3 className="text-sm font-bold text-[#1a1a1a]">Plan Criteria</h3>
+          <p className="text-xs text-[#6B6B68]">Client: {client.name}</p>
         </div>
       </div>
 
       <div className="space-y-4 p-5">
         <div>
-          <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">What are you looking for?</label>
+          <label className="mb-1 block text-xs font-semibold text-[#424242]">What are you looking for?</label>
           <Textarea
             value={values.free_prompt}
             onChange={(event) => setField("free_prompt", event.target.value)}
             placeholder="keep it simple, nothing too fancy"
-            className="min-h-[90px] resize-y border-[#E6E5E0] text-sm [font-family:Inter,sans-serif]"
+            className="min-h-[90px] resize-y border-[#E6E5E0] text-sm"
           />
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Number of Days</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Number of Days</label>
             <Select
               value={String(values.num_days)}
               onValueChange={(value) => setField("num_days", Number(value))}
@@ -93,7 +93,7 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Meals Per Day</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Meals Per Day</label>
             <Select
               value={String(values.meals_per_day)}
               onValueChange={(value) => setField("meals_per_day", Number(value))}
@@ -111,7 +111,7 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Meal Types</label>
+          <label className="mb-1 block text-xs font-semibold text-[#424242]">Meal Types</label>
           <ChipSelect
             options={MEAL_TYPES}
             selected={values.meal_types}
@@ -120,7 +120,7 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Focus Tags</label>
+          <label className="mb-1 block text-xs font-semibold text-[#424242]">Focus Tags</label>
           <ChipSelect
             options={FOCUS_TAGS}
             selected={values.focus_tags}

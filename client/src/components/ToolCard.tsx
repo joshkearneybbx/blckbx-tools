@@ -20,31 +20,32 @@ export function ToolCard({ tool }: ToolCardProps) {
   const isComingSoon = tool.status === "coming-soon";
   const isPlaceholder = tool.status === "placeholder";
   const isExternal = Boolean(tool.href && /^https?:\/\//.test(tool.href));
+  const isNavigable = Boolean(tool.href && !isPlaceholder);
 
   const cardClassName = `
-    relative bg-white rounded-xl p-8 text-center
-    border border-gray-200 transition-all duration-200
-    ${isActive ? "hover:shadow-lg hover:border-[#E7C51C] cursor-pointer" : ""}
+    relative bg-[#FAFAF8] rounded-none p-8 text-center
+    border border-[#D4D0CB] shadow-none transition-colors duration-200
+    ${isNavigable ? "hover:border-[#0A0A0A] cursor-pointer" : ""}
     ${isPlaceholder ? "opacity-50" : ""}
   `;
 
   const content = (
     <>
       {tool.badge ? (
-        <span className="absolute top-4 right-4 bg-[#E7C51C] text-[#1a1a1a] text-xs font-medium px-2 py-1 rounded-full">
+        <span className="absolute top-4 right-4 bg-[#0A0A0A] text-[#FAFAF8] text-xs font-medium px-2 py-0.5 rounded-none">
           {tool.badge}
         </span>
       ) : null}
 
       {isComingSoon && !tool.badge && (
-        <span className="absolute top-4 right-4 bg-[#E7C51C] text-[#1a1a1a] text-xs font-medium px-2 py-1 rounded-full">
+        <span className="absolute top-4 right-4 bg-[#0A0A0A] text-[#FAFAF8] text-xs font-medium px-2 py-0.5 rounded-none">
           Coming Soon
         </span>
       )}
 
       <div
         className={`
-          w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center
+          w-16 h-16 mx-auto mb-4 rounded-none flex items-center justify-center
           ${isActive ? "bg-[#1a1a1a] text-white" : "bg-gray-100 text-gray-400"}
         `}
       >
@@ -56,14 +57,10 @@ export function ToolCard({ tool }: ToolCardProps) {
       >
         {tool.name}
       </h2>
-
-      <p className={`text-sm ${isPlaceholder ? "text-gray-300" : "text-gray-600"}`}>
-        {tool.description}
-      </p>
     </>
   );
 
-  if (isActive && tool.href && isExternal) {
+  if (isNavigable && tool.href && isExternal) {
     return (
       <a href={tool.href} className={cardClassName}>
         {content}
@@ -71,7 +68,7 @@ export function ToolCard({ tool }: ToolCardProps) {
     );
   }
 
-  if (isActive && tool.href) {
+  if (isNavigable && tool.href) {
     return (
       <Link href={tool.href} className={cardClassName}>
         {content}

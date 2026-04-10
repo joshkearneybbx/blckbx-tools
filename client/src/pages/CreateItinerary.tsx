@@ -2213,6 +2213,16 @@ export default function CreateItinerary() {
       return;
     }
 
+    if (!wizardData?.assistantName?.trim() || !wizardData?.assistantEmail?.trim()) {
+      toast({
+        title: "Assistant details required",
+        description: "Please fill in assistant name and email.",
+        variant: "destructive",
+      });
+      setCurrentPage(0);
+      return;
+    }
+
     // Validate travellers - children must have ages
     const childrenWithoutAge = wizardData.travellers.filter(
       t => t.name && t.type === "child" && (!t.ageAtTravel || t.ageAtTravel < 1)
@@ -2679,16 +2689,16 @@ export default function CreateItinerary() {
         >
           <AlertDialogContent className="max-w-lg border-[#E6E5E0]">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-[#1a1a1a] [font-family:Inter,sans-serif]">
+              <AlertDialogTitle className="text-[#1a1a1a]">
                 Confirm Publish
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-[#6B6B68] [font-family:Inter,sans-serif]">
+              <AlertDialogDescription className="text-[#6B6B68]">
                 Review this summary before publishing.
               </AlertDialogDescription>
             </AlertDialogHeader>
 
             {publishConfirmData ? (
-              <div className="rounded-md border border-[#E6E5E0] bg-[#FAF9F8] p-3 space-y-3 text-sm [font-family:Inter,sans-serif]">
+              <div className="rounded-md border border-[#E6E5E0] bg-[#FAF9F8] p-3 space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: "Destinations", value: publishConfirmData.counts.destinations },

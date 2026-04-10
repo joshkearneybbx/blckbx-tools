@@ -17,6 +17,7 @@ export interface User {
   lastName?: string;
   profileImageUrl?: string;
   role: string;
+  allowed_tools?: string[];
   created: string;
   updated: string;
 }

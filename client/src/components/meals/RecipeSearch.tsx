@@ -33,11 +33,11 @@ export function RecipeSearch({ selectedRecipe, onSelectRecipe }: RecipeSearchPro
 
       <div className="max-h-52 space-y-1 overflow-auto rounded-md border border-[#E6E5E0] bg-white p-1">
         {!query.trim() ? (
-          <p className="p-2 text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">Start typing to search recipes.</p>
+          <p className="p-2 text-xs text-[#6B6B68]">Start typing to search recipes.</p>
         ) : isLoading ? (
-          <p className="p-2 text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">Searching recipes...</p>
+          <p className="p-2 text-xs text-[#6B6B68]">Searching recipes...</p>
         ) : recipes.length === 0 ? (
-          <p className="p-2 text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">No recipes found.</p>
+          <p className="p-2 text-xs text-[#6B6B68]">No recipes found.</p>
         ) : (
           recipes.map((recipe) => (
             <button

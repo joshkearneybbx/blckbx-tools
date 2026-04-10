@@ -18,8 +18,8 @@ export function ClientCard({ client, selected, onSelect, onOpenPastPlans }: Clie
       ].join(" ")}
     >
       <button type="button" onClick={onSelect} className="w-full text-left">
-        <h4 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">{client.name}</h4>
-        <p className="mb-3 text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
+        <h4 className="text-sm font-bold text-[#1a1a1a]">{client.name}</h4>
+        <p className="mb-3 text-xs text-[#6B6B68]">
           Household of {client.household_size ?? 1}
         </p>
 

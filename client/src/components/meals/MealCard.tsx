@@ -166,7 +166,7 @@ export function MealCard({
               </div>
             ) : (
               <div className="mt-1 flex items-center gap-1.5">
-                <h4 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">{title}</h4>
+                <h4 className="text-sm font-bold text-[#1a1a1a]">{title}</h4>
                 <button
                   type="button"
                   onClick={() => setIsEditingTitle(true)}
@@ -242,7 +242,7 @@ export function MealCard({
         </div>
       </div>
 
-      <div className="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
+      <div className="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#6B6B68]">
         {metaItems.map((meta) => (
           <span key={meta}>{meta}</span>
         ))}
@@ -369,7 +369,7 @@ export function MealCard({
       ) : null}
 
       {expanded ? (
-        <div className="mt-3 border-t border-[#E6E5E0] pt-3 text-xs [font-family:Inter,sans-serif]">
+        <div className="mt-3 border-t border-[#E6E5E0] pt-3 text-xs">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <h5 className="mb-1 font-semibold text-[#1a1a1a]">Ingredients</h5>
@@ -398,7 +398,7 @@ export function MealCard({
 
       {noteText ? (
         <div className="mt-3 rounded-md border border-[#E6E5E0] bg-[#FAF9F8] px-3 py-2">
-          <div className="flex items-start gap-2 text-xs [font-family:Inter,sans-serif]">
+          <div className="flex items-start gap-2 text-xs">
             <MessageSquare className="mt-0.5 h-3.5 w-3.5 text-[#6B6B68] shrink-0" />
             <div className="w-full">
               <div className="flex items-center justify-between gap-2">

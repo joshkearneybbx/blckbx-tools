@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { Plus, Trash2, Loader2, FileOutput } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +28,11 @@ type QuoteRecord = {
   created: string;
 };
 
+interface QuotesListProps {
+  onSelect?: (id: string) => void;
+  onNew?: () => void;
+}
+
 function formatDate(dateString: string): string {
   try {
     return new Date(dateString).toLocaleDateString("en-GB", {
@@ -40,7 +45,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-export default function QuotesList() {
+export default function QuotesList({ onSelect, onNew }: QuotesListProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
@@ -105,12 +110,13 @@ export default function QuotesList() {
               Review saved BLCK BX quotes, continue editing, or start a new one.
             </p>
           </div>
-          <Link href="/travel/quote-generator">
-            <Button className="bg-[#F5C518] text-[#1A1A1A] hover:bg-[#E3B90C]">
-              <Plus className="mr-2 h-4 w-4" />
-              New Quote
-            </Button>
-          </Link>
+          <Button
+            className="border border-[#0A0A0A] bg-[#0A0A0A] text-[#FAFAF8] hover:bg-[#FAFAF8] hover:text-[#0A0A0A]"
+            onClick={() => onNew ? onNew() : setLocation("/travel/quote-generator")}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Quote
+          </Button>
         </div>
 
         {isLoading ? (
@@ -132,12 +138,13 @@ export default function QuotesList() {
                   Create your first quote to start building a reusable library of drafts and sent quotes.
                 </p>
               </div>
-              <Link href="/travel/quote-generator">
-                <Button className="bg-[#F5C518] text-[#1A1A1A] hover:bg-[#E3B90C]">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create First Quote
-                </Button>
-              </Link>
+              <Button
+                className="border border-[#0A0A0A] bg-[#0A0A0A] text-[#FAFAF8] hover:bg-[#FAFAF8] hover:text-[#0A0A0A]"
+                onClick={() => onNew ? onNew() : setLocation("/travel/quote-generator")}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create First Quote
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -150,14 +157,14 @@ export default function QuotesList() {
               return (
                 <div
                   key={quote.id}
-                  onClick={() => setLocation(`/travel/quote-generator/${quote.id}`)}
+                  onClick={() => onSelect ? onSelect(quote.id) : setLocation(`/travel/quote-generator/${quote.id}`)}
                   className="cursor-pointer text-left"
                   role="button"
                   tabIndex={0}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      setLocation(`/travel/quote-generator/${quote.id}`);
+                      onSelect ? onSelect(quote.id) : setLocation(`/travel/quote-generator/${quote.id}`);
                     }
                   }}
                 >
@@ -178,7 +185,7 @@ export default function QuotesList() {
                           ) : null}
                         </div>
                         <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          className={`px-2.5 py-1 text-xs font-medium ${
                             quote.status === "sent"
                               ? "bg-emerald-100 text-emerald-800"
                               : "bg-stone-200 text-stone-700"

@@ -125,77 +125,77 @@ export function NewClientModal({ open, onOpenChange, onCreated }: NewClientModal
     >
       <DialogContent className="max-w-[480px] border-[#E6E5E0] p-0">
         <DialogHeader className="border-b border-[#E6E5E0] px-5 py-4 text-left">
-          <DialogTitle className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">
+          <DialogTitle className="text-sm font-bold text-[#1a1a1a]">
             New Client
           </DialogTitle>
-          <DialogDescription className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
+          <DialogDescription className="text-xs text-[#6B6B68]">
             Create a new MealCraft client profile.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 px-5 py-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Name</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Name</label>
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="e.g. Alex Morgan"
-              className="h-10 border-[#E6E5E0] bg-white text-sm [font-family:Inter,sans-serif]"
+              className="h-10 border-[#E6E5E0] bg-white text-sm"
             />
             {nameError ? (
-              <p className="mt-1 text-xs text-[#E33737] [font-family:Inter,sans-serif]">{nameError}</p>
+              <p className="mt-1 text-xs text-[#E33737]">{nameError}</p>
             ) : null}
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Email (optional)</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Email (optional)</label>
             <Input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="alex@example.com"
-              className="h-10 border-[#E6E5E0] bg-white text-sm [font-family:Inter,sans-serif]"
+              className="h-10 border-[#E6E5E0] bg-white text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Dietary</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Dietary</label>
             <ChipSelect options={DIETARY_OPTIONS} selected={dietary} onChange={setDietary} />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Dislikes</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Dislikes</label>
             <Input
               value={dislikesInput}
               onChange={(event) => setDislikesInput(event.target.value)}
               placeholder="mushrooms, coriander"
-              className="h-10 border-[#E6E5E0] bg-white text-sm [font-family:Inter,sans-serif]"
+              className="h-10 border-[#E6E5E0] bg-white text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Household size</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Household size</label>
             <Input
               type="number"
               min={1}
               value={householdSize}
               onChange={(event) => setHouseholdSize(Math.max(1, Number(event.target.value || 1)))}
-              className="h-10 border-[#E6E5E0] bg-white text-sm [font-family:Inter,sans-serif]"
+              className="h-10 border-[#E6E5E0] bg-white text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#424242] [font-family:Inter,sans-serif]">Notes</label>
+            <label className="mb-1 block text-xs font-semibold text-[#424242]">Notes</label>
             <Textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Prefers quick meals"
-              className="min-h-[88px] border-[#E6E5E0] text-sm [font-family:Inter,sans-serif]"
+              className="min-h-[88px] border-[#E6E5E0] text-sm"
             />
           </div>
 
           {submitError ? (
-            <p className="text-xs text-[#E33737] [font-family:Inter,sans-serif]">{submitError}</p>
+            <p className="text-xs text-[#E33737]">{submitError}</p>
           ) : null}
         </div>
 

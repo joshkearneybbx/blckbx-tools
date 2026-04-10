@@ -31,7 +31,7 @@ export function ClientSelect({
   return (
     <div className="rounded-[14px] border border-[#E6E5E0] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#E6E5E0] px-5 py-4">
-        <h3 className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Select Client</h3>
+        <h3 className="text-sm font-bold text-[#1a1a1a]">Select Client</h3>
         <Button
           type="button"
           variant="outline"
@@ -49,20 +49,20 @@ export function ClientSelect({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9B9797]" />
           <Input
             placeholder="Search by name, dietary needs, dislikes, or notes"
-            className="h-10 border-[#E6E5E0] bg-white pl-9 text-sm [font-family:Inter,sans-serif]"
+            className="h-10 border-[#E6E5E0] bg-white pl-9 text-sm"
             onChange={(event) => setSearch(event.target.value)}
             value={search}
           />
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#6B6B68] [font-family:Inter,sans-serif]">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#6B6B68]">
             Recent Clients
           </p>
           {isLoading ? (
-            <p className="text-sm text-[#6B6B68] [font-family:Inter,sans-serif]">Loading clients...</p>
+            <p className="text-sm text-[#6B6B68]">Loading clients...</p>
           ) : clients.length === 0 ? (
-            <p className="text-sm text-[#6B6B68] [font-family:Inter,sans-serif]">No clients found.</p>
+            <p className="text-sm text-[#6B6B68]">No clients found.</p>
           ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {clients.map((client) => (

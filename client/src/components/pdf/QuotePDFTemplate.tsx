@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
-import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
+import logoUrl from "@assets/blckbx-logo-white.png";
 import notoSerifRegular from "@assets/Noto_Serif/static/NotoSerif-Regular.ttf";
 import notoSerifBold from "@assets/Noto_Serif/static/NotoSerif-Bold.ttf";
 import notoSerifItalic from "@assets/Noto_Serif/static/NotoSerif-Italic.ttf";

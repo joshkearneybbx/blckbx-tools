@@ -66,7 +66,7 @@ export function ImportRecipeModal({ open, onClose, onImported }: ImportRecipeMod
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}>
       <DialogContent className="max-w-[440px] border-[#E6E5E0] p-0">
         <DialogHeader className="border-b border-[#E6E5E0] px-5 py-4 text-left">
-          <DialogTitle className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">Import Recipe</DialogTitle>
+          <DialogTitle className="text-sm font-bold text-[#1a1a1a]">Import Recipe</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 px-5 py-4">

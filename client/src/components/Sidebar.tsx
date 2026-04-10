@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { Plane, Map, FileOutput, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, ShoppingBag, Inbox, FileText, FolderOpen } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, LayoutDashboard, ClipboardCheck, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,7 +18,7 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
   const isExternal = /^https?:\/\//.test(to);
   const className = `
         flex items-center gap-3 px-4 py-3 transition-colors
-        ${active ? "bg-gray-800 border-l-2 border-[#E7C51C]" : "hover:bg-gray-800"}
+        ${active ? "bg-gray-800 border-l-2 border-[#FAFAF8]" : "hover:bg-gray-800"}
         ${disabled ? "opacity-50 cursor-not-allowed" : ""}
       `;
 
@@ -30,7 +30,7 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
           {label}
         </span>
         {badge && (
-          <span className="ml-auto text-xs bg-[#E7C51C] text-[#1a1a1a] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100">
+          <span className="ml-auto text-xs bg-[#FAFAF8] text-[#0A0A0A] px-1.5 py-0.5 rounded-none opacity-0 group-hover:opacity-100">
             {badge}
           </span>
         )}
@@ -49,7 +49,7 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
         {label}
       </span>
       {badge && (
-        <span className="ml-auto text-xs bg-[#E7C51C] text-[#1a1a1a] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100">
+        <span className="ml-auto text-xs bg-[#FAFAF8] text-[#0A0A0A] px-1.5 py-0.5 rounded-none opacity-0 group-hover:opacity-100">
           {badge}
         </span>
       )}
@@ -57,34 +57,9 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
   );
 }
 
-interface SidebarSubLinkProps {
-  to: string;
-  icon: LucideIcon;
-  label: string;
-  active: boolean;
-}
-
-function SidebarSubLink({ to, icon: Icon, label, active }: SidebarSubLinkProps) {
-  return (
-    <Link
-      href={to}
-      className={`
-        ml-2 flex items-center gap-3 px-4 py-2 transition-colors
-        ${active ? "bg-gray-800/80 border-l-2 border-[#E7C51C]" : "hover:bg-gray-800/70"}
-      `}
-    >
-      <Icon className="h-4 w-4 flex-shrink-0" />
-      <span className="text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-        {label}
-      </span>
-    </Link>
-  );
-}
-
 export function Sidebar() {
   const [location, setLocation] = useLocation();
-  const { logout, isAuthenticated } = useAuth();
-  const travelActive = location.startsWith("/travel") || location.startsWith("/itinerary");
+  const { logout, isAuthenticated, hasAccess } = useAuth();
 
   if (location === "/") return null;
 
@@ -105,77 +80,78 @@ export function Sidebar() {
       </Link>
 
       <nav className="mt-4">
-        <SidebarLink
-          to="/travel"
-          icon={Plane}
-          label="Travel"
-          active={travelActive}
-        />
-        <div className="pb-2">
-          <SidebarSubLink
+        {hasAccess("itinerary") && (
+          <SidebarLink
             to="/itinerary"
             icon={Map}
             label="Itinerary Maker"
             active={location.startsWith("/itinerary")}
           />
-          <SidebarSubLink
-            to="/travel/quotes"
-            icon={FolderOpen}
-            label="Quotes"
-            active={location.startsWith("/travel/quotes")}
+        )}
+        {hasAccess("foh") && (
+          <SidebarLink
+            to="/foh"
+            icon={LayoutDashboard}
+            label="FOH Dashboard"
+            active={location.startsWith("/foh")}
+            badge="Soon"
           />
-          <SidebarSubLink
-            to="/travel/quote-generator"
-            icon={FileOutput}
-            label="New Quote"
-            active={location.startsWith("/travel/quote-generator")}
+        )}
+        {hasAccess("approval") && (
+          <SidebarLink
+            to="/approval"
+            icon={ClipboardCheck}
+            label="Approval Catalogue"
+            active={location.startsWith("/approval")}
           />
-        </div>
-        <SidebarLink
-          to="/meals"
-          icon={UtensilsCrossed}
-          label="Meal Planner"
-          active={location.startsWith("/meals")}
-        />
-        <SidebarLink
-          to="/big-purchases"
-          icon={ReceiptPoundSterling}
-          label="Big Purchases"
-          active={location.startsWith("/big-purchases")}
-        />
-        <SidebarLink
-          to="/trend-inbox"
-          icon={Inbox}
-          label="Trend Inbox"
-          active={location.startsWith("/trend-inbox")}
-          badge="Testing"
-        />
-        <SidebarLink
-          to="https://bxgig.blckbx.co.uk/purchase-logger"
-          icon={ShoppingBag}
-          label="Purchase Logger"
-          active={false}
-          badge="Testing"
-        />
-        <SidebarLink
-          to="/task-guide"
-          icon={ClipboardList}
-          label="Task Guide"
-          active={location.startsWith("/task-guide")}
-        />
-        <SidebarLink
-          to="/pdf-import"
-          icon={FileText}
-          label="PDF Import"
-          active={location.startsWith("/pdf-import")}
-        />
+        )}
+        {hasAccess("research") && (
+          <SidebarLink
+            to="/research"
+            icon={Search}
+            label="Research Hub"
+            active={location.startsWith("/research")}
+          />
+        )}
+        {hasAccess("travel-hub") && (
+          <SidebarLink
+            to="/travel-hub"
+            icon={Map}
+            label="Travel Hub"
+            active={location.startsWith("/travel-hub")}
+          />
+        )}
+        {hasAccess("meals") && (
+          <SidebarLink
+            to="/meals"
+            icon={UtensilsCrossed}
+            label="Meal Planner"
+            active={location.startsWith("/meals")}
+          />
+        )}
+        {hasAccess("big-purchases") && (
+          <SidebarLink
+            to="/big-purchases"
+            icon={ReceiptPoundSterling}
+            label="Big Purchases"
+            active={location.startsWith("/big-purchases")}
+          />
+        )}
+        {hasAccess("task-guide") && (
+          <SidebarLink
+            to="/task-guide"
+            icon={ClipboardList}
+            label="Task Guide"
+            active={location.startsWith("/task-guide")}
+          />
+        )}
       </nav>
       {isAuthenticated && (
         <div className="absolute bottom-4 left-0 right-0 px-3 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full rounded-full bg-[#E7C51C] text-[#232220] text-sm font-medium py-2 hover:bg-[#d8b614] transition-colors"
+            className="w-full rounded-none bg-[#FAFAF8] text-[#0A0A0A] text-sm font-medium py-2 hover:bg-gray-200 transition-colors"
             data-testid="button-sidebar-signout"
           >
             Sign Out

@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react';
 import { pb, type User } from '@/lib/pocketbase';
+import { isToolSlug, type ToolSlug } from '@/lib/tool-access';
+
+function normalizeAllowedTools(value: unknown): ToolSlug[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((tool): tool is ToolSlug => (
+    typeof tool === 'string' && isToolSlug(tool)
+  ));
+}
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(pb.authStore.model as User | null);
   const [isLoading, setIsLoading] = useState(true);
+  const allowedTools = normalizeAllowedTools(user?.allowed_tools);
+  const hasAccess = (slug: ToolSlug): boolean => allowedTools.includes(slug);
 
   useEffect(() => {
     // Check if auth is valid on mount
@@ -38,7 +49,8 @@ export function useAuth() {
         passwordConfirm: password,
         firstName,
         lastName,
-        role: 'client'
+        role: 'client',
+        allowed_tools: []
       });
 
       // Auto-login after registration
@@ -73,6 +85,8 @@ export function useAuth() {
 
   return {
     user,
+    allowedTools,
+    hasAccess,
     isLoading,
     isAuthenticated: pb.authStore.isValid,
     isAuthResolved: !isLoading,

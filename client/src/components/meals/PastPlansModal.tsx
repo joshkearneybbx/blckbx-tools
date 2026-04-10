@@ -58,10 +58,10 @@ export function PastPlansModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[560px] border-[#E6E5E0] bg-white p-0">
         <DialogHeader className="border-b border-[#E6E5E0] px-5 py-4 text-left">
-          <DialogTitle className="text-sm font-bold text-[#1a1a1a] [font-family:Inter,sans-serif]">
+          <DialogTitle className="text-sm font-bold text-[#1a1a1a]">
             {clientName} - Meal Plans
           </DialogTitle>
-          <DialogDescription className="text-xs text-[#6B6B68] [font-family:Inter,sans-serif]">
+          <DialogDescription className="text-xs text-[#6B6B68]">
             Load a previous plan to review, swap meals, and re-export.
           </DialogDescription>
         </DialogHeader>

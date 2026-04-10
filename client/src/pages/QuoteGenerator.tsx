@@ -1,7 +1,7 @@
 import type { ChangeEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
-import { Link, useLocation, useRoute } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import {
   FileOutput,
   Loader2,
@@ -43,9 +43,9 @@ type Status = "upload" | "processing" | "result" | "error";
 
 const DEFAULT_QUOTE_WEBHOOK_URL = "https://n8n.blckbx.co.uk/webhook/pts-import";
 const EDITABLE_INPUT_CLASS =
-  "h-9 border border-[#E5E5E5] bg-[#FAFAFA] px-3 py-1.5 text-right text-sm text-[#1A1A1A] focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]";
+  "h-9 border border-[#D4D0CB] bg-[#FAFAF8] px-3 py-1.5 text-right text-sm text-[#0A0A0A] focus:border-[#0A0A0A] focus:ring-0";
 const EDITABLE_TEXTAREA_CLASS =
-  "min-h-[120px] w-full rounded-md border border-[#E5E5E5] bg-[#FAFAFA] px-3 py-2 text-sm text-[#1A1A1A] outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]";
+  "min-h-[120px] w-full resize-none border border-[#D4D0CB] bg-[#FAFAF8] px-3 py-2 text-sm text-[#0A0A0A] outline-none focus:border-[#0A0A0A] focus:ring-0";
 
 function getWebhookUrl(): string {
   return import.meta.env.VITE_QUOTE_GENERATOR_WEBHOOK_URL ?? DEFAULT_QUOTE_WEBHOOK_URL;
@@ -369,7 +369,12 @@ function EditableRow({
   );
 }
 
-export default function QuoteGenerator() {
+interface QuoteGeneratorProps {
+  embeddedQuoteId?: string;
+  onBack?: () => void;
+}
+
+export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGeneratorProps) {
   const [, setLocation] = useLocation();
   const [routeMatch, routeParams] = useRoute("/travel/quote-generator/:id");
   const { user } = useAuth();
@@ -391,7 +396,7 @@ export default function QuoteGenerator() {
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const tripPhotosInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
-  const quoteId = routeMatch ? routeParams?.id : undefined;
+  const quoteId = embeddedQuoteId || (routeMatch ? routeParams?.id : undefined);
 
   const hasOptionalSections = useMemo(() => {
     if (!quoteData) return false;
@@ -442,7 +447,9 @@ export default function QuoteGenerator() {
 
   const handleUploadAnother = () => {
     resetState();
-    if (quoteId) {
+    if (onBack) {
+      onBack();
+    } else if (quoteId) {
       setLocation("/travel/quote-generator");
     }
   };
@@ -517,7 +524,7 @@ export default function QuoteGenerator() {
   };
 
   useEffect(() => {
-    if (!quoteId) {
+    if (!quoteId || quoteId === "new") {
       setIsLoadingQuote(false);
       return;
     }
@@ -911,16 +918,15 @@ export default function QuoteGenerator() {
       <div className="min-h-screen bg-[#E8E4DE] px-4 py-10 md:px-8">
         <div className="mx-auto max-w-5xl space-y-6">
           <div>
-            <Link href="/travel/quotes">
-              <Button
-                type="button"
-                variant="ghost"
-                className="px-0 text-[#6B6B68] hover:bg-transparent hover:text-[#1A1A1A]"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Quotes
-              </Button>
-            </Link>
+            <Button
+              type="button"
+              variant="ghost"
+              className="px-0 text-[#6B6B68] hover:bg-transparent hover:text-[#1A1A1A]"
+              onClick={() => onBack ? onBack() : setLocation("/travel/quotes")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Quotes
+            </Button>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#6B6B68]">
@@ -1047,7 +1053,7 @@ export default function QuoteGenerator() {
                 <Button
                   onClick={handleUpload}
                   disabled={!selectedFile || status === "processing"}
-                  className="bg-[#1A1A1A] text-white hover:bg-[#111111]"
+                  className="border border-[#0A0A0A] bg-[#0A0A0A] text-[#FAFAF8] hover:bg-[#FAFAF8] hover:text-[#0A0A0A]"
                   data-testid="button-upload-generate-quote"
                 >
                   {status === "processing" ? (
@@ -1084,16 +1090,15 @@ export default function QuoteGenerator() {
     <div className="min-h-screen bg-[#E8E4DE] px-4 py-10 md:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div>
-          <Link href="/travel/quotes">
-            <Button
-              type="button"
-              variant="ghost"
-              className="px-0 text-[#6B6B68] hover:bg-transparent hover:text-[#1A1A1A]"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Quotes
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            className="px-0 text-[#6B6B68] hover:bg-transparent hover:text-[#1A1A1A]"
+            onClick={() => onBack ? onBack() : setLocation("/travel/quotes")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Quotes
+          </Button>
         </div>
         <div className="space-y-2">
           <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#6B6B68]">
@@ -1682,7 +1687,7 @@ export default function QuoteGenerator() {
               <Button
                 onClick={handleDownload}
                 disabled={isDownloading || isSaving}
-                className="bg-[#F5C518] text-[#1A1A1A] hover:bg-[#E3B90C]"
+                className="border border-[#0A0A0A] bg-[#0A0A0A] text-[#FAFAF8] hover:bg-[#FAFAF8] hover:text-[#0A0A0A]"
                 data-testid="button-download-quote-pdf"
               >
                 {isDownloading ? (

@@ -1,4 +1,4 @@
-import { Map, FileOutput } from "lucide-react";
+import { Map, FileOutput, FileText } from "lucide-react";
 import { ToolCard, type Tool } from "@/components/ToolCard";
 
 const travelTools: Tool[] = [
@@ -16,6 +16,14 @@ const travelTools: Tool[] = [
     description: "Manage saved BLCK BX quotes or start a new quote from your library",
     icon: FileOutput,
     href: "/travel/quotes",
+    status: "active",
+  },
+  {
+    id: "travel-bookings",
+    name: "Bookings",
+    description: "Create branded booking confirmation PDFs for clients",
+    icon: FileText,
+    href: "/travel/bookings",
     status: "active",
   },
 ];

@@ -1,7 +1,7 @@
 import { Image, Page, Text, View } from "@react-pdf/renderer";
 import type { ShoppingList } from "@/lib/meals/api";
 import { pdfStyles } from "./PDFStyles";
-import logoUrl from "@assets/BlckBx PNG on Blck_1763042542782.png";
+import logoUrl from "@assets/blckbx-logo-white.png";
 import { sanitizePdfText } from "./textSanitizer";
 
 interface PDFShoppingPageProps {
