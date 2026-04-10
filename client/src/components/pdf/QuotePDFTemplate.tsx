@@ -7,31 +7,34 @@ import {
   Link,
   StyleSheet,
   Font,
+  Path,
+  Svg,
 } from "@react-pdf/renderer";
 import logoUrl from "@assets/blckbx-logo-white.png";
-import notoSerifRegular from "@assets/Noto_Serif/static/NotoSerif-Regular.ttf";
-import notoSerifBold from "@assets/Noto_Serif/static/NotoSerif-Bold.ttf";
-import notoSerifItalic from "@assets/Noto_Serif/static/NotoSerif-Italic.ttf";
-import notoSerifBoldItalic from "@assets/Noto_Serif/static/NotoSerif-BoldItalic.ttf";
-import {
-  PlaneIcon,
-  CalendarIcon,
-  UsersIcon,
-  HotelIcon,
-  LocationIcon,
-} from "./PDFIcons";
 
 // =============================================================================
-// FONT REGISTRATION
+// FONT REGISTRATION — Inter (matches Booking PDF)
 // =============================================================================
 
 Font.register({
-  family: "Noto Serif",
+  family: "Inter",
   fonts: [
-    { src: notoSerifRegular, fontWeight: "normal", fontStyle: "normal" },
-    { src: notoSerifBold, fontWeight: "bold", fontStyle: "normal" },
-    { src: notoSerifItalic, fontWeight: "normal", fontStyle: "italic" },
-    { src: notoSerifBoldItalic, fontWeight: "bold", fontStyle: "italic" },
+    {
+      src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hjQ.ttf",
+      fontWeight: 400,
+    },
+    {
+      src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fAZ9hjQ.ttf",
+      fontWeight: 500,
+    },
+    {
+      src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYAZ9hjQ.ttf",
+      fontWeight: 600,
+    },
+    {
+      src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYAZ9hjQ.ttf",
+      fontWeight: 700,
+    },
   ],
 });
 Font.registerHyphenationCallback((word) => [word]);
@@ -134,61 +137,62 @@ const formatPassengerType = (type: PassengerDetail["type"]): string =>
   type === "child" ? "Child" : "Adult";
 
 // =============================================================================
-// STYLES
+// STYLES — aligned with Booking PDF
 // =============================================================================
 
 const styles = StyleSheet.create({
   page: {
-    backgroundColor: "#FAF9F8",
-    fontFamily: "Noto Serif",
-    paddingTop: 40,
-    paddingBottom: 40,
+    backgroundColor: "#FAFAF8",
+    color: "#0A0A0A",
+    fontFamily: "Inter",
+    fontSize: 11,
+    paddingTop: 24,
+    paddingBottom: 24,
+    paddingRight: 28,
+    paddingLeft: 148,
   },
 
   // Sidebar
   sidebar: {
     position: "absolute",
-    left: 0,
     top: 0,
+    left: 0,
     bottom: 0,
     width: 120,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#1A1A1A",
     padding: 20,
-    color: "#FFFFFF",
+    display: "flex",
+    flexDirection: "column",
+  },
+  sidebarTop: {
+    gap: 12,
   },
   sidebarLogo: {
     width: 80,
-    height: "auto",
-    marginBottom: 40,
+    marginBottom: 12,
   },
-  sidebarTripTitle: {
+  sidebarTrip: {
+    color: "#FAFAF8",
     fontSize: 10,
-    fontWeight: "bold",
-    color: "#FFFFFF",
     lineHeight: 1.3,
-    marginBottom: 20,
   },
-  sidebarSpacer: {
-    flex: 1,
+  sidebarBottom: {
+    gap: 6,
+    alignItems: "center",
   },
-  sidebarAssistantSection: {
-    marginBottom: 40,
-  },
-  sidebarAssistantName: {
+  sidebarHeading: {
+    color: "#FAFAF8",
     fontSize: 11,
-    color: "#FFFFFF",
   },
-  sidebarPageNumber: {
-    fontSize: 9,
-    color: "rgba(255, 255, 255, 0.7)",
+  sidebarText: {
+    color: "#FAFAF8",
+    fontSize: 8,
     textAlign: "center",
   },
-
-  // Main content
-  mainContent: {
-    marginLeft: 120,
-    paddingLeft: 40,
-    paddingRight: 40,
+  sidebarPage: {
+    color: "rgba(250,250,248,0.7)",
+    fontSize: 9,
+    marginTop: 8,
   },
 
   // Cover page
@@ -199,20 +203,19 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 370,
     objectFit: "cover",
-    borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   coverQuoteRef: {
-    fontSize: 10,
-    color: "#888888",
+    fontSize: 9,
+    color: "#6B6865",
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 12,
   },
   coverTitle: {
-    fontSize: 30,
-    fontWeight: "bold",
-    color: "#1a1a1a",
+    fontSize: 20,
+    fontWeight: 600,
+    color: "#0A0A0A",
     marginBottom: 10,
     lineHeight: 1.3,
   },
@@ -224,346 +227,307 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   coverClientName: {
-    fontSize: 14,
-    color: "#666666",
+    fontSize: 11,
+    color: "#6B6865",
   },
   coverDates: {
-    fontSize: 12,
-    color: "#888888",
-  },
-
-  // Section headers
-  pageTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 4,
-  },
-  divider: {
-    borderBottom: "2 solid #E8E4DE",
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 4,
-    marginTop: 2,
-  },
-
-  // Flight card
-  flightCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    marginBottom: 8,
-    overflow: "hidden",
-  },
-  flightCardHeader: {
-    backgroundColor: "#1a1a1a",
-    padding: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  flightNumberRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  flightNumber: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  flightAirlineBadge: {
-    backgroundColor: "#E7C51C",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 50,
-  },
-  flightAirlineText: {
     fontSize: 9,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-  },
-  flightCardBody: {
-    padding: 8,
-  },
-  flightRoute: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  airportColumn: {
-    alignItems: "center",
-    width: 72,
-  },
-  airportCode: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-  },
-  airportName: {
-    fontSize: 8,
-    color: "#666666",
-    textAlign: "center",
-    marginTop: 2,
-  },
-  flightTime: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginTop: 2,
-  },
-  flightDateText: {
-    fontSize: 8,
-    color: "#888888",
-    marginTop: 2,
-    textAlign: "center",
-  },
-  nextDayIndicator: {
-    fontSize: 8,
-    color: "#888888",
-  },
-  flightPathContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  flightPathLine: {
-    height: 2,
-    backgroundColor: "#E8E4DE",
-    flex: 1,
-  },
-  flightMetaRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 6,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 10,
-    color: "#666666",
-  },
-  bookingDetailsBox: {
-    backgroundColor: "#F5F3F0",
-    padding: 6,
-    borderRadius: 6,
-    marginTop: 6,
-  },
-  bookingDetailsTitle: {
-    fontSize: 8,
-    fontWeight: "bold",
-    marginBottom: 4,
-    color: "#666666",
-    textTransform: "uppercase",
-  },
-  bookingDetailRow: {
-    fontSize: 9,
-    color: "#1a1a1a",
-    marginBottom: 2,
-  },
-
-  // Accommodation card
-  accomCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    marginBottom: 8,
-    overflow: "hidden",
-    padding: 10,
-  },
-  accomName: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 4,
-  },
-  accomDetailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 4,
-  },
-  accomDetailText: {
-    fontSize: 9,
-    color: "#666666",
-  },
-  accomMetaRow: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 4,
-  },
-  accomMetaBlock: {
-    flex: 1,
-  },
-  accomMetaLabel: {
-    fontSize: 7,
-    fontWeight: "bold",
-    color: "#888888",
-    textTransform: "uppercase",
-    marginBottom: 1,
-  },
-  accomMetaValue: {
-    fontSize: 9,
-    color: "#1a1a1a",
-  },
-
-  // Activity card
-  activityCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    marginBottom: 12,
-    padding: 14,
-  },
-  activityName: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 4,
-  },
-  activityDescription: {
-    fontSize: 11,
-    color: "#666666",
-    lineHeight: 1.4,
-    marginBottom: 4,
-  },
-  activityPrice: {
-    fontSize: 11,
-    fontWeight: "bold",
-    color: "#1a1a1a",
+    color: "#6B6865",
   },
 
   // Description block
   descriptionCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    backgroundColor: "#F5F3F0",
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
     padding: 14,
     marginBottom: 12,
   },
   descriptionText: {
     fontSize: 11,
-    color: "#666666",
-    lineHeight: 1.5,
+    color: "#6B6865",
+    lineHeight: 1.6,
   },
+
+  // Section headers
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 700,
+    marginBottom: 10,
+  },
+  divider: {
+    height: 2,
+    backgroundColor: "#E8E5E0",
+    marginBottom: 16,
+  },
+  subSectionTitle: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#0A0A0A",
+    marginBottom: 4,
+    marginTop: 2,
+  },
+
+  // Generic card (matches booking segmentCard)
+  card: {
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    marginBottom: 14,
+  },
+  cardHeader: {
+    backgroundColor: "#0A0A0A",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  cardHeaderText: {
+    color: "#FAFAF8",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  cardBody: {
+    padding: 14,
+    gap: 8,
+  },
+
+  // Flight route
+  flightRoute: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#D4D0CB",
+    marginBottom: 12,
+  },
+  airportColumn: {
+    alignItems: "center",
+    width: 100,
+  },
+  airportCode: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: "#0A0A0A",
+  },
+  airportName: {
+    fontSize: 9,
+    color: "#6B6865",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  flightTime: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#0A0A0A",
+    marginTop: 6,
+  },
+  flightDateText: {
+    fontSize: 9,
+    color: "#6B6865",
+    marginTop: 2,
+  },
+  flightPath: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  flightPathLine: {
+    width: 60,
+    height: 2,
+    backgroundColor: "#D4D0CB",
+  },
+  arrivalNextDayBadge: {
+    fontSize: 8,
+    color: "#FAFAF8",
+    backgroundColor: "#0A0A0A",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+
+  // Detail rows
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  detailLabel: {
+    color: "#6B6865",
+  },
+  detailValue: {
+    flexShrink: 1,
+    textAlign: "right",
+  },
+
+  // Travellers card
   travellersCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    marginBottom: 14,
   },
-  travellersTitle: {
+  travellersHeader: {
+    backgroundColor: "#0A0A0A",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  travellersHeaderText: {
+    color: "#FAFAF8",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  passengerRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#D4D0CB",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  // Accommodation
+  accomCard: {
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    marginBottom: 14,
+  },
+  accomBody: {
+    padding: 14,
+    gap: 8,
+  },
+  accomName: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#0A0A0A",
+    marginBottom: 4,
+  },
+
+  // Activity card
+  activityCard: {
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    marginBottom: 14,
+    padding: 14,
+  },
+  activityName: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#0A0A0A",
+    marginBottom: 4,
+  },
+  activityDescription: {
     fontSize: 11,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 6,
+    color: "#6B6865",
+    lineHeight: 1.6,
+    marginBottom: 4,
   },
-  travellerRow: {
-    fontSize: 10,
-    color: "#666666",
-    marginBottom: 3,
-    lineHeight: 1.4,
+  activityPrice: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: "#0A0A0A",
   },
 
   // Notes
   notesCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
     padding: 16,
     marginBottom: 16,
   },
   notesText: {
     fontSize: 11,
-    color: "#666666",
-    lineHeight: 1.5,
+    color: "#6B6865",
+    lineHeight: 1.6,
   },
 
   // Pricing
   pricingCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    marginBottom: 14,
   },
   pricingHeader: {
-    backgroundColor: "#1a1a1a",
-    padding: 10,
+    backgroundColor: "#0A0A0A",
+    color: "#FAFAF8",
+    padding: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   pricingHeaderLabel: {
-    fontSize: 10,
-    color: "rgba(255, 255, 255, 0.7)",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 4,
+    fontSize: 11,
+    color: "#FAFAF8",
   },
   pricingHeaderAmount: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: 700,
+    color: "#FAFAF8",
   },
   pricingBody: {
-    padding: 10,
+    padding: 14,
   },
   pricingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottom: "1 solid #F0EDE8",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#D4D0CB",
   },
   pricingRowLast: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: 12,
   },
   pricingLabel: {
-    fontSize: 10,
-    color: "#666666",
+    color: "#6B6865",
   },
   pricingValue: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#1a1a1a",
+    fontWeight: 700,
   },
   pricingDeadline: {
     fontSize: 9,
-    color: "#888888",
+    color: "#B8B3AD",
     marginTop: 2,
   },
   pricingDisclaimer: {
     fontSize: 8,
-    color: "#888888",
-    fontStyle: "italic",
+    color: "#B8B3AD",
+
     marginTop: 12,
     lineHeight: 1.4,
   },
 
-  // Payment / Contact section
+  // Contact / Payment
   contactCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    padding: 14,
+    marginBottom: 14,
     alignItems: "center",
   },
   contactHeading: {
     fontSize: 13,
-    fontWeight: "bold",
-    color: "#1a1a1a",
+    fontWeight: 700,
+    color: "#0A0A0A",
     marginBottom: 4,
     textAlign: "center",
   },
   contactSubtext: {
     fontSize: 10,
-    color: "#666666",
+    color: "#6B6865",
     textAlign: "center",
-    marginBottom: 0,
     lineHeight: 1.3,
   },
   tcSection: {
@@ -571,20 +535,22 @@ const styles = StyleSheet.create({
   },
   tcHeading: {
     fontSize: 12,
-    fontWeight: "bold",
-    color: "#1a1a1a",
+    fontWeight: 700,
+    color: "#0A0A0A",
     marginBottom: 4,
   },
   tcText: {
     fontSize: 9,
-    color: "#666666",
+    color: "#6B6865",
     lineHeight: 1.4,
   },
   tcLink: {
     fontSize: 9,
-    color: "#2563EB",
+    color: "#0A0A0A",
     textDecoration: "underline",
   },
+
+  // Photos
   photoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -598,32 +564,36 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 180,
     objectFit: "cover",
-    borderRadius: 8,
   },
 });
 
 // =============================================================================
-// SIDEBAR COMPONENT
+// SIDEBAR COMPONENT — matches Booking PDF
 // =============================================================================
 
 const Sidebar = ({ tripTitle }: { tripTitle?: string }) => (
   <View style={styles.sidebar} fixed>
-    <Image src={logoUrl} style={styles.sidebarLogo} />
-    {tripTitle && <Text style={styles.sidebarTripTitle}>{tripTitle}</Text>}
-    <View style={styles.sidebarSpacer} />
-    <View style={styles.sidebarAssistantSection}>
-      <Text style={styles.sidebarAssistantName}>Blckbx Travel</Text>
+    <View style={styles.sidebarTop}>
+      <Image src={logoUrl} style={styles.sidebarLogo} />
+      <Text style={styles.sidebarTrip}>{tripTitle || "Quote"}</Text>
     </View>
-    <Text
-      style={styles.sidebarPageNumber}
-      render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-      fixed
-    />
+    <View style={{ flex: 1 }} />
+    <View style={styles.sidebarBottom}>
+      <Text style={styles.sidebarHeading}>Blckbx Travel</Text>
+      <Link style={styles.sidebarText} src="mailto:travel@blckbx.co.uk">
+        travel@blckbx.co.uk
+      </Link>
+      <Text style={styles.sidebarText}>0700000</Text>
+      <Text
+        style={styles.sidebarPage}
+        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+      />
+    </View>
   </View>
 );
 
 // =============================================================================
-// FLIGHT CARD COMPONENT
+// FLIGHT CARD COMPONENT — matches Booking PDF flight style
 // =============================================================================
 
 const FlightCard = ({
@@ -633,88 +603,94 @@ const FlightCard = ({
   flight: QuoteData["outboundTravel"];
   travellers: QuoteData["travellers"];
 }) => {
-  const fromCode = (flight.departureAirportCode || "").trim() || extractAirportCode(flight.departureAirport);
-  const toCode = (flight.arrivalAirportCode || "").trim() || extractAirportCode(flight.arrivalAirport);
+  const fromCode =
+    (flight.departureAirportCode || "").trim() ||
+    extractAirportCode(flight.departureAirport);
+  const toCode =
+    (flight.arrivalAirportCode || "").trim() ||
+    extractAirportCode(flight.arrivalAirport);
   const fromName = getLocationName(flight.departureAirport);
   const toName = getLocationName(flight.arrivalAirport);
   const departureDate = flight.departureDate || "";
   const arrivalDate = flight.arrivalDate || departureDate;
   const arrivesNextDay = Boolean(
-    departureDate &&
-      flight.arrivalDate &&
-      arrivalDate &&
-      departureDate !== arrivalDate
+    departureDate && flight.arrivalDate && arrivalDate && departureDate !== arrivalDate
   );
 
   return (
-    <View style={styles.flightCard} wrap={false}>
-      <View style={styles.flightCardHeader}>
-        <View style={styles.flightNumberRow}>
-          <PlaneIcon size={14} color="#FFFFFF" />
-          <Text style={styles.flightNumber}>{flight.flightNumber || "Flight"}</Text>
-        </View>
-        {flight.airline && (
-          <View style={styles.flightAirlineBadge}>
-            <Text style={styles.flightAirlineText}>{flight.airline}</Text>
-          </View>
-        )}
+    <View style={styles.card} wrap={false}>
+      <View style={styles.cardHeader}>
+        <Svg width={14} height={14} viewBox="0 0 24 24">
+          <Path
+            d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+            fill="#FAFAF8"
+          />
+        </Svg>
+        <Text style={styles.cardHeaderText}>
+          {flight.flightNumber || "Flight"}
+          {flight.airline ? ` · ${flight.airline}` : ""}
+        </Text>
       </View>
+      <View style={styles.cardBody}>
+        <View style={styles.flightRoute}>
+          <View style={styles.airportColumn}>
+            <Text style={styles.airportCode}>{fromCode}</Text>
+            <Text style={styles.airportName}>{fromName}</Text>
+            <Text style={styles.flightTime}>{flight.departureTime || "--:--"}</Text>
+            {departureDate ? (
+              <Text style={styles.flightDateText}>{departureDate}</Text>
+            ) : null}
+          </View>
 
-      <View style={styles.flightCardBody}>
-          <View style={styles.flightRoute}>
-            <View style={styles.airportColumn}>
-              <Text style={styles.airportCode}>{fromCode}</Text>
-              <Text style={styles.airportName}>{fromName}</Text>
-              <Text style={styles.flightTime}>{flight.departureTime || "--:--"}</Text>
-              {departureDate ? (
-                <Text style={styles.flightDateText}>{departureDate}</Text>
-              ) : null}
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <View style={styles.flightPath}>
+              <View style={styles.flightPathLine} />
+              <Svg width={14} height={14} viewBox="0 0 24 24" style={{ marginHorizontal: 4 }}>
+                <Path
+                  d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+                  fill="#6B6865"
+                />
+              </Svg>
+              <View style={styles.flightPathLine} />
             </View>
-
-          <View style={styles.flightPathContainer}>
-            <View style={styles.flightPathLine} />
-            <PlaneIcon size={10} color="#1a1a1a" />
-            <View style={styles.flightPathLine} />
+            {arrivesNextDay ? (
+              <Text style={styles.arrivalNextDayBadge}>+1 day</Text>
+            ) : null}
           </View>
 
           <View style={styles.airportColumn}>
             <Text style={styles.airportCode}>{toCode}</Text>
             <Text style={styles.airportName}>{toName}</Text>
-            <Text style={styles.flightTime}>
-              {flight.arrivalTime || "--:--"}
-              {arrivesNextDay ? (
-                <Text style={styles.nextDayIndicator}> +1</Text>
-              ) : null}
-            </Text>
+            <Text style={styles.flightTime}>{flight.arrivalTime || "--:--"}</Text>
             {arrivalDate ? (
               <Text style={styles.flightDateText}>{arrivalDate}</Text>
             ) : null}
           </View>
         </View>
 
-        <View style={styles.flightMetaRow}>
-          <View style={styles.metaItem}>
-            <UsersIcon size={11} color="#666666" />
-            <Text style={styles.metaText}>{travellers.total} passengers</Text>
-          </View>
-        </View>
-
-        <View style={styles.bookingDetailsBox}>
-          <Text style={styles.bookingDetailsTitle}>Flight Details</Text>
-          {flight.class && (
-            <Text style={styles.bookingDetailRow}>Class: {flight.class}</Text>
-          )}
-          {flight.baggage && (
-            <Text style={styles.bookingDetailRow}>Baggage: {flight.baggage}</Text>
-          )}
-        </View>
+        <Text>
+          <Text style={styles.detailLabel}>Passengers: </Text>
+          <Text style={styles.detailValue}>{travellers.total}</Text>
+        </Text>
+        {flight.class ? (
+          <Text>
+            <Text style={styles.detailLabel}>Class: </Text>
+            <Text style={styles.detailValue}>{flight.class}</Text>
+          </Text>
+        ) : null}
+        {flight.baggage ? (
+          <Text>
+            <Text style={styles.detailLabel}>Baggage: </Text>
+            <Text style={styles.detailValue}>{flight.baggage}</Text>
+          </Text>
+        ) : null}
       </View>
     </View>
   );
 };
 
 // =============================================================================
-// ACCOMMODATION CARD COMPONENT
+// ACCOMMODATION CARD COMPONENT — matches Booking PDF style
 // =============================================================================
 
 const AccommodationCard = ({
@@ -723,37 +699,37 @@ const AccommodationCard = ({
   accommodation: QuoteData["accommodation"];
 }) => (
   <View style={styles.accomCard} wrap={false}>
-    <Text style={styles.accomName}>{accommodation.name}</Text>
-
-    <View style={styles.accomDetailRow}>
-      <CalendarIcon size={11} color="#666666" />
-      <Text style={styles.accomDetailText}>
-        {accommodation.checkIn} — {accommodation.checkOut} ({accommodation.nights} nights)
-      </Text>
-    </View>
-
-    <View style={styles.accomDetailRow}>
-      <UsersIcon size={11} color="#666666" />
-      <Text style={styles.accomDetailText}>{accommodation.guests} guests</Text>
-    </View>
-
-    {(accommodation.roomType || accommodation.boardBasis) ? (
-      <View style={styles.accomMetaRow}>
-        {accommodation.roomType ? (
-          <View style={styles.accomMetaBlock}>
-            <Text style={styles.accomMetaLabel}>Room Type</Text>
-            <Text style={styles.accomMetaValue}>{accommodation.roomType}</Text>
-          </View>
-        ) : null}
-
-        {accommodation.boardBasis ? (
-          <View style={styles.accomMetaBlock}>
-            <Text style={styles.accomMetaLabel}>Board Basis</Text>
-            <Text style={styles.accomMetaValue}>{accommodation.boardBasis}</Text>
-          </View>
-        ) : null}
+    <View style={styles.accomBody}>
+      <Text style={styles.accomName}>{accommodation.name}</Text>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Check-in</Text>
+        <Text style={styles.detailValue}>{accommodation.checkIn}</Text>
       </View>
-    ) : null}
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Check-out</Text>
+        <Text style={styles.detailValue}>{accommodation.checkOut}</Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Duration</Text>
+        <Text style={styles.detailValue}>{accommodation.nights} nights</Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Guests</Text>
+        <Text style={styles.detailValue}>{String(accommodation.guests)}</Text>
+      </View>
+      {accommodation.roomType ? (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Room Type</Text>
+          <Text style={styles.detailValue}>{accommodation.roomType}</Text>
+        </View>
+      ) : null}
+      {accommodation.boardBasis ? (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Board Basis</Text>
+          <Text style={styles.detailValue}>{accommodation.boardBasis}</Text>
+        </View>
+      ) : null}
+    </View>
   </View>
 );
 
@@ -809,26 +785,24 @@ export function QuotePDFTemplate({
       {/* ================================================================== */}
       <Page size="A4" style={styles.page}>
         <Sidebar tripTitle={project.name} />
-        <View style={styles.mainContent}>
-          <View style={styles.coverWrap}>
-            <Text style={styles.coverQuoteRef}>Quote {project.quoteReference}</Text>
-            {hasCoverPhoto ? (
-              <View wrap={false}>
-                <Image src={coverPhotoUrl!} style={styles.coverImage} />
-              </View>
-            ) : null}
-            <Text style={styles.coverTitle}>{project.name}</Text>
-            <View style={styles.coverMetaRow}>
-              {clientName ? <Text style={styles.coverClientName}>{clientName}</Text> : <View />}
-              {destination.dates ? <Text style={styles.coverDates}>{destination.dates}</Text> : null}
+        <View style={styles.coverWrap}>
+          <Text style={styles.coverQuoteRef}>Quote {project.quoteReference}</Text>
+          {hasCoverPhoto ? (
+            <View wrap={false}>
+              <Image src={coverPhotoUrl!} style={styles.coverImage} />
             </View>
-
-            {hasDescription ? (
-              <View style={styles.descriptionCard}>
-                <Text style={styles.descriptionText}>{description}</Text>
-              </View>
-            ) : null}
+          ) : null}
+          <Text style={styles.coverTitle}>{project.name}</Text>
+          <View style={styles.coverMetaRow}>
+            {clientName ? <Text style={styles.coverClientName}>{clientName}</Text> : <View />}
+            {destination.dates ? <Text style={styles.coverDates}>{destination.dates}</Text> : null}
           </View>
+
+          {hasDescription ? (
+            <View style={styles.descriptionCard}>
+              <Text style={styles.descriptionText}>{description}</Text>
+            </View>
+          ) : null}
         </View>
       </Page>
 
@@ -837,30 +811,46 @@ export function QuotePDFTemplate({
       {/* ================================================================== */}
       <Page size="A4" style={styles.page}>
         <Sidebar tripTitle={project.name} />
-        <View style={styles.mainContent}>
-          <Text style={styles.pageTitle}>Trip Details</Text>
-          <View style={styles.divider} />
+        <Text style={styles.sectionTitle}>Trip Details</Text>
+        <View style={styles.divider} />
 
-          <View>
-            {hasPassengers && (
-              <View style={styles.travellersCard}>
-                <Text style={styles.travellersTitle}>Travellers</Text>
-                {validPassengers.map((passenger, index) => (
-                  <Text key={`traveller-${index}`} style={styles.travellerRow}>
-                    • {passenger.name} ({formatPassengerType(passenger.type)}
-                    {passenger.dateOfBirth ? `, DOB: ${passenger.dateOfBirth}` : ""})
-                  </Text>
-                ))}
+        <View>
+          {hasPassengers && (
+            <View style={styles.travellersCard} wrap={false}>
+              <View style={styles.travellersHeader}>
+                <Text style={styles.travellersHeaderText}>Travellers</Text>
               </View>
-            )}
+              {validPassengers.map((passenger, index) => (
+                <View
+                  key={`traveller-${index}`}
+                  style={
+                    index === validPassengers.length - 1
+                      ? { ...styles.passengerRow, borderBottomWidth: 0 }
+                      : styles.passengerRow
+                  }
+                >
+                  <Text>
+                    {passenger.name}
+                    {passenger.dateOfBirth ? ` (DOB: ${passenger.dateOfBirth})` : ""}
+                  </Text>
+                  <Text style={styles.detailLabel}>{formatPassengerType(passenger.type)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-            <Text style={styles.sectionTitle}>Outbound Flight</Text>
+          <View wrap={false}>
+            <Text style={styles.subSectionTitle}>Outbound Flight</Text>
             <FlightCard flight={outboundTravel} travellers={travellers} />
+          </View>
 
-            <Text style={styles.sectionTitle}>Accommodation</Text>
+          <View wrap={false}>
+            <Text style={styles.subSectionTitle}>Accommodation</Text>
             <AccommodationCard accommodation={accommodation} />
+          </View>
 
-            <Text style={styles.sectionTitle}>Return Flight</Text>
+          <View wrap={false}>
+            <Text style={styles.subSectionTitle}>Return Flight</Text>
             <FlightCard flight={returnTravel} travellers={travellers} />
           </View>
         </View>
@@ -872,22 +862,18 @@ export function QuotePDFTemplate({
       {hasActivities && (
         <Page size="A4" style={styles.page} wrap>
           <Sidebar tripTitle={project.name} />
-          <View style={styles.mainContent}>
-            <Text style={styles.pageTitle}>Activities</Text>
-            <View style={styles.divider} />
+          <Text style={styles.sectionTitle}>Activities</Text>
+          <View style={styles.divider} />
 
-            {filteredActivities.map((activity, index) => (
-              <View key={`activity-${index}`} style={styles.activityCard} wrap={false}>
-                <Text style={styles.activityName}>{activity.name}</Text>
-                {activity.description && (
-                  <Text style={styles.activityDescription}>{activity.description}</Text>
-                )}
-                {activity.price && (
-                  <Text style={styles.activityPrice}>{activity.price}</Text>
-                )}
-              </View>
-            ))}
-          </View>
+          {filteredActivities.map((activity, index) => (
+            <View key={`activity-${index}`} style={styles.activityCard} wrap={false}>
+              <Text style={styles.activityName}>{activity.name}</Text>
+              {activity.description && (
+                <Text style={styles.activityDescription}>{activity.description}</Text>
+              )}
+              {activity.price && <Text style={styles.activityPrice}>{activity.price}</Text>}
+            </View>
+          ))}
         </Page>
       )}
 
@@ -897,29 +883,28 @@ export function QuotePDFTemplate({
       {hasNotes && (
         <Page size="A4" style={styles.page}>
           <Sidebar tripTitle={project.name} />
-          <View style={styles.mainContent}>
-            <Text style={styles.pageTitle}>Additional Notes</Text>
-            <View style={styles.divider} />
-            <View style={styles.notesCard}>
-              <Text style={styles.notesText}>{notes}</Text>
-            </View>
+          <Text style={styles.sectionTitle}>Additional Notes</Text>
+          <View style={styles.divider} />
+          <View style={styles.notesCard}>
+            <Text style={styles.notesText}>{notes}</Text>
           </View>
         </Page>
       )}
 
+      {/* ================================================================== */}
+      {/* PHOTOS PAGE (conditional)                                          */}
+      {/* ================================================================== */}
       {tripPhotos && tripPhotos.filter(Boolean).length > 0 && resolvedTripPhotos.length > 0 && (
         <Page size="A4" style={styles.page}>
           <Sidebar tripTitle={project.name} />
-          <View style={styles.mainContent}>
-            <Text style={styles.pageTitle}>Photos</Text>
-            <View style={styles.divider} />
-            <View style={styles.photoGrid}>
-              {resolvedTripPhotos.map((photoUrl, index) => (
-                <View key={`photo-${index}`} style={styles.photoContainer} wrap={false}>
-                  <Image src={photoUrl} style={styles.photoImage} />
-                </View>
-              ))}
-            </View>
+          <Text style={styles.sectionTitle}>Photos</Text>
+          <View style={styles.divider} />
+          <View style={styles.photoGrid}>
+            {resolvedTripPhotos.map((photoUrl, index) => (
+              <View key={`photo-${index}`} style={styles.photoContainer} wrap={false}>
+                <Image src={photoUrl} style={styles.photoImage} />
+              </View>
+            ))}
           </View>
         </Page>
       )}
@@ -929,65 +914,60 @@ export function QuotePDFTemplate({
       {/* ================================================================== */}
       <Page size="A4" style={styles.page}>
         <Sidebar tripTitle={project.name} />
-        <View style={styles.mainContent}>
-          <Text style={styles.pageTitle}>Pricing</Text>
-          <View style={styles.divider} />
+        <Text style={styles.sectionTitle}>Pricing</Text>
+        <View style={styles.divider} />
 
-          <View style={styles.pricingCard} wrap={false}>
-            <View style={styles.pricingHeader}>
-              <Text style={styles.pricingHeaderLabel}>Total Cost</Text>
-              <Text style={styles.pricingHeaderAmount}>{pricing.totalCost}</Text>
-            </View>
-
-            <View style={styles.pricingBody}>
-              <View style={styles.pricingRow}>
-                <View>
-                  <Text style={styles.pricingLabel}>Deposit</Text>
-                  {pricing.depositDeadline && (
-                    <Text style={styles.pricingDeadline}>
-                      Due by {pricing.depositDeadline}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.pricingValue}>{pricing.deposit}</Text>
-              </View>
-
-              <View style={styles.pricingRowLast}>
-                <View>
-                  <Text style={styles.pricingLabel}>Balance</Text>
-                  {pricing.balanceDeadline && (
-                    <Text style={styles.pricingDeadline}>
-                      Due by {pricing.balanceDeadline}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.pricingValue}>{pricing.balance}</Text>
-              </View>
-
-              <Text style={styles.pricingDisclaimer}>
-                Prices are subject to availability and may change until booking is confirmed. Contact your travel assistant to secure this rate.
-              </Text>
-            </View>
+        <View style={styles.pricingCard} wrap={false}>
+          <View style={styles.pricingHeader}>
+            <Text style={styles.pricingHeaderLabel}>TOTAL COST</Text>
+            <Text style={styles.pricingHeaderAmount}>{pricing.totalCost}</Text>
           </View>
 
-          {/* Payment / Contact Section */}
-          <Text style={styles.sectionTitle}>Making Payment</Text>
+          <View style={styles.pricingBody}>
+            <View style={styles.pricingRow}>
+              <View>
+                <Text style={styles.pricingLabel}>Deposit</Text>
+                {pricing.depositDeadline && (
+                  <Text style={styles.pricingDeadline}>Due by {pricing.depositDeadline}</Text>
+                )}
+              </View>
+              <Text style={styles.pricingValue}>{pricing.deposit}</Text>
+            </View>
 
-          <View style={styles.contactCard} wrap={false}>
-            <Text style={styles.contactHeading}>Ready to book?</Text>
-            <Text style={styles.contactSubtext}>• Let your assistant know in the app</Text>
-          </View>
+            <View style={styles.pricingRowLast}>
+              <View>
+                <Text style={styles.pricingLabel}>Balance</Text>
+                {pricing.balanceDeadline && (
+                  <Text style={styles.pricingDeadline}>Due by {pricing.balanceDeadline}</Text>
+                )}
+              </View>
+              <Text style={styles.pricingValue}>{pricing.balance}</Text>
+            </View>
 
-          <View style={styles.tcSection}>
-            <Text style={styles.tcHeading}>Terms &amp; Conditions</Text>
-            <Text style={styles.tcText}>
-              By proceeding with this booking, you agree to our{" "}
-              <Link src="https://tools.blckbx.co.uk/blckbx-travel-terms-and-conditions.pdf">
-                <Text style={styles.tcLink}>terms and conditions</Text>
-              </Link>
-              .
+            <Text style={styles.pricingDisclaimer}>
+              Prices are subject to availability and may change until booking is confirmed. Contact
+              your travel assistant to secure this rate.
             </Text>
           </View>
+        </View>
+
+        {/* Payment / Contact Section */}
+        <Text style={styles.subSectionTitle}>Making Payment</Text>
+
+        <View style={styles.contactCard} wrap={false}>
+          <Text style={styles.contactHeading}>Ready to book?</Text>
+          <Text style={styles.contactSubtext}>• Let your assistant know in the app</Text>
+        </View>
+
+        <View style={styles.tcSection}>
+          <Text style={styles.tcHeading}>Terms &amp; Conditions</Text>
+          <Text style={styles.tcText}>
+            By proceeding with this booking, you agree to our{" "}
+            <Link src="https://tools.blckbx.co.uk/blckbx-travel-terms-and-conditions.pdf">
+              <Text style={styles.tcLink}>terms and conditions</Text>
+            </Link>
+            .
+          </Text>
         </View>
       </Page>
     </Document>
