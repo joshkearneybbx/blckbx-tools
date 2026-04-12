@@ -6,18 +6,22 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  FileInput,
   FileText,
   Hotel,
+  Loader2,
   Plane,
   Plus,
   Save,
   Send,
+  X,
   Trash2
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { fetchBookings, saveBooking, deleteBooking } from "@/lib/bookings-api";
 import {
+  createBookingFromQuote,
   createEmptyBooking,
   emptyAccommodationSegment,
   emptyFlightLeg,
@@ -25,6 +29,7 @@ import {
   emptyPassenger,
   emptyTransferSegment,
   formatLongDate,
+  parseStoredQuoteData,
   segmentLabel
 } from "@/lib/bookings";
 import type {
@@ -39,8 +44,22 @@ import type {
 } from "@/lib/types";
 import { BookingPDFTemplate } from "@/components/pdf/booking-pdf-template";
 import { useToast } from "@/hooks/use-toast";
+import { pb } from "@/lib/pocketbase";
 
 type ActionState = "idle" | "saving" | "sending";
+
+type QuoteImportRecord = {
+  id: string;
+  tripName?: string;
+  quoteReference?: string;
+  clientName?: string;
+  destination?: string;
+  dates?: string;
+  status?: "draft" | "sent";
+  coverPhoto?: string;
+  created: string;
+  quoteData?: unknown;
+};
 
 const buttonToneClasses = {
   primary:
@@ -214,6 +233,290 @@ function updateSegmentList(
   };
 }
 
+function formatShortDate(value: string) {
+  if (!value) return "-";
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function getQuotePreviewItems(quote: QuoteImportRecord) {
+  const quoteData = parseStoredQuoteData(quote.quoteData);
+  const project = quoteData.project && typeof quoteData.project === "object"
+    ? (quoteData.project as Record<string, unknown>)
+    : {};
+  const outboundTravel = quoteData.outboundTravel && typeof quoteData.outboundTravel === "object"
+    ? (quoteData.outboundTravel as Record<string, unknown>)
+    : {};
+  const returnTravel = quoteData.returnTravel && typeof quoteData.returnTravel === "object"
+    ? (quoteData.returnTravel as Record<string, unknown>)
+    : {};
+  const accommodation = quoteData.accommodation && typeof quoteData.accommodation === "object"
+    ? (quoteData.accommodation as Record<string, unknown>)
+    : {};
+  const pricing = quoteData.pricing && typeof quoteData.pricing === "object"
+    ? (quoteData.pricing as Record<string, unknown>)
+    : {};
+  const passengers = Array.isArray(quoteData.passengers) ? quoteData.passengers : [];
+
+  return [
+    {
+      label: "Client name",
+      value: quote.clientName || "Will be split into first and last name"
+    },
+    {
+      label: "Trip name",
+      value: String(project.name ?? quote.tripName ?? "—")
+    },
+    {
+      label: "Quote reference",
+      value: String(project.quoteReference ?? quote.quoteReference ?? "—")
+    },
+    {
+      label: "Outbound flight",
+      value:
+        [outboundTravel.flightNumber, outboundTravel.departureAirport, outboundTravel.arrivalAirport]
+          .map((item) => String(item ?? "").trim())
+          .filter(Boolean)
+          .join(" • ") || "No outbound flight found"
+    },
+    {
+      label: "Return flight",
+      value:
+        [returnTravel.flightNumber, returnTravel.departureAirport, returnTravel.arrivalAirport]
+          .map((item) => String(item ?? "").trim())
+          .filter(Boolean)
+          .join(" • ") || "No return flight found"
+    },
+    {
+      label: "Accommodation",
+      value:
+        [accommodation.name, accommodation.roomType, accommodation.boardBasis]
+          .map((item) => String(item ?? "").trim())
+          .filter(Boolean)
+          .join(" • ") || "No accommodation found"
+    },
+    {
+      label: "Passengers",
+      value: passengers.length ? `${passengers.length} passenger${passengers.length === 1 ? "" : "s"}` : "Will fall back to traveller count"
+    },
+    {
+      label: "Pricing",
+      value:
+        [pricing.totalCost, pricing.deposit, pricing.balanceDeadline]
+          .map((item) => String(item ?? "").trim())
+          .filter(Boolean)
+          .join(" • ") || "No pricing found"
+    }
+  ];
+}
+
+function ImportFromQuoteModal({
+  open,
+  disabled,
+  onClose,
+  onImport
+}: {
+  open: boolean;
+  disabled: boolean;
+  onClose: () => void;
+  onImport: (quote: QuoteImportRecord) => Promise<void> | void;
+}) {
+  const { toast } = useToast();
+  const [quotes, setQuotes] = useState<QuoteImportRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteImportRecord | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedQuote(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+
+    void pb
+      .collection("blckbx_quotes")
+      .getList(1, 50, {
+        sort: "-created",
+        requestKey: null
+      })
+      .then((result) => {
+        if (!cancelled) {
+          setQuotes(result.items as unknown as QuoteImportRecord[]);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        toast({
+          title: "Failed to load quotes",
+          description: error instanceof Error ? error.message : "Please try again.",
+          variant: "destructive"
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, toast]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-8">
+      <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden border border-[hsl(var(--sand-300))] bg-[#FAFAF8] shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[hsl(var(--sand-300))] px-6 py-5">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold text-[hsl(var(--base-black))]">Import from Quote</h2>
+            <p className="text-sm text-[hsl(var(--sand-900))]">
+              Select a saved quote and overwrite this booking with its structured data.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center border border-[hsl(var(--sand-300))] bg-white text-[hsl(var(--base-black))] transition hover:border-[hsl(var(--base-black))]"
+            aria-label="Close import modal"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-h-0 overflow-y-auto border-b border-[hsl(var(--sand-300))] p-6 lg:border-b-0 lg:border-r">
+            {isLoading ? (
+              <div className="flex min-h-[280px] items-center justify-center gap-3 text-sm text-[hsl(var(--sand-900))]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading quotes...
+              </div>
+            ) : quotes.length === 0 ? (
+              <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 border border-dashed border-[hsl(var(--sand-300))] bg-white px-6 py-8 text-center">
+                <FileText className="h-5 w-5 text-[hsl(var(--sand-900))]" />
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-[hsl(var(--base-black))]">No saved quotes found</div>
+                  <div className="text-sm text-[hsl(var(--sand-900))]">
+                    Save a quote first, then import it into a booking.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {quotes.map((quote) => (
+                  <button
+                    key={quote.id}
+                    type="button"
+                    onClick={() => setSelectedQuote(quote)}
+                    className={`w-full border px-4 py-4 text-left transition ${
+                      selectedQuote?.id === quote.id
+                        ? "border-[hsl(var(--base-black))] bg-[hsl(var(--sand-100))]"
+                        : "border-[hsl(var(--sand-300))] bg-white hover:border-[hsl(var(--base-black))]"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-[hsl(var(--base-black))]">
+                          {quote.tripName || "Untitled quote"}
+                        </div>
+                        <div className="mt-1 text-sm text-[hsl(var(--sand-900))]">
+                          {quote.clientName || "Client tbc"}
+                        </div>
+                      </div>
+                      <span
+                        className={`border px-2 py-1 text-[11px] uppercase tracking-[0.08em] ${
+                          quote.status === "sent"
+                            ? "border-[hsl(var(--success))] bg-[hsl(var(--success-light))] text-[hsl(var(--success))]"
+                            : "border-[hsl(var(--sand-300))] bg-[hsl(var(--sand-100))] text-[hsl(var(--sand-900))]"
+                        }`}
+                      >
+                        {quote.status === "sent" ? "Sent" : "Draft"}
+                      </span>
+                    </div>
+                    <div className="mt-3 space-y-1 text-sm text-[hsl(var(--sand-900))]">
+                      <div>
+                        {[quote.destination, quote.dates].filter(Boolean).join(" • ") || "Destination and dates unavailable"}
+                      </div>
+                      <div className="text-xs uppercase tracking-[0.08em] text-[hsl(var(--sand-400))]">
+                        {quote.quoteReference || "Ref tbc"} · Created {formatShortDate(quote.created)}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="min-h-0 overflow-y-auto bg-white p-6">
+            {selectedQuote ? (
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[hsl(var(--sand-400))]">
+                    Import Preview
+                  </div>
+                  <div className="text-lg font-semibold text-[hsl(var(--base-black))]">
+                    {selectedQuote.tripName || "Untitled quote"}
+                  </div>
+                  <div className="text-sm text-[hsl(var(--sand-900))]">
+                    Existing booking data will be overwritten. Fields not present in the quote will be left empty.
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {getQuotePreviewItems(selectedQuote).map((item) => (
+                    <div key={item.label} className="border border-[hsl(var(--sand-300))] bg-[#FAFAF8] px-4 py-3">
+                      <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[hsl(var(--sand-400))]">
+                        {item.label}
+                      </div>
+                      <div className="mt-1 text-sm text-[hsl(var(--base-black))]">{item.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <BookingsButton label="Cancel" tone="secondary" onClick={onClose} disabled={isImporting} />
+                  <BookingsButton
+                    label={isImporting ? "Importing..." : "Import"}
+                    icon={FileInput}
+                    onClick={async () => {
+                      setIsImporting(true);
+                      try {
+                        await onImport(selectedQuote);
+                      } finally {
+                        setIsImporting(false);
+                      }
+                    }}
+                    disabled={disabled || isImporting}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-[280px] items-center justify-center border border-dashed border-[hsl(var(--sand-300))] bg-[#FAFAF8] px-6 py-8 text-center text-sm text-[hsl(var(--sand-900))]">
+                Select a quote to preview the fields that will be imported.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BookingsTool() {
   const { toast } = useToast();
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
@@ -221,6 +524,7 @@ export function BookingsTool() {
   const [actionState, setActionState] = useState<ActionState>("idle");
   const [message, setMessage] = useState<string>("");
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   useEffect(() => {
     void fetchBookings().then((records) => {
@@ -315,8 +619,29 @@ export function BookingsTool() {
     }
   }
 
+  async function importFromQuote(quote: QuoteImportRecord) {
+    if (!activeBooking) {
+      return;
+    }
+
+    const coverImageUrl = quote.coverPhoto ? pb.files.getUrl(quote as never, quote.coverPhoto) : "";
+    const importedBooking = createBookingFromQuote(quote, {
+      currentBooking: activeBooking,
+      coverImageUrl
+    });
+
+    setActiveBooking(importedBooking);
+    setIsImportModalOpen(false);
+    setMessage("Quote data imported.");
+    toast({
+      title: "Quote imported",
+      description: "Booking fields have been populated from the selected quote."
+    });
+  }
+
   return (
-    <div className="bookings-tool grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+    <>
+      <div className="bookings-tool grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="border border-[hsl(var(--sand-300))] bg-[#FAFAF8] p-5">
         <div className="space-y-4">
           <div className="space-y-1">
@@ -409,6 +734,13 @@ export function BookingsTool() {
               </div>
               <div className="flex flex-wrap items-center gap-2 xl:justify-end">
                 <BookingsButton
+                  label="Import from Quote"
+                  icon={FileInput}
+                  tone="secondary"
+                  onClick={() => setIsImportModalOpen(true)}
+                  disabled={actionState !== "idle" || isDownloadingPdf}
+                />
+                <BookingsButton
                   label={actionState === "saving" ? "Saving..." : "Save Draft"}
                   icon={Save}
                   tone="secondary"
@@ -437,6 +769,7 @@ export function BookingsTool() {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Trip Name">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   value={activeBooking.tripName}
                   onChange={(event) =>
                     patchBooking((booking) => ({ ...booking, tripName: event.target.value }))
@@ -445,6 +778,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Booking Ref">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   value={activeBooking.bookingRef}
                   onChange={(event) =>
                     patchBooking((booking) => ({ ...booking, bookingRef: event.target.value }))
@@ -453,6 +787,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Issue Date">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   type="date"
                   value={activeBooking.issueDate}
                   onChange={(event) =>
@@ -462,6 +797,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Departure Date">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   type="date"
                   value={activeBooking.departureDate}
                   onChange={(event) =>
@@ -471,6 +807,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Client First Name">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   value={activeBooking.clientFirstName}
                   onChange={(event) =>
                     patchBooking((booking) => ({ ...booking, clientFirstName: event.target.value }))
@@ -479,6 +816,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Client Last Name">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   value={activeBooking.clientLastName}
                   onChange={(event) =>
                     patchBooking((booking) => ({ ...booking, clientLastName: event.target.value }))
@@ -519,6 +857,7 @@ export function BookingsTool() {
                     }}
                   />
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     placeholder="Or paste an image URL"
                     value={activeBooking.coverImage.startsWith("data:") ? "" : activeBooking.coverImage}
                     onChange={(event) =>
@@ -529,7 +868,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Welcome Message" className="md:col-span-2">
                 <textarea
-                  className="min-h-[100px]"
+                  className="min-h-[100px] w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   value={activeBooking.welcomeMessage}
                   onChange={(event) =>
                     patchBooking((booking) => ({ ...booking, welcomeMessage: event.target.value }))
@@ -543,6 +882,7 @@ export function BookingsTool() {
             <div className="grid gap-4 md:grid-cols-3">
               <Field label="Total Cost">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   value={activeBooking.bookingData.pricing.totalCost}
                   onChange={(event) =>
                     patchBooking((booking) => ({
@@ -560,6 +900,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Deposit Paid">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   value={activeBooking.bookingData.pricing.depositPaid}
                   onChange={(event) =>
                     patchBooking((booking) => ({
@@ -577,6 +918,7 @@ export function BookingsTool() {
               </Field>
               <Field label="Balance Due Date">
                 <input
+                  className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                   type="date"
                   value={activeBooking.bookingData.pricing.balanceDueDate}
                   onChange={(event) =>
@@ -603,6 +945,7 @@ export function BookingsTool() {
                   <div className="flex flex-wrap items-end gap-3">
                     <Field label={`Passenger ${index + 1}`} className="min-w-[220px] flex-1">
                       <input
+                        className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                         value={passenger.name}
                         onChange={(event) =>
                           patchBooking((booking) => ({
@@ -619,6 +962,7 @@ export function BookingsTool() {
                     </Field>
                     <Field label="Type" className="w-[150px]">
                       <select
+                        className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                         value={passenger.type}
                         onChange={(event) =>
                           patchBooking((booking) => ({
@@ -648,6 +992,7 @@ export function BookingsTool() {
                     {passenger.type === "child" ? (
                       <Field label="Age" className="w-[100px]">
                         <input
+                          className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                           type="number"
                           value={passenger.age ?? ""}
                           onChange={(event) =>
@@ -847,7 +1192,7 @@ export function BookingsTool() {
           <SectionCard title="Additional Information">
             <Field label="Free text">
               <textarea
-                className="min-h-[100px]"
+                className="min-h-[100px] w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                 value={activeBooking.bookingData.additionalInfo}
                 onChange={(event) =>
                   patchBooking((booking) => ({
@@ -867,7 +1212,14 @@ export function BookingsTool() {
           Select a booking or create a new one to start building the PDF.
         </div>
       )}
-    </div>
+      </div>
+      <ImportFromQuoteModal
+        open={isImportModalOpen}
+        disabled={actionState !== "idle" || isDownloadingPdf}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={importFromQuote}
+      />
+    </>
   );
 }
 
@@ -882,6 +1234,7 @@ function TransferSegmentForm({
     <div className="grid gap-3 md:grid-cols-2">
       <Field label="Transfer Type">
         <select
+          className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
           value={segment.label}
           onChange={(event) => onChange({ ...segment, label: event.target.value })}
         >
@@ -893,31 +1246,31 @@ function TransferSegmentForm({
         </select>
       </Field>
       <Field label="Custom Label">
-        <input value={segment.label} onChange={(event) => onChange({ ...segment, label: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.label} onChange={(event) => onChange({ ...segment, label: event.target.value })} />
       </Field>
       <Field label="Company">
-        <input value={segment.company} onChange={(event) => onChange({ ...segment, company: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.company} onChange={(event) => onChange({ ...segment, company: event.target.value })} />
       </Field>
       <Field label="Pickup Time">
-        <input value={segment.pickupTime} onChange={(event) => onChange({ ...segment, pickupTime: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.pickupTime} onChange={(event) => onChange({ ...segment, pickupTime: event.target.value })} />
       </Field>
       <Field label="Payment Status">
-        <input value={segment.paymentStatus} onChange={(event) => onChange({ ...segment, paymentStatus: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.paymentStatus} onChange={(event) => onChange({ ...segment, paymentStatus: event.target.value })} />
       </Field>
       <Field label="Pickup Location">
-        <input value={segment.pickupLocation} onChange={(event) => onChange({ ...segment, pickupLocation: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.pickupLocation} onChange={(event) => onChange({ ...segment, pickupLocation: event.target.value })} />
       </Field>
       <Field label="Dropoff Location">
-        <input value={segment.dropoffLocation} onChange={(event) => onChange({ ...segment, dropoffLocation: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.dropoffLocation} onChange={(event) => onChange({ ...segment, dropoffLocation: event.target.value })} />
       </Field>
       <Field label="Vehicle Details">
-        <input value={segment.vehicleDetails} onChange={(event) => onChange({ ...segment, vehicleDetails: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.vehicleDetails} onChange={(event) => onChange({ ...segment, vehicleDetails: event.target.value })} />
       </Field>
       <Field label="Contact Number">
-        <input value={segment.contactNumber} onChange={(event) => onChange({ ...segment, contactNumber: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.contactNumber} onChange={(event) => onChange({ ...segment, contactNumber: event.target.value })} />
       </Field>
       <Field label="Notes" className="md:col-span-2">
-        <textarea value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} />
+        <textarea className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} />
       </Field>
     </div>
   );
@@ -945,46 +1298,47 @@ function FlightSegmentForm({
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
         <Field label="Flight Number">
-          <input value={segment.flightNumber} onChange={(event) => patch("flightNumber", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.flightNumber} onChange={(event) => patch("flightNumber", event.target.value)} />
         </Field>
         <Field label="Airline">
-          <input value={segment.airline} onChange={(event) => patch("airline", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.airline} onChange={(event) => patch("airline", event.target.value)} />
         </Field>
         <Field label="PNR">
-          <input value={segment.pnr} onChange={(event) => patch("pnr", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.pnr} onChange={(event) => patch("pnr", event.target.value)} />
         </Field>
         <Field label="Departure Airport">
-          <input value={segment.departureAirport} onChange={(event) => patch("departureAirport", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.departureAirport} onChange={(event) => patch("departureAirport", event.target.value)} />
         </Field>
         <Field label="Departure Code">
-          <input value={segment.departureCode} onChange={(event) => patch("departureCode", event.target.value.toUpperCase())} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.departureCode} onChange={(event) => patch("departureCode", event.target.value.toUpperCase())} />
         </Field>
         <Field label="Departure Terminal">
-          <input value={segment.departureTerminal} onChange={(event) => patch("departureTerminal", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.departureTerminal} onChange={(event) => patch("departureTerminal", event.target.value)} />
         </Field>
         <Field label="Arrival Airport">
-          <input value={segment.arrivalAirport} onChange={(event) => patch("arrivalAirport", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.arrivalAirport} onChange={(event) => patch("arrivalAirport", event.target.value)} />
         </Field>
         <Field label="Arrival Code">
-          <input value={segment.arrivalCode} onChange={(event) => patch("arrivalCode", event.target.value.toUpperCase())} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.arrivalCode} onChange={(event) => patch("arrivalCode", event.target.value.toUpperCase())} />
         </Field>
         <Field label="Arrival Terminal">
-          <input value={segment.arrivalTerminal} onChange={(event) => patch("arrivalTerminal", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.arrivalTerminal} onChange={(event) => patch("arrivalTerminal", event.target.value)} />
         </Field>
         <Field label="Departure Date">
-          <input type="date" value={segment.departureDate} onChange={(event) => patch("departureDate", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" type="date" value={segment.departureDate} onChange={(event) => patch("departureDate", event.target.value)} />
         </Field>
         <Field label="Departure Time">
-          <input value={segment.departureTime} onChange={(event) => patch("departureTime", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.departureTime} onChange={(event) => patch("departureTime", event.target.value)} />
         </Field>
         <Field label="Arrival Date">
-          <input type="date" value={segment.arrivalDate} onChange={(event) => patch("arrivalDate", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" type="date" value={segment.arrivalDate} onChange={(event) => patch("arrivalDate", event.target.value)} />
         </Field>
         <Field label="Arrival Time">
-          <input value={segment.arrivalTime} onChange={(event) => patch("arrivalTime", event.target.value)} />
+          <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.arrivalTime} onChange={(event) => patch("arrivalTime", event.target.value)} />
         </Field>
         <Field label="Connecting Flight">
           <select
+            className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
             value={String(segment.isConnecting)}
             onChange={(event) => patch("isConnecting", event.target.value === "true")}
           >
@@ -994,6 +1348,7 @@ function FlightSegmentForm({
         </Field>
         <Field label="+1 Day Arrival">
           <select
+            className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
             value={String(segment.arrivalNextDay)}
             onChange={(event) => patch("arrivalNextDay", event.target.value === "true")}
           >
@@ -1040,18 +1395,21 @@ function FlightSegmentForm({
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="Flight Number">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.flightNumber}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, flightNumber: event.target.value }))}
                   />
                 </Field>
                 <Field label="Airline">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.airline}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, airline: event.target.value }))}
                   />
                 </Field>
                 <Field label="Layover Duration">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.layoverDuration}
                     placeholder="e.g. 2h 30m"
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, layoverDuration: event.target.value }))}
@@ -1059,42 +1417,49 @@ function FlightSegmentForm({
                 </Field>
                 <Field label="Departure Airport">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.departureAirport}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, departureAirport: event.target.value }))}
                   />
                 </Field>
                 <Field label="Departure Code">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.departureCode}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, departureCode: event.target.value.toUpperCase() }))}
                   />
                 </Field>
                 <Field label="Departure Terminal">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.departureTerminal}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, departureTerminal: event.target.value }))}
                   />
                 </Field>
                 <Field label="Arrival Airport">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.arrivalAirport}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, arrivalAirport: event.target.value }))}
                   />
                 </Field>
                 <Field label="Arrival Code">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.arrivalCode}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, arrivalCode: event.target.value.toUpperCase() }))}
                   />
                 </Field>
                 <Field label="Arrival Terminal">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.arrivalTerminal}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, arrivalTerminal: event.target.value }))}
                   />
                 </Field>
                 <Field label="Departure Date">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     type="date"
                     value={leg.departureDate}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, departureDate: event.target.value }))}
@@ -1102,6 +1467,7 @@ function FlightSegmentForm({
                 </Field>
                 <Field label="Departure Time">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.departureTime}
                     placeholder="e.g. 14:30"
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, departureTime: event.target.value }))}
@@ -1109,6 +1475,7 @@ function FlightSegmentForm({
                 </Field>
                 <Field label="Arrival Date">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     type="date"
                     value={leg.arrivalDate}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, arrivalDate: event.target.value }))}
@@ -1116,6 +1483,7 @@ function FlightSegmentForm({
                 </Field>
                 <Field label="Arrival Time">
                   <input
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={leg.arrivalTime}
                     placeholder="e.g. 05:45"
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, arrivalTime: event.target.value }))}
@@ -1123,6 +1491,7 @@ function FlightSegmentForm({
                 </Field>
                 <Field label="+1 Day Arrival">
                   <select
+                    className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
                     value={String(leg.arrivalNextDay)}
                     onChange={(event) => patchLeg(leg.id, (item) => ({ ...item, arrivalNextDay: event.target.value === "true" }))}
                   >
@@ -1149,35 +1518,36 @@ function AccommodationSegmentForm({
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <Field label="Hotel Name">
-        <input value={segment.hotelName} onChange={(event) => onChange({ ...segment, hotelName: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.hotelName} onChange={(event) => onChange({ ...segment, hotelName: event.target.value })} />
       </Field>
       <Field label="Room Type">
-        <input value={segment.roomType} onChange={(event) => onChange({ ...segment, roomType: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.roomType} onChange={(event) => onChange({ ...segment, roomType: event.target.value })} />
       </Field>
       <Field label="Board Basis">
-        <input value={segment.boardBasis} onChange={(event) => onChange({ ...segment, boardBasis: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.boardBasis} onChange={(event) => onChange({ ...segment, boardBasis: event.target.value })} />
       </Field>
       <Field label="Rooms">
         <input
+          className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
           type="number"
           value={segment.numberOfRooms}
           onChange={(event) => onChange({ ...segment, numberOfRooms: Number(event.target.value) || 1 })}
         />
       </Field>
       <Field label="Check-in Date">
-        <input type="date" value={segment.checkInDate} onChange={(event) => onChange({ ...segment, checkInDate: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" type="date" value={segment.checkInDate} onChange={(event) => onChange({ ...segment, checkInDate: event.target.value })} />
       </Field>
       <Field label="Check-out Date">
-        <input type="date" value={segment.checkOutDate} onChange={(event) => onChange({ ...segment, checkOutDate: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" type="date" value={segment.checkOutDate} onChange={(event) => onChange({ ...segment, checkOutDate: event.target.value })} />
       </Field>
       <Field label="Check-out Time">
-        <input value={segment.checkOutTime} onChange={(event) => onChange({ ...segment, checkOutTime: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.checkOutTime} onChange={(event) => onChange({ ...segment, checkOutTime: event.target.value })} />
       </Field>
       <Field label="Duration">
-        <input value={segment.duration} onChange={(event) => onChange({ ...segment, duration: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.duration} onChange={(event) => onChange({ ...segment, duration: event.target.value })} />
       </Field>
       <Field label="Address" className="md:col-span-2">
-        <input value={segment.address} onChange={(event) => onChange({ ...segment, address: event.target.value })} />
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.address} onChange={(event) => onChange({ ...segment, address: event.target.value })} />
       </Field>
       <Field label="Hotel Photo" className="md:col-span-2">
         <div className="space-y-3">
@@ -1213,6 +1583,7 @@ function AccommodationSegmentForm({
             }}
           />
           <input
+            className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
             placeholder="Or paste an image URL"
             value={segment.image.startsWith("data:") ? "" : segment.image}
             onChange={(event) => onChange({ ...segment, image: event.target.value })}
@@ -1220,7 +1591,7 @@ function AccommodationSegmentForm({
         </div>
       </Field>
       <Field label="Notes" className="md:col-span-2">
-        <textarea value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} />
+        <textarea className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} />
       </Field>
     </div>
   );
