@@ -87,6 +87,82 @@ const buildFlightLegSegments = (
   });
 };
 
+function buildFullItineraryPayload({
+  project,
+  destinations = [],
+  travellers = [],
+  accommodations = [],
+  activities = [],
+  dining = [],
+  bars = [],
+  outboundTravel = null,
+  returnTravel = null,
+  helpfulInformation = null,
+  interDestinationTravel = [],
+  customSectionItems = [],
+}: {
+  project: any;
+  destinations?: any[];
+  travellers?: any[];
+  accommodations?: any[];
+  activities?: any[];
+  dining?: any[];
+  bars?: any[];
+  outboundTravel?: any;
+  returnTravel?: any;
+  helpfulInformation?: any;
+  interDestinationTravel?: any[];
+  customSectionItems?: any[];
+}): FullItinerary {
+  let additionalTravelSegments: any[] = [];
+  if (project?.additionalTravelSegments && Array.isArray(project.additionalTravelSegments)) {
+    additionalTravelSegments = project.additionalTravelSegments;
+  } else if (outboundTravel?.additionalSegments && Array.isArray(outboundTravel.additionalSegments)) {
+    additionalTravelSegments = outboundTravel.additionalSegments;
+  }
+
+  const firstDest = destinations[0];
+  const travelDetails = firstDest
+    ? {
+        dates:
+          firstDest.dates ||
+          (firstDest.startDate && firstDest.endDate
+            ? `${new Date(firstDest.startDate).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })} - ${new Date(firstDest.endDate).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}`
+            : null),
+        location: firstDest.location || firstDest.name || null,
+        weather: firstDest.weather || null,
+        weatherUrl: firstDest.weatherUrl || null,
+      }
+    : null;
+
+  return {
+    itinerary: project,
+    destinations,
+    travelDetails,
+    travellers,
+    accommodations,
+    activities,
+    dining,
+    bars,
+    additionalTravel: additionalTravelSegments,
+    outboundTravel,
+    returnTravel,
+    interDestinationTravel,
+    outboundJourney: outboundTravel ? outboundToSegments(outboundTravel as any) : [],
+    returnJourney: returnTravel ? returnToSegments(returnTravel as any) : [],
+    helpfulInformation,
+    customSectionItems,
+  };
+}
+
 // Sortable Travel Item component for drag-and-drop
 // Supports both legacy AdditionalTravel format and new AdditionalTravelSegment format
 function SortableTravelItem({
@@ -810,11 +886,38 @@ export default function ViewItinerary() {
     queryFn: async () => {
       if (!slug) throw new Error('No slug provided');
 
-      console.log('Fetching itinerary by slug:', { slug, isLoggedIn });
-      console.log('Making API call to PocketBase...');
+      try {
+        const publicResponse = await fetch(
+          `${pb.baseUrl}/api/public/itinerary/${encodeURIComponent(slug)}`
+        );
 
-      // Always fetch by slug first and apply auth/status checks after response.
-      // This allows PocketBase view rules to decide public access for published records.
+        if (publicResponse.ok) {
+          const publicData = await publicResponse.json();
+          return buildFullItineraryPayload({
+            project: publicData.project,
+            destinations: publicData.destinations ?? [],
+            travellers: publicData.travellers ?? [],
+            accommodations: publicData.accommodations ?? [],
+            activities: publicData.activities ?? [],
+            dining: publicData.dining ?? [],
+            bars: publicData.bars ?? [],
+            outboundTravel: publicData.outboundTravel ?? null,
+            returnTravel: publicData.returnTravel ?? null,
+            helpfulInformation: publicData.helpfulInformation ?? null,
+            interDestinationTravel: publicData.interDestinationTravel ?? [],
+            customSectionItems: publicData.customSectionItems ?? [],
+          });
+        }
+      } catch (err) {
+        console.error("Public itinerary fetch failed:", err);
+      }
+
+      // Fallback for authenticated users only. This preserves internal access to drafts
+      // even if the public endpoint is unavailable.
+      if (!pb.authStore.isValid) {
+        throw new Error("Itinerary not found");
+      }
+
       let project: any;
       try {
         project = await pb.collection('blckbx_projects').getFirstListItem(
@@ -825,14 +928,9 @@ export default function ViewItinerary() {
         throw new Error('Itinerary not found');
       }
 
-      console.log('API response:', { id: project?.id, status: project?.status, slug: project?.customUrlSlug });
-
-      // Explicit client-side guard: public users cannot access drafts.
       if (project?.status === 'draft' && !pb.authStore.isValid) {
         throw new Error('This itinerary is not available');
       }
-
-      console.log('Project fetched:', { id: project.id, name: project.name, slug: project.customUrlSlug });
 
       // Fetch related collections
       const [
@@ -902,63 +1000,20 @@ export default function ViewItinerary() {
       if (helpfulInformationResult.status === 'rejected') console.error('Helpful information fetch error:', helpfulInformationResult.reason);
       if (interDestinationTravelResult.status === 'rejected') console.error('Inter-destination travel fetch error:', interDestinationTravelResult.reason);
 
-      console.log('Related collections fetched:', {
-        destinations: destinations.length,
-        travellers: travellers.length,
-        accommodations: accommodations.length,
-        activities: activities.length,
-        dining: dining.length,
-        bars: bars.length,
-        interDestinationTravel: interDestinationTravel.length,
-      });
-
-      // Load additional travel segments from project or fallback to outbound travel
-      let additionalTravelSegments: any[] = [];
-      if (project.additionalTravelSegments && Array.isArray(project.additionalTravelSegments)) {
-        console.log('=== LOADING ADDITIONAL TRAVEL FROM PROJECT (VIEW) ===');
-        console.log('additionalTravelSegments:', project.additionalTravelSegments);
-        additionalTravelSegments = project.additionalTravelSegments;
-      } else if (outboundTravel?.additionalSegments && Array.isArray(outboundTravel.additionalSegments)) {
-        console.log('=== LOADING ADDITIONAL TRAVEL FROM OUTBOUND (VIEW FALLBACK) ===');
-        console.log('additionalSegments:', outboundTravel.additionalSegments);
-        additionalTravelSegments = outboundTravel.additionalSegments;
-      } else {
-        console.log('=== NO ADDITIONAL TRAVEL DATA FOUND (VIEW) ===');
-      }
-
-      // Build travelDetails from the first destination
-      const firstDest = destinations[0];
-      const travelDetails = firstDest ? {
-        dates: firstDest.dates || (firstDest.startDate && firstDest.endDate
-          ? `${new Date(firstDest.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} - ${new Date(firstDest.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
-          : null),
-        location: firstDest.location || firstDest.name || null,
-        weather: firstDest.weather || null,
-        weatherUrl: firstDest.weatherUrl || null,
-      } : null;
-
-      console.log('=== TRAVEL DETAILS BUILT ===');
-      console.log('travelDetails:', travelDetails);
-
-      return {
-        itinerary: project,
+      return buildFullItineraryPayload({
+        project,
         destinations,
-        travelDetails,
         travellers,
         accommodations,
         activities,
         dining,
         bars,
-        additionalTravel: additionalTravelSegments,
         outboundTravel,
         returnTravel,
-        interDestinationTravel,
-        // Migrate legacy data to segments for PDF rendering
-        outboundJourney: outboundTravel ? outboundToSegments(outboundTravel as any) : [],
-        returnJourney: returnTravel ? returnToSegments(returnTravel as any) : [],
         helpfulInformation,
+        interDestinationTravel,
         customSectionItems: [],
-      };
+      });
     },
     enabled: !!slug && isAuthResolved,
     staleTime: 0,

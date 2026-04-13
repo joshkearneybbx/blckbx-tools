@@ -1,7 +1,11 @@
 import PocketBase from 'pocketbase';
 
+const pocketBaseUrl =
+  import.meta.env.VITE_POCKETBASE_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8090');
+
 export const pb = new PocketBase(
-  import.meta.env.VITE_POCKETBASE_URL || 'http://localhost:8090'
+  pocketBaseUrl
 );
 
 // Auto-refresh auth
