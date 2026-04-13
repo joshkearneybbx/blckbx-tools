@@ -1655,12 +1655,17 @@ export default function CreateItinerary() {
     if (isEditMode && editId) {
       // Update existing project
       debugLog("Updating project:", editId);
+      const existingProject = await pb.collection('blckbx_projects').getOne(editId);
+      const effectiveStatus =
+        existingProject.status === 'published' && statusParam === 'draft'
+          ? 'published'
+          : statusParam;
 
       const updatedProject = await pb.collection('blckbx_projects').update(editId, {
         name: wizardData.title,
         assistantName: wizardData.assistantName,
         assistantEmail: getValidEmail(wizardData.assistantEmail),
-        status: statusParam,
+        status: effectiveStatus,
       });
 
       projectId = updatedProject.id;
