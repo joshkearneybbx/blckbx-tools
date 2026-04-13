@@ -912,12 +912,6 @@ export default function ViewItinerary() {
         console.error("Public itinerary fetch failed:", err);
       }
 
-      // Fallback for authenticated users only. This preserves internal access to drafts
-      // even if the public endpoint is unavailable.
-      if (!pb.authStore.isValid) {
-        throw new Error("Itinerary not found");
-      }
-
       let project: any;
       try {
         project = await pb.collection('blckbx_projects').getFirstListItem(
@@ -926,10 +920,6 @@ export default function ViewItinerary() {
       } catch (err: any) {
         console.error('Project fetch error:', err);
         throw new Error('Itinerary not found');
-      }
-
-      if (project?.status === 'draft' && !pb.authStore.isValid) {
-        throw new Error('This itinerary is not available');
       }
 
       // Fetch related collections
