@@ -583,7 +583,7 @@ const Sidebar = ({ tripTitle }: { tripTitle?: string }) => (
       <Link style={styles.sidebarText} src="mailto:travel@blckbx.co.uk">
         travel@blckbx.co.uk
       </Link>
-      <Text style={styles.sidebarText}>0700000</Text>
+      <Text style={styles.sidebarText}>02078647125</Text>
       <Text
         style={styles.sidebarPage}
         render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
