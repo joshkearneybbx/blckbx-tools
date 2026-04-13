@@ -47,6 +47,16 @@ const EDITABLE_INPUT_CLASS =
 const EDITABLE_TEXTAREA_CLASS =
   "min-h-[120px] w-full resize-none border border-[#D4D0CB] bg-[#FAFAF8] px-3 py-2 text-sm text-[#0A0A0A] outline-none focus:border-[#0A0A0A] focus:ring-0";
 
+const EMPTY_ACCOMMODATION: NonNullable<QuoteData["accommodation"]> = {
+  name: "",
+  checkIn: "",
+  checkOut: "",
+  nights: "",
+  roomType: "",
+  boardBasis: "",
+  guests: "",
+};
+
 function getWebhookUrl(): string {
   return import.meta.env.VITE_QUOTE_GENERATOR_WEBHOOK_URL ?? DEFAULT_QUOTE_WEBHOOK_URL;
 }
@@ -86,6 +96,20 @@ function normalizeActivities(value: unknown): QuoteData["activities"] {
     .filter((activity): activity is NonNullable<typeof activity> => Boolean(activity));
 
   return activities.length > 0 ? activities : undefined;
+}
+
+function hasAccommodationData(accommodation: QuoteData["accommodation"]): boolean {
+  if (!accommodation) return false;
+
+  return Boolean(
+    accommodation.name?.trim() ||
+      accommodation.checkIn?.trim() ||
+      accommodation.checkOut?.trim() ||
+      String(accommodation.nights || "").trim() ||
+      accommodation.roomType?.trim() ||
+      accommodation.boardBasis?.trim() ||
+      String(accommodation.guests || "").trim()
+  );
 }
 
 function normalizeQuoteData(payload: unknown): QuoteData {
@@ -167,15 +191,18 @@ function normalizeQuoteData(payload: unknown): QuoteData {
       class: sanitizeValue(returnTravel.class),
       baggage: sanitizeValue(returnTravel.baggage),
     },
-    accommodation: {
-      name: sanitizeValue(accommodation.name),
-      checkIn: sanitizeValue(accommodation.checkIn),
-      checkOut: sanitizeValue(accommodation.checkOut),
-      nights: sanitizeValue(accommodation.nights),
-      roomType: sanitizeValue(accommodation.roomType),
-      boardBasis: sanitizeValue(accommodation.boardBasis),
-      guests: sanitizeValue(accommodation.guests),
-    },
+    accommodation:
+      Object.keys(accommodation).length > 0
+        ? {
+            name: sanitizeValue(accommodation.name),
+            checkIn: sanitizeValue(accommodation.checkIn),
+            checkOut: sanitizeValue(accommodation.checkOut),
+            nights: sanitizeValue(accommodation.nights),
+            roomType: sanitizeValue(accommodation.roomType),
+            boardBasis: sanitizeValue(accommodation.boardBasis),
+            guests: sanitizeValue(accommodation.guests),
+          }
+        : null,
     pricing: {
       totalCost: sanitizeValue(pricing.totalCost),
       deposit: sanitizeValue(pricing.deposit),
@@ -184,6 +211,7 @@ function normalizeQuoteData(payload: unknown): QuoteData {
       balanceDeadline: sanitizeValue(pricing.balanceDeadline),
     },
     description: sanitizeValue(source.description),
+    additionalNotes: sanitizeValue(source.additionalNotes),
     activities: normalizeActivities(source.activities),
     notes: sanitizeValue(source.notes),
   };
@@ -392,6 +420,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
   const [quoteRecordStatus, setQuoteRecordStatus] = useState<"draft" | "sent">("draft");
+  const [isAccommodationIncluded, setIsAccommodationIncluded] = useState(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const tripPhotosInputRef = useRef<HTMLInputElement | null>(null);
@@ -440,6 +469,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setTripPhotos([]);
     setSavedRecordId(null);
     setQuoteRecordStatus("draft");
+    setIsAccommodationIncluded(true);
     if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
     if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
     setIsDragging(false);
@@ -456,6 +486,9 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
   const buildStoredPayload = (currentQuoteData: QuoteData) => ({
     ...currentQuoteData,
+    accommodation: isAccommodationIncluded
+      ? currentQuoteData.accommodation || { ...EMPTY_ACCOMMODATION }
+      : null,
     clientName: clientName.trim(),
     passengers,
   });
@@ -571,6 +604,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         setTripPhotos(nextTripPhotos);
         setSavedRecordId(record.id);
         setQuoteRecordStatus(record.status === "sent" ? "sent" : "draft");
+        setIsAccommodationIncluded(hasAccommodationData(resolvedQuoteData.accommodation));
         setStatus("result");
       } catch (err) {
         if (cancelled) return;
@@ -660,6 +694,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       setTripPhotos([]);
       setSavedRecordId(null);
       setQuoteRecordStatus("draft");
+      setIsAccommodationIncluded(hasAccommodationData(normalized.accommodation));
       if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
       if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
       setStatus("result");
@@ -694,10 +729,11 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
     setIsDownloading(true);
     try {
+      const pdfData = buildStoredPayload(quoteData);
       await persistQuote({ silent: true });
       const blob = await pdf(
         <QuotePDFTemplate
-          data={quoteData}
+          data={pdfData}
           passengers={passengers}
           coverPhotoUrl={coverPhoto || undefined}
           tripPhotos={tripPhotos}
@@ -707,7 +743,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = buildFilename(quoteData);
+      anchor.download = buildFilename(pdfData);
       anchor.click();
       URL.revokeObjectURL(url);
       toast({
@@ -776,7 +812,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   ) => {
     updateQuoteData((current) => ({
       ...current,
-      accommodation: { ...current.accommodation, [field]: value },
+      accommodation: { ...(current.accommodation || EMPTY_ACCOMMODATION), [field]: value },
     }));
   };
 
@@ -1361,58 +1397,98 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
           </div>
 
           <PreviewSection title="Accommodation" icon={Hotel}>
-            <EditableRow
-              label="Property Name"
-              value={quoteData.accommodation.name}
-              onChange={(value) => updateAccommodationField("name", value)}
-            />
-            <EditableRow
-              label="Check In"
-              value={quoteData.accommodation.checkIn}
-              onChange={(value) => updateAccommodationField("checkIn", value)}
-            />
-            <EditableRow
-              label="Check Out"
-              value={quoteData.accommodation.checkOut}
-              onChange={(value) => updateAccommodationField("checkOut", value)}
-            />
-            <EditableRow
-              label="Nights"
-              value={String(quoteData.accommodation.nights)}
-              onChange={(value) => updateAccommodationField("nights", value)}
-              type="number"
-              min={0}
-            />
-            <EditableRow
-              label="Room Type"
-              value={quoteData.accommodation.roomType}
-              onChange={(value) => updateAccommodationField("roomType", value)}
-            />
-            <EditableRow
-              label="Board Basis"
-              value={quoteData.accommodation.boardBasis}
-              onChange={(value) => updateAccommodationField("boardBasis", value)}
-            />
-            <EditableRow
-              label="Guests"
-              value={String(quoteData.accommodation.guests)}
-              onChange={(value) => updateAccommodationField("guests", value)}
-              type="number"
-              min={0}
-            />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 border-b border-[#ECEAE5] pb-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-[#1A1A1A]">Accommodation details</p>
+                  <p className="text-xs text-[#6B6B68]">
+                    Remove this section for flight-only quotes.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-[#D8D2C8] bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"
+                  onClick={() => {
+                    setIsAccommodationIncluded((current) => {
+                      const nextValue = !current;
+                      if (nextValue) {
+                        updateQuoteData((currentQuoteData) => ({
+                          ...currentQuoteData,
+                          accommodation:
+                            currentQuoteData.accommodation || { ...EMPTY_ACCOMMODATION },
+                        }));
+                      }
+                      return nextValue;
+                    });
+                  }}
+                >
+                  {isAccommodationIncluded ? "Remove Accommodation" : "Add Accommodation"}
+                </Button>
+              </div>
+
+              {isAccommodationIncluded ? (
+                <>
+                  <EditableRow
+                    label="Property Name"
+                    value={quoteData.accommodation?.name || ""}
+                    onChange={(value) => updateAccommodationField("name", value)}
+                  />
+                  <EditableRow
+                    label="Check In"
+                    value={quoteData.accommodation?.checkIn || ""}
+                    onChange={(value) => updateAccommodationField("checkIn", value)}
+                  />
+                  <EditableRow
+                    label="Check Out"
+                    value={quoteData.accommodation?.checkOut || ""}
+                    onChange={(value) => updateAccommodationField("checkOut", value)}
+                  />
+                  <EditableRow
+                    label="Nights"
+                    value={String(quoteData.accommodation?.nights || "")}
+                    onChange={(value) => updateAccommodationField("nights", value)}
+                    type="number"
+                    min={0}
+                  />
+                  <EditableRow
+                    label="Room Type"
+                    value={quoteData.accommodation?.roomType || ""}
+                    onChange={(value) => updateAccommodationField("roomType", value)}
+                  />
+                  <EditableRow
+                    label="Board Basis"
+                    value={quoteData.accommodation?.boardBasis || ""}
+                    onChange={(value) => updateAccommodationField("boardBasis", value)}
+                  />
+                  <EditableRow
+                    label="Guests"
+                    value={String(quoteData.accommodation?.guests || "")}
+                    onChange={(value) => updateAccommodationField("guests", value)}
+                    type="number"
+                    min={0}
+                  />
+                </>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[#D8D2C8] bg-[#FAFAFA] px-4 py-6 text-sm text-[#6B6B68]">
+                  This quote will be saved and exported without an accommodation section.
+                </div>
+              )}
+            </div>
           </PreviewSection>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <PreviewSection title="Description" icon={FileOutput}>
-              <textarea
-                rows={5}
-                value={quoteData.description || ""}
-                onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-                  updateQuoteData((current) => ({ ...current, description: event.target.value }))
-                }
-                className={EDITABLE_TEXTAREA_CLASS}
-              />
-            </PreviewSection>
+            <textarea
+              rows={5}
+              value={quoteData.description || ""}
+              onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                updateQuoteData((current) => ({ ...current, description: event.target.value }))
+              }
+              className={EDITABLE_TEXTAREA_CLASS}
+              style={{ width: "100%", minHeight: 180, display: "block" }}
+            />
+          </PreviewSection>
 
             <PreviewSection title="Passengers" icon={Users}>
               <div className="space-y-4">
@@ -1478,6 +1554,18 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
               </div>
             </PreviewSection>
           </div>
+
+          <PreviewSection title="Additional Notes" icon={FileOutput}>
+            <textarea
+              rows={5}
+              value={quoteData.additionalNotes || ""}
+              onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                updateQuoteData((current) => ({ ...current, additionalNotes: event.target.value }))
+              }
+              className={EDITABLE_TEXTAREA_CLASS}
+              style={{ width: "100%", minHeight: 140, display: "block" }}
+            />
+          </PreviewSection>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <PreviewSection title="Cover Photo" icon={Camera}>

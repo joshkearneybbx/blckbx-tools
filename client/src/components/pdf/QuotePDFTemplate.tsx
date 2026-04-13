@@ -94,7 +94,7 @@ export interface QuoteData {
     roomType: string;
     boardBasis: string;
     guests: number | string;
-  };
+  } | null;
   pricing: {
     totalCost: string;
     deposit: string;
@@ -103,6 +103,7 @@ export interface QuoteData {
     balanceDeadline: string;
   };
   description?: string;
+  additionalNotes?: string;
   activities?: Array<{
     name: string;
     description?: string;
@@ -135,6 +136,20 @@ const getLocationName = (location: string): string => {
 
 const formatPassengerType = (type: PassengerDetail["type"]): string =>
   type === "child" ? "Child" : "Adult";
+
+const hasAccommodationData = (accommodation: QuoteData["accommodation"]): boolean => {
+  if (!accommodation) return false;
+
+  return Boolean(
+    accommodation.name?.trim() ||
+      accommodation.checkIn?.trim() ||
+      accommodation.checkOut?.trim() ||
+      String(accommodation.nights || "").trim() ||
+      accommodation.roomType?.trim() ||
+      accommodation.boardBasis?.trim() ||
+      String(accommodation.guests || "").trim()
+  );
+};
 
 // =============================================================================
 // STYLES — aligned with Booking PDF
@@ -447,6 +462,21 @@ const styles = StyleSheet.create({
     color: "#6B6865",
     lineHeight: 1.6,
   },
+  additionalInfoCard: {
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    marginBottom: 14,
+  },
+  additionalInfoBody: {
+    padding: 14,
+    gap: 4,
+  },
+  additionalInfoText: {
+    fontSize: 9,
+    color: "#0A0A0A",
+    lineHeight: 1.5,
+  },
 
   // Pricing
   pricingCard: {
@@ -696,7 +726,7 @@ const FlightCard = ({
 const AccommodationCard = ({
   accommodation,
 }: {
-  accommodation: QuoteData["accommodation"];
+  accommodation: NonNullable<QuoteData["accommodation"]>;
 }) => (
   <View style={styles.accomCard} wrap={false}>
     <View style={styles.accomBody}>
@@ -761,6 +791,7 @@ export function QuotePDFTemplate({
     accommodation,
     pricing,
     description,
+    additionalNotes,
     activities,
     notes,
   } = data;
@@ -771,6 +802,8 @@ export function QuotePDFTemplate({
   const hasActivities = filteredActivities.length > 0;
   const hasNotes = Boolean(notes && notes.trim().length > 0);
   const hasDescription = Boolean(description && description.trim().length > 0);
+  const hasAdditionalNotes = Boolean(additionalNotes && additionalNotes.trim().length > 0);
+  const hasAccommodation = hasAccommodationData(accommodation);
   const hasCoverPhoto = Boolean(coverPhotoUrl);
   const resolvedTripPhotos = (tripPhotos || [])
     .filter((photo) => typeof photo === "string" && photo.trim().length > 0)
@@ -844,15 +877,35 @@ export function QuotePDFTemplate({
             <FlightCard flight={outboundTravel} travellers={travellers} />
           </View>
 
-          <View wrap={false}>
-            <Text style={styles.subSectionTitle}>Accommodation</Text>
-            <AccommodationCard accommodation={accommodation} />
-          </View>
+          {hasAccommodation ? (
+            <View wrap={false}>
+              <Text style={styles.subSectionTitle}>Accommodation</Text>
+              <AccommodationCard accommodation={accommodation!} />
+            </View>
+          ) : null}
 
           <View wrap={false}>
             <Text style={styles.subSectionTitle}>Return Flight</Text>
             <FlightCard flight={returnTravel} travellers={travellers} />
           </View>
+
+          {hasAdditionalNotes ? (
+            <View wrap={false}>
+              <Text style={styles.subSectionTitle}>Additional Information</Text>
+              <View style={styles.additionalInfoCard}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardHeaderText}>Additional Information</Text>
+                </View>
+                <View style={styles.additionalInfoBody}>
+                  {additionalNotes!.split("\n").map((line, index) => (
+                    <Text key={`additional-notes-${index}`} style={styles.additionalInfoText}>
+                      {line || " "}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            </View>
+          ) : null}
         </View>
       </Page>
 
