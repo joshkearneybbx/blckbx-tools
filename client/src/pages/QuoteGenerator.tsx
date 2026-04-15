@@ -57,6 +57,21 @@ const EMPTY_ACCOMMODATION: NonNullable<QuoteData["accommodation"]> = {
   guests: "",
 };
 
+const EMPTY_FLIGHT: NonNullable<QuoteData["outboundTravel"]> = {
+  airline: "",
+  flightNumber: "",
+  departureDate: "",
+  arrivalDate: "",
+  departureAirport: "",
+  departureAirportCode: "",
+  arrivalAirport: "",
+  arrivalAirportCode: "",
+  departureTime: "",
+  arrivalTime: "",
+  class: "",
+  baggage: "",
+};
+
 function getWebhookUrl(): string {
   return import.meta.env.VITE_QUOTE_GENERATOR_WEBHOOK_URL ?? DEFAULT_QUOTE_WEBHOOK_URL;
 }
@@ -112,6 +127,23 @@ function hasAccommodationData(accommodation: QuoteData["accommodation"]): boolea
   );
 }
 
+function hasFlightData(
+  flight: QuoteData["outboundTravel"] | QuoteData["returnTravel"]
+): boolean {
+  if (!flight) return false;
+
+  return Boolean(
+    flight.airline?.trim() ||
+      flight.flightNumber?.trim() ||
+      flight.departureAirport?.trim() ||
+      flight.departureAirportCode?.trim() ||
+      flight.arrivalAirport?.trim() ||
+      flight.arrivalAirportCode?.trim() ||
+      flight.departureDate?.trim() ||
+      flight.arrivalDate?.trim()
+  );
+}
+
 function normalizeQuoteData(payload: unknown): QuoteData {
   const source = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
 
@@ -159,38 +191,44 @@ function normalizeQuoteData(payload: unknown): QuoteData {
       adults: sanitizeValue(travellers.adults),
       children: sanitizeValue(travellers.children),
     },
-    outboundTravel: {
-      airline: sanitizeValue(outboundTravel.airline),
-      flightNumber: sanitizeValue(outboundTravel.flightNumber),
-      departureDate:
-        sanitizeValue(outboundTravel.departureDate) ||
-        sanitizeValue(outboundTravel.flightDate),
-      arrivalDate: sanitizeValue(outboundTravel.arrivalDate),
-      departureAirport: sanitizeValue(outboundTravel.departureAirport),
-      departureAirportCode: sanitizeValue(outboundTravel.departureAirportCode),
-      arrivalAirport: sanitizeValue(outboundTravel.arrivalAirport),
-      arrivalAirportCode: sanitizeValue(outboundTravel.arrivalAirportCode),
-      departureTime: sanitizeValue(outboundTravel.departureTime),
-      arrivalTime: sanitizeValue(outboundTravel.arrivalTime),
-      class: sanitizeValue(outboundTravel.class),
-      baggage: sanitizeValue(outboundTravel.baggage),
-    },
-    returnTravel: {
-      airline: sanitizeValue(returnTravel.airline),
-      flightNumber: sanitizeValue(returnTravel.flightNumber),
-      departureDate:
-        sanitizeValue(returnTravel.departureDate) ||
-        sanitizeValue(returnTravel.flightDate),
-      arrivalDate: sanitizeValue(returnTravel.arrivalDate),
-      departureAirport: sanitizeValue(returnTravel.departureAirport),
-      departureAirportCode: sanitizeValue(returnTravel.departureAirportCode),
-      arrivalAirport: sanitizeValue(returnTravel.arrivalAirport),
-      arrivalAirportCode: sanitizeValue(returnTravel.arrivalAirportCode),
-      departureTime: sanitizeValue(returnTravel.departureTime),
-      arrivalTime: sanitizeValue(returnTravel.arrivalTime),
-      class: sanitizeValue(returnTravel.class),
-      baggage: sanitizeValue(returnTravel.baggage),
-    },
+    outboundTravel:
+      Object.keys(outboundTravel).length > 0
+        ? {
+            airline: sanitizeValue(outboundTravel.airline),
+            flightNumber: sanitizeValue(outboundTravel.flightNumber),
+            departureDate:
+              sanitizeValue(outboundTravel.departureDate) ||
+              sanitizeValue(outboundTravel.flightDate),
+            arrivalDate: sanitizeValue(outboundTravel.arrivalDate),
+            departureAirport: sanitizeValue(outboundTravel.departureAirport),
+            departureAirportCode: sanitizeValue(outboundTravel.departureAirportCode),
+            arrivalAirport: sanitizeValue(outboundTravel.arrivalAirport),
+            arrivalAirportCode: sanitizeValue(outboundTravel.arrivalAirportCode),
+            departureTime: sanitizeValue(outboundTravel.departureTime),
+            arrivalTime: sanitizeValue(outboundTravel.arrivalTime),
+            class: sanitizeValue(outboundTravel.class),
+            baggage: sanitizeValue(outboundTravel.baggage),
+          }
+        : null,
+    returnTravel:
+      Object.keys(returnTravel).length > 0
+        ? {
+            airline: sanitizeValue(returnTravel.airline),
+            flightNumber: sanitizeValue(returnTravel.flightNumber),
+            departureDate:
+              sanitizeValue(returnTravel.departureDate) ||
+              sanitizeValue(returnTravel.flightDate),
+            arrivalDate: sanitizeValue(returnTravel.arrivalDate),
+            departureAirport: sanitizeValue(returnTravel.departureAirport),
+            departureAirportCode: sanitizeValue(returnTravel.departureAirportCode),
+            arrivalAirport: sanitizeValue(returnTravel.arrivalAirport),
+            arrivalAirportCode: sanitizeValue(returnTravel.arrivalAirportCode),
+            departureTime: sanitizeValue(returnTravel.departureTime),
+            arrivalTime: sanitizeValue(returnTravel.arrivalTime),
+            class: sanitizeValue(returnTravel.class),
+            baggage: sanitizeValue(returnTravel.baggage),
+          }
+        : null,
     accommodation:
       Object.keys(accommodation).length > 0
         ? {
@@ -420,6 +458,8 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
   const [quoteRecordStatus, setQuoteRecordStatus] = useState<"draft" | "sent">("draft");
+  const [isOutboundFlightIncluded, setIsOutboundFlightIncluded] = useState(true);
+  const [isReturnFlightIncluded, setIsReturnFlightIncluded] = useState(true);
   const [isAccommodationIncluded, setIsAccommodationIncluded] = useState(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
@@ -469,6 +509,8 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setTripPhotos([]);
     setSavedRecordId(null);
     setQuoteRecordStatus("draft");
+    setIsOutboundFlightIncluded(true);
+    setIsReturnFlightIncluded(true);
     setIsAccommodationIncluded(true);
     if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
     if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
@@ -486,6 +528,12 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
   const buildStoredPayload = (currentQuoteData: QuoteData) => ({
     ...currentQuoteData,
+    outboundTravel: isOutboundFlightIncluded
+      ? currentQuoteData.outboundTravel || { ...EMPTY_FLIGHT }
+      : null,
+    returnTravel: isReturnFlightIncluded
+      ? currentQuoteData.returnTravel || { ...EMPTY_FLIGHT }
+      : null,
     accommodation: isAccommodationIncluded
       ? currentQuoteData.accommodation || { ...EMPTY_ACCOMMODATION }
       : null,
@@ -604,6 +652,8 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         setTripPhotos(nextTripPhotos);
         setSavedRecordId(record.id);
         setQuoteRecordStatus(record.status === "sent" ? "sent" : "draft");
+        setIsOutboundFlightIncluded(hasFlightData(resolvedQuoteData.outboundTravel));
+        setIsReturnFlightIncluded(hasFlightData(resolvedQuoteData.returnTravel));
         setIsAccommodationIncluded(hasAccommodationData(resolvedQuoteData.accommodation));
         setStatus("result");
       } catch (err) {
@@ -694,6 +744,8 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       setTripPhotos([]);
       setSavedRecordId(null);
       setQuoteRecordStatus("draft");
+      setIsOutboundFlightIncluded(hasFlightData(normalized.outboundTravel));
+      setIsReturnFlightIncluded(hasFlightData(normalized.returnTravel));
       setIsAccommodationIncluded(hasAccommodationData(normalized.accommodation));
       if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = "";
       if (tripPhotosInputRef.current) tripPhotosInputRef.current.value = "";
@@ -802,7 +854,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   ) => {
     updateQuoteData((current) => ({
       ...current,
-      [section]: { ...current[section], [field]: value },
+      [section]: { ...(current[section] || EMPTY_FLIGHT), [field]: value },
     }));
   };
 
@@ -1256,143 +1308,221 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <PreviewSection title="Outbound Flight" icon={Plane}>
-              <EditableRow
-                label="Airline"
-                value={quoteData.outboundTravel.airline}
-                onChange={(value) => updateTravelField("outboundTravel", "airline", value)}
-              />
-              <EditableRow
-                label="Flight Number"
-                value={quoteData.outboundTravel.flightNumber}
-                onChange={(value) => updateTravelField("outboundTravel", "flightNumber", value)}
-              />
-              <EditableRow
-                label="Departure Airport"
-                value={quoteData.outboundTravel.departureAirport}
-                onChange={(value) =>
-                  updateTravelField("outboundTravel", "departureAirport", value)
-                }
-              />
-              <EditableRow
-                label="Departure Code"
-                value={quoteData.outboundTravel.departureAirportCode || ""}
-                onChange={(value) =>
-                  updateTravelField("outboundTravel", "departureAirportCode", value.toUpperCase())
-                }
-              />
-              <EditableRow
-                label="Arrival Airport"
-                value={quoteData.outboundTravel.arrivalAirport}
-                onChange={(value) =>
-                  updateTravelField("outboundTravel", "arrivalAirport", value)
-                }
-              />
-              <EditableRow
-                label="Arrival Code"
-                value={quoteData.outboundTravel.arrivalAirportCode || ""}
-                onChange={(value) =>
-                  updateTravelField("outboundTravel", "arrivalAirportCode", value.toUpperCase())
-                }
-              />
-              <EditableRow
-                label="Departure Time"
-                value={quoteData.outboundTravel.departureTime}
-                onChange={(value) => updateTravelField("outboundTravel", "departureTime", value)}
-              />
-              <EditableRow
-                label="Arrival Time"
-                value={quoteData.outboundTravel.arrivalTime}
-                onChange={(value) => updateTravelField("outboundTravel", "arrivalTime", value)}
-              />
-              <EditableRow
-                label="Departure Date"
-                value={quoteData.outboundTravel.departureDate}
-                onChange={(value) => updateTravelField("outboundTravel", "departureDate", value)}
-              />
-              <EditableRow
-                label="Arrival Date"
-                value={quoteData.outboundTravel.arrivalDate}
-                onChange={(value) => updateTravelField("outboundTravel", "arrivalDate", value)}
-              />
-              <EditableRow
-                label="Class"
-                value={quoteData.outboundTravel.class}
-                onChange={(value) => updateTravelField("outboundTravel", "class", value)}
-              />
-              <EditableRow
-                label="Baggage"
-                value={quoteData.outboundTravel.baggage}
-                onChange={(value) => updateTravelField("outboundTravel", "baggage", value)}
-              />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3 border-b border-[#ECEAE5] pb-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-[#1A1A1A]">Outbound flight details</p>
+                    <p className="text-xs text-[#6B6B68]">
+                      Remove this section for accommodation-only or land-only quotes.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-[#D8D2C8] bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"
+                    onClick={() => {
+                      setIsOutboundFlightIncluded((current) => {
+                        const nextValue = !current;
+                        if (nextValue) {
+                          updateQuoteData((currentQuoteData) => ({
+                            ...currentQuoteData,
+                            outboundTravel:
+                              currentQuoteData.outboundTravel || { ...EMPTY_FLIGHT },
+                          }));
+                        }
+                        return nextValue;
+                      });
+                    }}
+                  >
+                    {isOutboundFlightIncluded ? "Remove Outbound Flight" : "Add Outbound Flight"}
+                  </Button>
+                </div>
+
+                {isOutboundFlightIncluded ? (
+                  <>
+                    <EditableRow
+                      label="Airline"
+                      value={quoteData.outboundTravel?.airline || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "airline", value)}
+                    />
+                    <EditableRow
+                      label="Flight Number"
+                      value={quoteData.outboundTravel?.flightNumber || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "flightNumber", value)}
+                    />
+                    <EditableRow
+                      label="Departure Airport"
+                      value={quoteData.outboundTravel?.departureAirport || ""}
+                      onChange={(value) =>
+                        updateTravelField("outboundTravel", "departureAirport", value)
+                      }
+                    />
+                    <EditableRow
+                      label="Departure Code"
+                      value={quoteData.outboundTravel?.departureAirportCode || ""}
+                      onChange={(value) =>
+                        updateTravelField("outboundTravel", "departureAirportCode", value.toUpperCase())
+                      }
+                    />
+                    <EditableRow
+                      label="Arrival Airport"
+                      value={quoteData.outboundTravel?.arrivalAirport || ""}
+                      onChange={(value) =>
+                        updateTravelField("outboundTravel", "arrivalAirport", value)
+                      }
+                    />
+                    <EditableRow
+                      label="Arrival Code"
+                      value={quoteData.outboundTravel?.arrivalAirportCode || ""}
+                      onChange={(value) =>
+                        updateTravelField("outboundTravel", "arrivalAirportCode", value.toUpperCase())
+                      }
+                    />
+                    <EditableRow
+                      label="Departure Time"
+                      value={quoteData.outboundTravel?.departureTime || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "departureTime", value)}
+                    />
+                    <EditableRow
+                      label="Arrival Time"
+                      value={quoteData.outboundTravel?.arrivalTime || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "arrivalTime", value)}
+                    />
+                    <EditableRow
+                      label="Departure Date"
+                      value={quoteData.outboundTravel?.departureDate || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "departureDate", value)}
+                    />
+                    <EditableRow
+                      label="Arrival Date"
+                      value={quoteData.outboundTravel?.arrivalDate || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "arrivalDate", value)}
+                    />
+                    <EditableRow
+                      label="Class"
+                      value={quoteData.outboundTravel?.class || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "class", value)}
+                    />
+                    <EditableRow
+                      label="Baggage"
+                      value={quoteData.outboundTravel?.baggage || ""}
+                      onChange={(value) => updateTravelField("outboundTravel", "baggage", value)}
+                    />
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-[#D8D2C8] bg-[#FAFAFA] px-4 py-6 text-sm text-[#6B6B68]">
+                    This quote will be saved and exported without an outbound flight section.
+                  </div>
+                )}
+              </div>
             </PreviewSection>
 
             <PreviewSection title="Return Flight" icon={Plane}>
-              <EditableRow
-                label="Airline"
-                value={quoteData.returnTravel.airline}
-                onChange={(value) => updateTravelField("returnTravel", "airline", value)}
-              />
-              <EditableRow
-                label="Flight Number"
-                value={quoteData.returnTravel.flightNumber}
-                onChange={(value) => updateTravelField("returnTravel", "flightNumber", value)}
-              />
-              <EditableRow
-                label="Departure Airport"
-                value={quoteData.returnTravel.departureAirport}
-                onChange={(value) =>
-                  updateTravelField("returnTravel", "departureAirport", value)
-                }
-              />
-              <EditableRow
-                label="Departure Code"
-                value={quoteData.returnTravel.departureAirportCode || ""}
-                onChange={(value) =>
-                  updateTravelField("returnTravel", "departureAirportCode", value.toUpperCase())
-                }
-              />
-              <EditableRow
-                label="Arrival Airport"
-                value={quoteData.returnTravel.arrivalAirport}
-                onChange={(value) => updateTravelField("returnTravel", "arrivalAirport", value)}
-              />
-              <EditableRow
-                label="Arrival Code"
-                value={quoteData.returnTravel.arrivalAirportCode || ""}
-                onChange={(value) =>
-                  updateTravelField("returnTravel", "arrivalAirportCode", value.toUpperCase())
-                }
-              />
-              <EditableRow
-                label="Departure Time"
-                value={quoteData.returnTravel.departureTime}
-                onChange={(value) => updateTravelField("returnTravel", "departureTime", value)}
-              />
-              <EditableRow
-                label="Arrival Time"
-                value={quoteData.returnTravel.arrivalTime}
-                onChange={(value) => updateTravelField("returnTravel", "arrivalTime", value)}
-              />
-              <EditableRow
-                label="Departure Date"
-                value={quoteData.returnTravel.departureDate}
-                onChange={(value) => updateTravelField("returnTravel", "departureDate", value)}
-              />
-              <EditableRow
-                label="Arrival Date"
-                value={quoteData.returnTravel.arrivalDate}
-                onChange={(value) => updateTravelField("returnTravel", "arrivalDate", value)}
-              />
-              <EditableRow
-                label="Class"
-                value={quoteData.returnTravel.class}
-                onChange={(value) => updateTravelField("returnTravel", "class", value)}
-              />
-              <EditableRow
-                label="Baggage"
-                value={quoteData.returnTravel.baggage}
-                onChange={(value) => updateTravelField("returnTravel", "baggage", value)}
-              />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3 border-b border-[#ECEAE5] pb-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-[#1A1A1A]">Return flight details</p>
+                    <p className="text-xs text-[#6B6B68]">
+                      Remove this section for one-way, rail, or accommodation-only quotes.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-[#D8D2C8] bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"
+                    onClick={() => {
+                      setIsReturnFlightIncluded((current) => {
+                        const nextValue = !current;
+                        if (nextValue) {
+                          updateQuoteData((currentQuoteData) => ({
+                            ...currentQuoteData,
+                            returnTravel:
+                              currentQuoteData.returnTravel || { ...EMPTY_FLIGHT },
+                          }));
+                        }
+                        return nextValue;
+                      });
+                    }}
+                  >
+                    {isReturnFlightIncluded ? "Remove Return Flight" : "Add Return Flight"}
+                  </Button>
+                </div>
+
+                {isReturnFlightIncluded ? (
+                  <>
+                    <EditableRow
+                      label="Airline"
+                      value={quoteData.returnTravel?.airline || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "airline", value)}
+                    />
+                    <EditableRow
+                      label="Flight Number"
+                      value={quoteData.returnTravel?.flightNumber || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "flightNumber", value)}
+                    />
+                    <EditableRow
+                      label="Departure Airport"
+                      value={quoteData.returnTravel?.departureAirport || ""}
+                      onChange={(value) =>
+                        updateTravelField("returnTravel", "departureAirport", value)
+                      }
+                    />
+                    <EditableRow
+                      label="Departure Code"
+                      value={quoteData.returnTravel?.departureAirportCode || ""}
+                      onChange={(value) =>
+                        updateTravelField("returnTravel", "departureAirportCode", value.toUpperCase())
+                      }
+                    />
+                    <EditableRow
+                      label="Arrival Airport"
+                      value={quoteData.returnTravel?.arrivalAirport || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "arrivalAirport", value)}
+                    />
+                    <EditableRow
+                      label="Arrival Code"
+                      value={quoteData.returnTravel?.arrivalAirportCode || ""}
+                      onChange={(value) =>
+                        updateTravelField("returnTravel", "arrivalAirportCode", value.toUpperCase())
+                      }
+                    />
+                    <EditableRow
+                      label="Departure Time"
+                      value={quoteData.returnTravel?.departureTime || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "departureTime", value)}
+                    />
+                    <EditableRow
+                      label="Arrival Time"
+                      value={quoteData.returnTravel?.arrivalTime || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "arrivalTime", value)}
+                    />
+                    <EditableRow
+                      label="Departure Date"
+                      value={quoteData.returnTravel?.departureDate || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "departureDate", value)}
+                    />
+                    <EditableRow
+                      label="Arrival Date"
+                      value={quoteData.returnTravel?.arrivalDate || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "arrivalDate", value)}
+                    />
+                    <EditableRow
+                      label="Class"
+                      value={quoteData.returnTravel?.class || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "class", value)}
+                    />
+                    <EditableRow
+                      label="Baggage"
+                      value={quoteData.returnTravel?.baggage || ""}
+                      onChange={(value) => updateTravelField("returnTravel", "baggage", value)}
+                    />
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-[#D8D2C8] bg-[#FAFAFA] px-4 py-6 text-sm text-[#6B6B68]">
+                    This quote will be saved and exported without a return flight section.
+                  </div>
+                )}
+              </div>
             </PreviewSection>
           </div>
 

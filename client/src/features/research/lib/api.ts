@@ -1,7 +1,12 @@
 import type {
   AddItemSubmission,
+  BrandOption,
   ClientAccount,
+  ClientProfile,
   DedupCheckResult,
+  InterestTagOption,
+  ProfileAffinity,
+  ProfileInterest,
   Recommendation,
   Recipient,
   TaskMatchResponse,
@@ -45,6 +50,19 @@ async function gatewayFetch(path: string, options?: RequestInit) {
       ...options?.headers,
     },
   });
+}
+
+async function parseGatewayJson<T>(response: Response): Promise<T> {
+  const data = await response.json();
+  return data as T;
+}
+
+function unwrapDataArray<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
 }
 
 function toSearchParams(params: Record<string, unknown>) {
@@ -178,6 +196,223 @@ export async function searchClientAccounts(query: string): Promise<ClientAccount
       ? mockClientAccounts.filter((client) => client.account_name.toLowerCase().includes(normalizedQuery))
       : mockClientAccounts;
   }
+}
+
+export async function searchInterestClientAccounts(query: string, limit = 20): Promise<ClientAccount[]> {
+  const searchParams = toSearchParams({ search: query.trim(), limit });
+  const response = await gatewayFetch(`/client-accounts?${searchParams.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Client account search failed");
+  }
+
+  return unwrapDataArray<ClientAccount>(await response.json());
+}
+
+export async function fetchClientInterestProfiles(clientAccountKey: string): Promise<ClientProfile[]> {
+  const response = await gatewayFetch(`/client-accounts/${encodeURIComponent(clientAccountKey)}/profiles`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load profiles");
+  }
+
+  return unwrapDataArray<ClientProfile>(await response.json());
+}
+
+export async function fetchProfileInterests(profileKey: string): Promise<ProfileInterest[]> {
+  const response = await gatewayFetch(`/profiles/${encodeURIComponent(profileKey)}/interests`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load interests");
+  }
+
+  const payload = await response.json();
+  if (payload && typeof payload === "object" && Array.isArray((payload as { interests?: unknown[] }).interests)) {
+    return (payload as { interests: ProfileInterest[] }).interests;
+  }
+  return unwrapDataArray<ProfileInterest>(payload);
+}
+
+export async function fetchProfileAffinities(profileKey: string): Promise<ProfileAffinity[]> {
+  const response = await gatewayFetch(`/profiles/${encodeURIComponent(profileKey)}/affinities`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load affinities");
+  }
+
+  const payload = await response.json();
+  if (payload && typeof payload === "object" && Array.isArray((payload as { affinities?: unknown[] }).affinities)) {
+    return (payload as { affinities: ProfileAffinity[] }).affinities;
+  }
+  return unwrapDataArray<ProfileAffinity>(payload);
+}
+
+export async function searchInterestTags(query: string, limit = 10): Promise<InterestTagOption[]> {
+  const searchParams = toSearchParams({ search: query.trim(), limit });
+  const response = await gatewayFetch(`/tags?${searchParams.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load tags");
+  }
+
+  return unwrapDataArray<InterestTagOption>(await response.json());
+}
+
+export async function createInterestTag(payload: {
+  label: string;
+  category: string;
+}): Promise<InterestTagOption> {
+  const response = await gatewayFetch("/tags", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseGatewayJson<Record<string, unknown>>(response);
+  if (!response.ok) {
+    throw new Error(String(data.error ?? data.message ?? "Failed to create tag"));
+  }
+
+  return data as unknown as InterestTagOption;
+}
+
+export async function createProfileInterest(
+  profileKey: string,
+  payload: {
+    tag_key: string;
+    strength: number;
+    note?: string;
+    added_by?: string;
+  }
+) {
+  const response = await gatewayFetch(`/profiles/${encodeURIComponent(profileKey)}/interests`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseGatewayJson<Record<string, unknown>>(response);
+  if (!response.ok) {
+    const message = String(data.error ?? data.message ?? "Failed to add interest");
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateProfileInterest(
+  profileKey: string,
+  edgeKey: string,
+  payload: {
+    strength?: number;
+    note?: string;
+  }
+) {
+  const response = await gatewayFetch(
+    `/profiles/${encodeURIComponent(profileKey)}/interests/${encodeURIComponent(edgeKey)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to update interest");
+  }
+
+  return response.json();
+}
+
+export async function deleteProfileInterest(profileKey: string, edgeKey: string) {
+  const response = await gatewayFetch(
+    `/profiles/${encodeURIComponent(profileKey)}/interests/${encodeURIComponent(edgeKey)}`,
+    { method: "DELETE" }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to delete interest");
+  }
+}
+
+export async function searchBrands(query: string, limit = 10): Promise<BrandOption[]> {
+  const searchParams = toSearchParams({ search: query.trim(), limit });
+  const response = await gatewayFetch(`/brands?${searchParams.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load brands");
+  }
+
+  return unwrapDataArray<BrandOption>(await response.json());
+}
+
+export async function createProfileAffinity(
+  profileKey: string,
+  payload: {
+    brand_key: string;
+    note?: string;
+    added_by?: string;
+  }
+) {
+  const response = await gatewayFetch(`/profiles/${encodeURIComponent(profileKey)}/affinities`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseGatewayJson<Record<string, unknown>>(response);
+  if (!response.ok) {
+    const message = String(data.error ?? data.message ?? "Failed to add brand affinity");
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateProfileAffinity(
+  profileKey: string,
+  edgeKey: string,
+  payload: {
+    note?: string;
+  }
+) {
+  const response = await gatewayFetch(
+    `/profiles/${encodeURIComponent(profileKey)}/affinities/${encodeURIComponent(edgeKey)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to update affinity");
+  }
+
+  return response.json();
+}
+
+export async function deleteProfileAffinity(profileKey: string, edgeKey: string) {
+  const response = await gatewayFetch(
+    `/profiles/${encodeURIComponent(profileKey)}/affinities/${encodeURIComponent(edgeKey)}`,
+    { method: "DELETE" }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to delete affinity");
+  }
+}
+
+export async function updateProfileNotes(profileKey: string, notes: string) {
+  const response = await gatewayFetch(`/profiles/${encodeURIComponent(profileKey)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ notes }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to save notes");
+  }
+
+  return response.json();
 }
 
 export async function searchRecipients(query: string, clientAccountKey: string): Promise<Recipient[]> {

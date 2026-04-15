@@ -23,6 +23,7 @@ import { ResearchLayout } from "@/features/research/ResearchLayout";
 import ResearchAddItem from "@/features/research/pages/ResearchAddItem";
 import ResearchSearch from "@/features/research/pages/ResearchSearch";
 import ResearchTaskMatcher from "@/features/research/pages/ResearchTaskMatcher";
+import ClientInterests from "@/features/research/pages/ClientInterests";
 import ResearchLists from "@/features/research/pages/ResearchLists";
 import ResearchListDetail from "@/features/research/pages/ResearchListDetail";
 import ApprovalPage from "@/features/approval/ApprovalPage";
@@ -203,6 +204,15 @@ function Router() {
             <ToolGuard slug="research">
               <ResearchLayout>
                 <ResearchTaskMatcher />
+              </ResearchLayout>
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research/client-interests">
+          {() => (
+            <ToolGuard slug="research">
+              <ResearchLayout>
+                <ClientInterests />
               </ResearchLayout>
             </ToolGuard>
           )}

@@ -702,7 +702,10 @@ export async function createCurationDecision(data: {
   });
 }
 
-export async function promoteTrendCandidates(promotedBy: string): Promise<{
+export async function promoteTrendCandidates(
+  promotedBy: string,
+  keys?: string[]
+): Promise<{
   promoted: number;
   failed: number;
   errors: string[];
@@ -710,11 +713,17 @@ export async function promoteTrendCandidates(promotedBy: string): Promise<{
   return request("/trend-candidates/promote", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ promoted_by: promotedBy })
+    body: JSON.stringify({
+      promoted_by: promotedBy,
+      ...(keys?.length ? { keys } : {})
+    })
   });
 }
 
-export async function promoteCandidates(promotedBy: string): Promise<{
+export async function promoteCandidates(
+  promotedBy: string,
+  keys?: string[]
+): Promise<{
   promoted: number;
   failed: number;
   errors: string[];
@@ -722,7 +731,10 @@ export async function promoteCandidates(promotedBy: string): Promise<{
   return request("/candidates/promote", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ promoted_by: promotedBy })
+    body: JSON.stringify({
+      promoted_by: promotedBy,
+      ...(keys?.length ? { keys } : {})
+    })
   });
 }
 
@@ -755,9 +767,27 @@ export async function fetchLists(params?: {
     items: payload.map((item) => ({
       _key: item._key,
       name: item.name,
-      list_type: item.list_type
+      list_type: item.list_type,
+      occasion: typeof item.occasion === "string" ? item.occasion : null,
+      year: typeof item.year === "string" ? item.year : null
     }))
   };
+}
+
+export async function createList(body: {
+  name: string;
+  list_type: string;
+  category: string;
+  occasion?: string | null;
+  year?: string | null;
+  status?: string;
+  content_type?: string;
+}) {
+  return request<ListOption & Record<string, unknown>>("/lists", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
 }
 
 export function emptySidebarCounts(): SidebarCounts {

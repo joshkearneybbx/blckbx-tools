@@ -82,12 +82,65 @@ export type TaskMatchResponse = {
 export type ClientAccount = {
   _key: string;
   account_name: string;
+  primary_contact?: string | null;
+  primary_contact_name?: string | null;
+  membership_tier?: "standard" | "premium" | "luxury" | "ultra" | string | null;
 };
 
 export type Recipient = {
   _key: string;
   name: string;
   client_account_key: string;
+};
+
+export type ClientProfile = {
+  _key: string;
+  first_name: string;
+  last_name: string;
+  is_primary?: boolean;
+  interests_count?: number;
+  affinities_count?: number;
+  notes?: string | null;
+};
+
+export type InterestTagOption = {
+  _key: string;
+  label: string;
+  category?: string | null;
+  usage_count?: number | null;
+};
+
+export type BrandOption = {
+  _key: string;
+  name: string;
+  tier?: "budget" | "mid" | "premium" | "luxury" | "ultra_luxury" | string | null;
+  website?: string | null;
+};
+
+export type ProfileInterest = {
+  edge_key: string;
+  tag_key: string;
+  label: string;
+  strength: number;
+  note?: string | null;
+  editable: boolean;
+  added_by?: string | null;
+  inferred_from?: string | null;
+  updated_at?: string | null;
+};
+
+export type ProfileAffinity = {
+  edge_key: string;
+  brand_key: string;
+  name: string;
+  tier?: string | null;
+  note?: string | null;
+  editable: boolean;
+  added_by?: string | null;
+  inferred_from?: string | null;
+  purchase_count?: number | null;
+  total_spend_pence?: number | null;
+  updated_at?: string | null;
 };
 
 export type RecentSubmission = {

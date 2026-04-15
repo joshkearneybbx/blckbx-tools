@@ -33,6 +33,23 @@ const rejectionPresetOptions = [
   { value: "out_of_stock", label: "Out of stock" }
 ] as const;
 
+const listTypeOptions = ["themed", "seasonal", "occasion", "editorial"] as const;
+const occasionOptions = [
+  "christmas",
+  "valentines",
+  "mothers_day",
+  "fathers_day",
+  "easter",
+  "birthday",
+  "anniversary",
+  "wedding",
+  "new_baby",
+  "housewarming",
+  "thank_you",
+  "graduation",
+  "retirement"
+] as const;
+
 type EditDraft = {
   imageUrl: string;
   name: string;
@@ -422,17 +439,26 @@ export function CatalogueGrid({
   lists,
   currentUser,
   busyKey,
+  exitingIds,
+  selectionEnabled,
+  selectedIds,
+  onToggleSelect,
   onApprove,
   onReject,
   onEdit,
   onTagsChange,
-  onListsChange
+  onListsChange,
+  onCreateList
 }: {
   candidates: CatalogueItem[];
   gridMode: GridMode;
   lists: ListOption[];
   currentUser: string;
   busyKey?: string;
+  exitingIds?: string[];
+  selectionEnabled?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (candidate: CatalogueItem) => void;
   onApprove: (candidate: CatalogueItem, reason?: string) => void;
   onReject: (
     candidate: CatalogueItem,
@@ -441,6 +467,10 @@ export function CatalogueGrid({
   onEdit: (candidate: CatalogueItem, changes: Record<string, unknown>) => Promise<unknown>;
   onTagsChange: (candidate: CatalogueItem, tags: string[]) => void;
   onListsChange: (candidate: CatalogueItem, assignedLists: string[]) => void;
+  onCreateList: (
+    candidate: CatalogueItem,
+    payload: { name: string; list_type: string; occasion?: string; year?: string }
+  ) => Promise<ListOption>;
 }) {
   return (
     <div
@@ -457,11 +487,16 @@ export function CatalogueGrid({
           lists={lists}
           currentUser={currentUser}
           busy={busyKey === candidate._key}
+          isExiting={exitingIds?.includes(`${candidate.collection}:${candidate._key}`)}
+          selectionEnabled={selectionEnabled}
+          selected={selectedIds?.includes(`${candidate.collection}:${candidate._key}`)}
+          onToggleSelect={() => onToggleSelect?.(candidate)}
           onApprove={(reason) => onApprove(candidate, reason)}
           onReject={(reason) => onReject(candidate, reason)}
           onEdit={(changes) => onEdit(candidate, changes)}
           onTagsChange={(tags) => onTagsChange(candidate, tags)}
           onListsChange={(assignedLists) => onListsChange(candidate, assignedLists)}
+          onCreateList={(payload) => onCreateList(candidate, payload)}
         />
       ))}
     </div>
@@ -551,6 +586,7 @@ export function CompactList({
                   src={imageUrl}
                   alt={candidate.name}
                   loading="lazy"
+                  referrerPolicy="no-referrer"
                   className="absolute inset-0 h-full w-full object-cover"
                 />
               ) : (
@@ -633,21 +669,36 @@ function CatalogueCard({
   lists,
   currentUser,
   busy,
+  isExiting,
+  selectionEnabled,
+  selected,
+  onToggleSelect,
   onApprove,
   onReject,
   onEdit,
   onTagsChange,
-  onListsChange
+  onListsChange,
+  onCreateList
 }: {
   candidate: CatalogueItem;
   lists: ListOption[];
   currentUser: string;
   busy: boolean;
+  isExiting?: boolean;
+  selectionEnabled?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   onApprove: (reason?: string) => void;
   onReject: (payload: { reason?: string; rejectionPreset: string }) => void;
   onEdit: (changes: Record<string, unknown>) => Promise<unknown>;
   onTagsChange: (tags: string[]) => void;
   onListsChange: (assignedLists: string[]) => void;
+  onCreateList: (payload: {
+    name: string;
+    list_type: string;
+    occasion?: string;
+    year?: string;
+  }) => Promise<ListOption>;
 }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -697,52 +748,80 @@ function CatalogueCard({
       : null;
 
   if (candidate.collection !== "product_candidates") {
-    return (
+      return (
         <TrendCatalogueCard
           candidate={candidate}
           currentUser={currentUser}
           busy={busy}
-        link={link}
-        variant="curation"
-        approvePrompt={approvePrompt}
-        approveReason={approveReason}
-        rejectReason={rejectReason}
-        rejectPreset={rejectPreset}
-        rejectError={rejectError}
-        isRejecting={isRejecting}
-        onApproveReasonChange={setApproveReason}
-        onRejectReasonChange={(value) => {
-          setRejectReason(value);
-          setRejectError(false);
-        }}
-        onRejectPresetChange={(value) => {
-          setRejectPreset(value);
-          setRejectError(false);
-        }}
-        onApprove={() => onApprove(approveReason.trim() || undefined)}
-        onApproveSkip={() => onApprove(undefined)}
-        onReject={submitReject}
-        onEdit={(changes) => onEdit(changes)}
-        onDismissReject={() => {
-          setIsRejecting(false);
-          setRejectReason("");
-          setRejectPreset("");
-          setRejectError(false);
-        }}
-        onShowApprove={() => setApprovePrompt(true)}
-        onShowReject={() => setIsRejecting(true)}
-      />
+          isExiting={isExiting}
+          selectionEnabled={selectionEnabled}
+          selected={selected}
+          onToggleSelect={onToggleSelect}
+          link={link}
+          variant="curation"
+          approvePrompt={approvePrompt}
+          approveReason={approveReason}
+          rejectReason={rejectReason}
+          rejectPreset={rejectPreset}
+          rejectError={rejectError}
+          isRejecting={isRejecting}
+          onApproveReasonChange={setApproveReason}
+          onRejectReasonChange={(value) => {
+            setRejectReason(value);
+            setRejectError(false);
+          }}
+          onRejectPresetChange={(value) => {
+            setRejectPreset(value);
+            setRejectError(false);
+          }}
+          onApprove={() => onApprove(approveReason.trim() || undefined)}
+          onApproveSkip={() => onApprove(undefined)}
+          onReject={submitReject}
+          onEdit={(changes) => onEdit(changes)}
+          onDismissReject={() => {
+            setIsRejecting(false);
+            setRejectReason("");
+            setRejectPreset("");
+            setRejectError(false);
+          }}
+          onShowApprove={() => setApprovePrompt(true)}
+          onShowReject={() => setIsRejecting(true)}
+        />
     );
   }
 
   return (
-    <article className="flex h-full flex-col overflow-hidden border border-[var(--sand-300)] bg-white transition hover:border-[var(--black)]">
+    <article
+      className={classNames(
+        "flex h-full flex-col overflow-hidden border border-[var(--sand-300)] bg-white transition hover:border-[var(--black)]",
+        isExiting ? "opacity-0 duration-200" : "opacity-100"
+      )}
+    >
       <div className="relative aspect-[4/3] w-full bg-[var(--sand-100)]">
+        {selectionEnabled ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSelect?.();
+            }}
+            className={classNames(
+              "absolute left-3 top-3 z-20 inline-flex h-4 w-4 items-center justify-center border-2 text-[10px] leading-none",
+              selected
+                ? "border-[var(--black)] bg-[var(--black)] text-[var(--white)]"
+                : "border-[var(--sand-300)] bg-white text-transparent"
+            )}
+            aria-label={selected ? "Deselect item" : "Select item"}
+          >
+            ✓
+          </button>
+        ) : null}
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={candidate.name}
             loading="lazy"
+            referrerPolicy="no-referrer"
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
@@ -840,23 +919,14 @@ function CatalogueCard({
 
         <div className="space-y-2">
           <Label>Add to list</Label>
-          <select
-            value=""
-            onChange={(event) => {
-              if (!event.target.value) {
-                return;
-              }
-              onListsChange([...candidate.assigned_lists, event.target.value]);
+          <ListSelector
+            availableLists={availableLists}
+            onAssign={(listKey) => onListsChange([...candidate.assigned_lists, listKey])}
+            onCreateList={async (payload) => {
+              const list = await onCreateList(payload);
+              onListsChange([...candidate.assigned_lists, list._key]);
             }}
-            className="w-full border border-[var(--sand-300)] bg-[var(--white)] px-3 py-3 text-sm text-[var(--text)] outline-none focus:border-[var(--black)]"
-          >
-            <option value="">Add to list...</option>
-            {availableLists.map((list) => (
-              <option key={list._key} value={list._key}>
-                {list.name}
-              </option>
-            ))}
-          </select>
+          />
           <div className="flex flex-wrap gap-2">
             {selectedLists.map((list) => (
               <Pill key={list._key} tone="list">
@@ -1000,6 +1070,10 @@ function TrendCatalogueCard({
   candidate,
   currentUser,
   busy,
+  isExiting,
+  selectionEnabled,
+  selected,
+  onToggleSelect,
   link,
   variant,
   approvePrompt,
@@ -1022,6 +1096,10 @@ function TrendCatalogueCard({
   candidate: TrendCandidate | RecommendationCandidate;
   currentUser: string;
   busy: boolean;
+  isExiting?: boolean;
+  selectionEnabled?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   link: ReturnType<typeof getPrimaryLink>;
   variant: "curation" | "research";
   approvePrompt: boolean;
@@ -1045,8 +1123,18 @@ function TrendCatalogueCard({
   const isResearch = variant === "research";
 
   return (
-    <article className="flex h-full flex-col overflow-hidden border border-[var(--sand-300)] bg-white transition hover:border-[var(--black)]">
-      <TrendHeroImage candidate={candidate} />
+    <article
+      className={classNames(
+        "flex h-full flex-col overflow-hidden border border-[var(--sand-300)] bg-white transition hover:border-[var(--black)]",
+        isExiting ? "opacity-0 duration-200" : "opacity-100"
+      )}
+    >
+      <TrendHeroImage
+        candidate={candidate}
+        selectionEnabled={selectionEnabled}
+        selected={selected}
+        onToggleSelect={onToggleSelect}
+      />
       <div className="border-b border-[var(--sand-300)] bg-[linear-gradient(135deg,rgba(245,243,240,0.9),rgba(255,255,255,1))] px-4 py-4">
         <div className="flex flex-wrap items-center gap-2">
           <ReviewPriorityBadges candidate={candidate} />
@@ -1370,18 +1458,43 @@ function TravelResearchCard({
 }
 
 function TrendHeroImage({
-  candidate
+  candidate,
+  selectionEnabled,
+  selected,
+  onToggleSelect
 }: {
   candidate: TrendCandidate | RecommendationCandidate;
+  selectionEnabled?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const imageUrl = candidate.hero_image_url || candidate.cover_images?.[0] || null;
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--sand-100)]">
+      {selectionEnabled ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleSelect?.();
+          }}
+          className={classNames(
+            "absolute left-3 top-3 z-20 inline-flex h-4 w-4 items-center justify-center border-2 text-[10px] leading-none",
+            selected
+              ? "border-[var(--black)] bg-[var(--black)] text-[var(--white)]"
+              : "border-[var(--sand-300)] bg-white text-transparent"
+          )}
+          aria-label={selected ? "Deselect item" : "Select item"}
+        >
+          ✓
+        </button>
+      ) : null}
       {imageUrl ? (
         <img
           src={imageUrl}
           alt={candidate.name}
           loading="lazy"
+          referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : (
@@ -1548,8 +1661,19 @@ const EditCandidateModal = memo(function EditCandidateModal({
     isGeoCandidate && (isEditingGeo || geoState?.geo_needs_review === true || !hasExistingGeo);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(20,18,15,0.45)] p-4 md:p-6">
-      <div className="max-h-[calc(100vh-2rem)] w-full max-w-[900px] overflow-hidden border border-[var(--sand-300)] bg-[var(--white)]">
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        aria-label="Close modal"
+        className="modal-backdrop"
+        onClick={() => {
+          if (!busy) {
+            onClose();
+          }
+        }}
+      />
+      <div className="edit-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="max-h-[90vh] overflow-hidden border border-[var(--sand-300)] bg-[var(--white)]">
         <div className="flex items-center justify-between gap-4 border-b border-[var(--sand-300)] px-5 py-4">
           <p className="text-[0.72rem] uppercase tracking-[0.2em] text-[var(--sand-700)]">
             Edit candidate
@@ -1591,6 +1715,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                     <img
                       src={draft.imageUrl}
                       alt={draft.name || candidate.name}
+                      referrerPolicy="no-referrer"
                       className="h-full w-full object-cover"
                       onError={() => setImageError(true)}
                     />
@@ -2071,6 +2196,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                               <img
                                 src={imageUrl}
                                 alt={`${candidate.name} cover ${index + 1}`}
+                                referrerPolicy="no-referrer"
                                 className="h-full w-full object-cover"
                               />
                             ) : null}
@@ -2211,11 +2337,155 @@ const EditCandidateModal = memo(function EditCandidateModal({
             </section>
           </div>
         </div>
+        </div>
       </div>
     </div>,
     document.body
   );
 });
+
+function ListSelector({
+  availableLists,
+  onAssign,
+  onCreateList
+}: {
+  availableLists: ListOption[];
+  onAssign: (listKey: string) => void;
+  onCreateList: (payload: {
+    name: string;
+    list_type: string;
+    occasion?: string;
+    year?: string;
+  }) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState("");
+  const [listType, setListType] = useState<string>("themed");
+  const [occasion, setOccasion] = useState("");
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="w-full border border-[var(--sand-300)] bg-[var(--white)] px-3 py-3 text-left text-sm text-[var(--text)] outline-none transition hover:border-[var(--black)]"
+      >
+        Add to list...
+      </button>
+      {open ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 border border-[var(--sand-300)] bg-white">
+          {availableLists.map((list) => (
+            <button
+              key={list._key}
+              type="button"
+              onClick={() => {
+                onAssign(list._key);
+                setOpen(false);
+              }}
+              className="block w-full border-b border-[var(--sand-200)] px-3 py-3 text-left text-sm transition hover:bg-[var(--sand-100)] last:border-b-0"
+            >
+              {list.name}
+            </button>
+          ))}
+          <div className="border-t border-[var(--sand-200)]">
+            <button
+              type="button"
+              onClick={() => setShowCreate((current) => !current)}
+              className="block w-full px-3 py-3 text-left text-sm transition hover:bg-[var(--sand-100)]"
+            >
+              + Create new list
+            </button>
+            {showCreate ? (
+              <div className="space-y-3 border-t border-[var(--sand-200)] px-3 py-3">
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Summer Edit 2026"
+                  className={fieldClasses}
+                />
+                <select
+                  value={listType}
+                  onChange={(event) => setListType(event.target.value)}
+                  className={fieldClasses}
+                >
+                  {listTypeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                {(listType === "occasion" || listType === "seasonal") ? (
+                  <select
+                    value={occasion}
+                    onChange={(event) => setOccasion(event.target.value)}
+                    className={fieldClasses}
+                  >
+                    <option value="">Occasion (optional)</option>
+                    {occasionOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <input
+                  value={year}
+                  onChange={(event) => setYear(event.target.value)}
+                  className={fieldClasses}
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreate(false);
+                      setError("");
+                    }}
+                    className="border border-[var(--sand-300)] px-3 py-2 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={creating || !name.trim()}
+                    onClick={async () => {
+                      setCreating(true);
+                      setError("");
+                      try {
+                        await onCreateList({
+                          name: name.trim(),
+                          list_type: listType,
+                          occasion: occasion || undefined,
+                          year: year.trim() || undefined
+                        });
+                        setOpen(false);
+                        setShowCreate(false);
+                        setName("");
+                        setOccasion("");
+                        setYear(String(new Date().getFullYear()));
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Failed to create list");
+                      } finally {
+                        setCreating(false);
+                      }
+                    }}
+                    className="border border-[var(--black)] bg-[var(--black)] px-3 py-2 text-sm font-medium text-[var(--white)] disabled:opacity-60"
+                  >
+                    {creating ? "Creating..." : "Create"}
+                  </button>
+                </div>
+                {error ? <p className="text-sm text-[var(--error)]">{error}</p> : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function FormField({
   label,

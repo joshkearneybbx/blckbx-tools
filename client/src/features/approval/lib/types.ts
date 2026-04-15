@@ -174,6 +174,8 @@ export type ListOption = {
   _key: string;
   name: string;
   list_type: string;
+  occasion?: string | null;
+  year?: string | null;
 };
 
 export type ListsResponse = {

@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   createCurationDecision,
+  createList,
   emptySidebarCounts,
   fetchCandidates,
   fetchLists,
@@ -27,10 +28,10 @@ import type {
   CatalogueStatus,
   ContentTab,
   GridMode,
+  ListOption,
   ReviewerName,
   StayingInFilter,
-  TrendCandidate,
-  TrendConfidence
+  TrendCandidate
 } from "../lib/types";
 import { contentTabs, reviewerOptions } from "../lib/types";
 import { classNames, contentTabLabel, statusLabel } from "../lib/utils";
@@ -41,7 +42,7 @@ import {
 } from "./catalogue-card";
 
 const gridModes: GridMode[] = [2, 3];
-const tabOrder: CatalogueStatus[] = ["pending", "approved", "rejected"];
+const tabOrder: CatalogueStatus[] = ["pending", "rejected"];
 const pendingPageSize = 12;
 const compactPageSize = 50;
 const SUBCATEGORY_MAP: Partial<
@@ -130,6 +131,14 @@ type CatalogueQueryResult = {
   pages: number;
 };
 
+function candidateId(candidate: CatalogueItem) {
+  return `${candidate.collection}:${candidate._key}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function replaceCatalogueItem(items: CatalogueItem[], updated: CatalogueItem) {
   let changed = false;
   const nextItems = items.map((item) => {
@@ -186,6 +195,10 @@ export function CatalogueApp() {
     2
   );
   const [toast, setToast] = useState<ToastState>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [busyApproveId, setBusyApproveId] = useState<string | undefined>(undefined);
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [exitingIds, setExitingIds] = useState<string[]>([]);
   const search = searchByTab[contentTab];
 
   useEffect(() => {
@@ -211,6 +224,10 @@ export function CatalogueApp() {
     const handle = window.setTimeout(() => setToast(null), 2500);
     return () => window.clearTimeout(handle);
   }, [toast]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [activeTab, contentTab, page, stayingInFilter, selectedSubcategory, debouncedSearch]);
 
   const statsQuery = useQuery({
     queryKey: ["catalogue-stats"],
@@ -320,57 +337,6 @@ export function CatalogueApp() {
     placeholderData: keepPreviousData
   });
 
-  const approvedQuery = useQuery<CatalogueQueryResult>({
-    queryKey: [
-      "catalogue",
-      contentTab,
-      "approved",
-      debouncedSearch,
-      stayingInFilter,
-      selectedSubcategory
-    ],
-    queryFn: () => {
-      if (isRequestsTab(contentTab)) {
-        return Promise.resolve({
-          items: [],
-          total: 0,
-          page: 1,
-          pageSize: compactPageSize,
-          pages: 1
-        });
-      }
-
-      if (isShoppingTab(contentTab)) {
-        return fetchCandidates({
-          status: "approved",
-          page: 1,
-          limit: compactPageSize,
-          search: debouncedSearch,
-          subcategory: selectedSubcategory ?? undefined
-        }) as Promise<CatalogueQueryResult>;
-      }
-
-      if (contentTab === "travel") {
-        return Promise.resolve({
-          items: [],
-          total: 0,
-          page: 1,
-          pageSize: compactPageSize,
-          pages: 1
-        });
-      }
-
-      return fetchTrendCandidates({
-        status: "approved",
-        ...getTrendFilters(contentTab, stayingInFilter),
-        page: 1,
-        limit: compactPageSize,
-        search: debouncedSearch,
-        subcategory: selectedSubcategory ?? undefined
-      }) as Promise<CatalogueQueryResult>;
-    }
-  });
-
   const rejectedQuery = useQuery<CatalogueQueryResult>({
     queryKey: [
       "catalogue",
@@ -440,62 +406,6 @@ export function CatalogueApp() {
       setToast({ tone: "error", message: error.message });
     }
   };
-
-  const approveMutation = useMutation<
-    unknown,
-    Error,
-    {
-      key: string;
-      collection: CatalogueItem["collection"];
-      curationReason?: string;
-      decidedBy: string;
-    }
-  >({
-    mutationFn: ({
-      key,
-      collection,
-      curationReason,
-      decidedBy
-    }: {
-      key: string;
-      collection: CatalogueItem["collection"];
-      curationReason?: string;
-      decidedBy: string;
-    }) =>
-      collection === "product_candidates"
-        ? createCurationDecision({
-            candidate_key: key,
-            candidate_collection: "product_candidates",
-            decision: "approved",
-            reason: curationReason || undefined,
-            decided_by: decidedBy
-          })
-        : collection === "recommendations"
-          ? updateRecommendation(key, {
-              curation_status: "approved",
-              status: "active",
-              curated_by: decidedBy,
-              curation_reason: curationReason || undefined
-            })
-        : createCurationDecision({
-            candidate_key: key,
-            candidate_collection: "trend_candidates",
-            decision: "approved",
-            reason: curationReason || undefined,
-            decided_by: decidedBy
-          }),
-    ...mutationOptions,
-    onSuccess: async (_result, variables) => {
-      setToast({
-        tone: "success",
-        message:
-          variables.collection === "product_candidates"
-            ? "Product moved to review."
-            : "Trend candidate moved to review."
-      });
-      await mutationOptions.onSuccess();
-    }
-  });
 
   const rejectMutation = useMutation<
     unknown,
@@ -606,23 +516,6 @@ export function CatalogueApp() {
     }
   });
 
-  const promoteMutation = useMutation({
-    mutationFn: () =>
-      contentTab === "travel" || isRequestsTab(contentTab)
-        ? Promise.resolve({ promoted: 0, failed: 0, errors: [] })
-        : isShoppingTab(contentTab)
-        ? promoteCandidates(reviewer)
-        : promoteTrendCandidates(reviewer),
-    ...mutationOptions,
-    onSuccess: async (result) => {
-      setToast({
-        tone: "success",
-        message: `${result.promoted} ${isShoppingTab(contentTab) ? "products" : "trend candidates"} promoted to recommendations`
-      });
-      await mutationOptions.onSuccess();
-    }
-  });
-
   const editMutation = useMutation<
     CatalogueItem,
     Error,
@@ -664,18 +557,15 @@ export function CatalogueApp() {
   const tabCounts = isShoppingTab(contentTab)
     ? {
         pending: pendingQuery.data?.total ?? 0,
-        approved: stats.ready_to_promote,
         rejected: stats.rejected
       }
     : isRequestsTab(contentTab)
       ? {
           pending: pendingQuery.data?.total ?? 0,
-          approved: 0,
           rejected: 0
         }
     : {
         pending: contentTab === "travel" ? pendingQuery.data?.total ?? 0 : pendingQuery.data?.total ?? 0,
-        approved: contentTab === "travel" ? 0 : approvedQuery.data?.total ?? 0,
         rejected: contentTab === "travel" ? 0 : rejectedQuery.data?.total ?? 0
       };
 
@@ -708,24 +598,152 @@ export function CatalogueApp() {
     if (activeTab === "pending") {
       return pendingQuery.data?.items ?? [];
     }
-    if (activeTab === "approved") {
-      return (approvedQuery.data?.items ?? []).filter((item) => !item.promoted_to_key);
-    }
     return rejectedQuery.data?.items ?? [];
   }, [
     activeTab,
-    approvedQuery.data?.items,
     pendingQuery.data?.items,
     rejectedQuery.data?.items
   ]);
 
+  const visibleSelectedIds = selectedIds.filter((id) =>
+    activeView.some((candidate) => candidateId(candidate) === id)
+  );
+
   const busyKey =
-    (approveMutation.isPending ? approveMutation.variables?.key : undefined) ??
+    busyApproveId ??
     (rejectMutation.isPending ? rejectMutation.variables?.key : undefined) ??
     (restoreMutation.isPending ? restoreMutation.variables?.key : undefined) ??
     (editMutation.isPending ? editMutation.variables?.candidate._key : undefined) ??
     (tagsMutation.isPending ? tagsMutation.variables?.key : undefined) ??
     (listsMutation.isPending ? listsMutation.variables?.key : undefined);
+
+  async function invalidateCatalogueData() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["catalogue"] }),
+      queryClient.invalidateQueries({ queryKey: ["catalogue-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["trend-catalogue-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["lists"] })
+    ]);
+  }
+
+  async function approveCandidateNow(candidate: CatalogueItem, curationReason?: string) {
+    const id = candidateId(candidate);
+    setBusyApproveId(candidate._key);
+    try {
+      if (candidate.collection === "product_candidates") {
+        await updateCandidate(candidate._key, {
+          status: "approved",
+          reviewed_by: reviewer,
+          reviewed_at: new Date().toISOString(),
+          curation_reason: curationReason || null
+        });
+        try {
+          await promoteCandidates(reviewer, [candidate._key]);
+        } catch (error) {
+          await updateCandidate(candidate._key, {
+            status: "pending",
+            reviewed_by: null,
+            reviewed_at: null,
+            curation_reason: null
+          });
+          throw error;
+        }
+      } else if (candidate.collection === "trend_candidates") {
+        await updateTrendCandidate(candidate._key, {
+          status: "approved",
+          reviewed_by: reviewer,
+          reviewed_at: new Date().toISOString(),
+          curation_reason: curationReason || null
+        });
+        try {
+          await promoteTrendCandidates(reviewer, [candidate._key]);
+        } catch (error) {
+          await updateTrendCandidate(candidate._key, {
+            status: "pending",
+            reviewed_by: null,
+            reviewed_at: null,
+            curation_reason: null
+          });
+          throw error;
+        }
+      } else {
+        await updateRecommendation(candidate._key, {
+          curation_status: "approved",
+          status: "active",
+          curated_by: reviewer,
+          curation_reason: curationReason || null
+        });
+      }
+
+      setExitingIds((current) => [...current, id]);
+      await sleep(180);
+      setSelectedIds((current) => current.filter((selectedId) => selectedId !== id));
+      setToast({ tone: "success", message: `${candidate.name} approved.` });
+      await invalidateCatalogueData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Approval failed.";
+      setToast({ tone: "error", message });
+      throw error;
+    } finally {
+      setExitingIds((current) => current.filter((candidateKey) => candidateKey !== id));
+      setBusyApproveId(undefined);
+    }
+  }
+
+  async function handleBulkApprove() {
+    const candidates = activeView.filter((candidate) =>
+      visibleSelectedIds.includes(candidateId(candidate))
+    );
+    if (!candidates.length) return;
+
+    setBulkApproving(true);
+    const failures: string[] = [];
+    for (const candidate of candidates) {
+      try {
+        await approveCandidateNow(candidate);
+      } catch {
+        failures.push(candidate.name);
+      }
+    }
+    setBulkApproving(false);
+    setSelectedIds([]);
+    if (failures.length) {
+      setToast({
+        tone: "error",
+        message: `Failed to approve: ${failures.join(", ")}`
+      });
+    }
+  }
+
+  async function handleCreateList(
+    candidate: CatalogueItem,
+    payload: {
+      name: string;
+      list_type: string;
+      occasion?: string;
+      year?: string;
+    }
+  ): Promise<ListOption> {
+    const created = await createList({
+      name: payload.name,
+      list_type: payload.list_type,
+      occasion: payload.occasion || null,
+      year: payload.year || null,
+      category:
+        contentTab === "requests" ? "shopping" : contentTab,
+      status: "active",
+      content_type: "list"
+    });
+    await queryClient.invalidateQueries({ queryKey: ["lists"] });
+    setToast({ tone: "success", message: `Created list "${created.name}".` });
+    return {
+      _key: created._key,
+      name: created.name,
+      list_type: created.list_type,
+      occasion: typeof created.occasion === "string" ? created.occasion : null,
+      year: typeof created.year === "string" ? created.year : null
+    };
+  }
 
   return (
     <main className="min-h-screen bg-transparent p-3 md:p-5">
@@ -966,30 +984,6 @@ export function CatalogueApp() {
           </div>
 
           <div className="flex-1 px-4 py-5 md:px-8">
-            {activeTab === "approved" &&
-            contentTab !== "travel" &&
-            !isRequestsTab(contentTab) &&
-            tabCounts.approved > 0 ? (
-              <div className="mb-5 flex flex-col gap-3 border border-[var(--sand-300)] bg-[var(--sand-100)] px-4 py-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-base font-medium text-[var(--text)]">
-                    {tabCounts.approved} items ready to send
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--sand-900)]">
-                    Approved items stay staged here until they are sent to the recommendations database.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={!tabCounts.approved || promoteMutation.isPending}
-                  onClick={() => promoteMutation.mutate()}
-                  className="border border-[var(--black)] bg-[var(--black)] px-4 py-2 text-sm font-medium text-[var(--white)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Send to database
-                </button>
-              </div>
-            ) : null}
-
             {isLoading ||
             statsQuery.isLoading ||
             trendStatsQuery.isLoading ||
@@ -997,11 +991,9 @@ export function CatalogueApp() {
             shoppingCountQuery.isLoading ||
             travelCountQuery.isLoading ||
             pendingQuery.isLoading ||
-            approvedQuery.isLoading ||
             rejectedQuery.isLoading ? (
               <LoadingState />
             ) : pendingQuery.isError ||
-              approvedQuery.isError ||
               rejectedQuery.isError ||
               statsQuery.isError ||
               trendStatsQuery.isError ||
@@ -1024,14 +1016,20 @@ export function CatalogueApp() {
                   lists={lists}
                   currentUser={reviewer}
                   busyKey={busyKey}
-                  onApprove={(candidate, reason) =>
-                    approveMutation.mutate({
-                      key: candidate._key,
-                      collection: candidate.collection,
-                      curationReason: reason,
-                      decidedBy: reviewer
-                    })
-                  }
+                  exitingIds={exitingIds}
+                  selectionEnabled
+                  selectedIds={selectedIds}
+                  onToggleSelect={(candidate) => {
+                    const id = candidateId(candidate);
+                    setSelectedIds((current) =>
+                      current.includes(id)
+                        ? current.filter((selectedId) => selectedId !== id)
+                        : [...current, id]
+                    );
+                  }}
+                  onApprove={(candidate, reason) => {
+                    void approveCandidateNow(candidate, reason);
+                  }}
                   onReject={(candidate, payload) =>
                     rejectMutation.mutate({
                       key: candidate._key,
@@ -1059,7 +1057,42 @@ export function CatalogueApp() {
                       assignedLists
                     })
                   }
+                  onCreateList={handleCreateList}
                 />
+                {visibleSelectedIds.length ? (
+                  <div className="sticky bottom-4 mt-5 flex flex-col gap-3 border border-[var(--black)] bg-[var(--black)] px-4 py-4 text-sm text-[var(--white)] md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedIds([])}
+                        className="inline-flex h-6 w-6 items-center justify-center border border-[var(--white)] text-[var(--white)]"
+                        aria-label="Clear selection"
+                      >
+                        ×
+                      </button>
+                      <span>{visibleSelectedIds.length} selected</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedIds(activeView.map((candidate) => candidateId(candidate)))
+                        }
+                        className="text-[var(--white)] underline underline-offset-4"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        disabled={bulkApproving}
+                        onClick={() => void handleBulkApprove()}
+                        className="border border-[var(--white)] bg-[var(--white)] px-4 py-2 font-medium text-[var(--black)] disabled:opacity-50"
+                      >
+                        {bulkApproving ? "Approving..." : "Approve Selected"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
               </>
             ) : (

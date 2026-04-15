@@ -71,7 +71,7 @@ export interface QuoteData {
     arrivalTime: string;
     class: string;
     baggage: string;
-  };
+  } | null;
   returnTravel: {
     airline: string;
     flightNumber: string;
@@ -85,7 +85,7 @@ export interface QuoteData {
     arrivalTime: string;
     class: string;
     baggage: string;
-  };
+  } | null;
   accommodation: {
     name: string;
     checkIn: string;
@@ -148,6 +148,23 @@ const hasAccommodationData = (accommodation: QuoteData["accommodation"]): boolea
       accommodation.roomType?.trim() ||
       accommodation.boardBasis?.trim() ||
       String(accommodation.guests || "").trim()
+  );
+};
+
+const hasFlightData = (
+  flight: QuoteData["outboundTravel"] | QuoteData["returnTravel"]
+): boolean => {
+  if (!flight) return false;
+
+  return Boolean(
+    flight.airline?.trim() ||
+      flight.flightNumber?.trim() ||
+      flight.departureAirport?.trim() ||
+      flight.departureAirportCode?.trim() ||
+      flight.arrivalAirport?.trim() ||
+      flight.arrivalAirportCode?.trim() ||
+      flight.departureDate?.trim() ||
+      flight.arrivalDate?.trim()
   );
 };
 
@@ -630,7 +647,7 @@ const FlightCard = ({
   flight,
   travellers,
 }: {
-  flight: QuoteData["outboundTravel"];
+  flight: NonNullable<QuoteData["outboundTravel"]>;
   travellers: QuoteData["travellers"];
 }) => {
   const fromCode =
@@ -803,6 +820,8 @@ export function QuotePDFTemplate({
   const hasNotes = Boolean(notes && notes.trim().length > 0);
   const hasDescription = Boolean(description && description.trim().length > 0);
   const hasAdditionalNotes = Boolean(additionalNotes && additionalNotes.trim().length > 0);
+  const hasOutboundFlight = hasFlightData(outboundTravel);
+  const hasReturnFlight = hasFlightData(returnTravel);
   const hasAccommodation = hasAccommodationData(accommodation);
   const hasCoverPhoto = Boolean(coverPhotoUrl);
   const resolvedTripPhotos = (tripPhotos || [])
@@ -872,10 +891,12 @@ export function QuotePDFTemplate({
             </View>
           )}
 
-          <View wrap={false}>
-            <Text style={styles.subSectionTitle}>Outbound Flight</Text>
-            <FlightCard flight={outboundTravel} travellers={travellers} />
-          </View>
+          {hasOutboundFlight ? (
+            <View wrap={false}>
+              <Text style={styles.subSectionTitle}>Outbound Flight</Text>
+              <FlightCard flight={outboundTravel!} travellers={travellers} />
+            </View>
+          ) : null}
 
           {hasAccommodation ? (
             <View wrap={false}>
@@ -884,10 +905,12 @@ export function QuotePDFTemplate({
             </View>
           ) : null}
 
-          <View wrap={false}>
-            <Text style={styles.subSectionTitle}>Return Flight</Text>
-            <FlightCard flight={returnTravel} travellers={travellers} />
-          </View>
+          {hasReturnFlight ? (
+            <View wrap={false}>
+              <Text style={styles.subSectionTitle}>Return Flight</Text>
+              <FlightCard flight={returnTravel!} travellers={travellers} />
+            </View>
+          ) : null}
 
           {hasAdditionalNotes ? (
             <View wrap={false}>

@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { FileSearch, List, PlusSquare, UsersIcon } from "lucide-react";
 import { ToastProvider } from "./components/ToastProvider";
 import "./research.css";
 
 const navItems = [
-  { href: "/research", label: "Add Item" },
-  { href: "/research/search", label: "Search" },
-  { href: "/research/task-matcher", label: "Task Matcher" },
-  { href: "/research/lists", label: "Lists" },
+  { href: "/research", label: "Add Item", icon: PlusSquare },
+  { href: "/research/search", label: "Search", icon: FileSearch },
+  { href: "/research/task-matcher", label: "Task Matcher", icon: FileSearch },
+  { href: "/research/client-interests", label: "Client Interests", icon: UsersIcon },
+  { href: "/research/lists", label: "Lists", icon: List },
 ];
 
 export function ResearchLayout({ children }: { children: ReactNode }) {
@@ -24,17 +26,19 @@ export function ResearchLayout({ children }: { children: ReactNode }) {
           <nav className="mt-7 flex flex-col">
             {navItems.map((item) => {
               const active = item.href === "/research" ? location === "/research" : location.startsWith(item.href);
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={[
-                    "flex min-h-10 items-center border-l-[3px] py-[10px] pl-4 text-[14px] text-[var(--muted)] transition-colors",
+                    "flex min-h-10 items-center gap-2 border-l-[3px] py-[10px] pl-4 text-[14px] text-[var(--muted)] transition-colors",
                     active
                       ? "border-[var(--black)] bg-[var(--sand-100)] font-medium text-[var(--text)]"
                       : "border-transparent hover:text-[var(--text)]",
                   ].join(" ")}
                 >
+                  <Icon className="h-4 w-4" />
                   {item.label}
                 </Link>
               );
