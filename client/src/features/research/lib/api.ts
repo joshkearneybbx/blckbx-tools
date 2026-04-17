@@ -47,6 +47,9 @@ async function gatewayFetch(path: string, options?: RequestInit) {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(import.meta.env.VITE_GATEWAY_API_KEY
+        ? { "x-api-key": import.meta.env.VITE_GATEWAY_API_KEY }
+        : {}),
       ...options?.headers,
     },
   });

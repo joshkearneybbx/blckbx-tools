@@ -14,8 +14,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(init?.headers ?? {})
-    }
+      ...(import.meta.env.VITE_GATEWAY_API_KEY
+        ? { "x-api-key": import.meta.env.VITE_GATEWAY_API_KEY }
+        : {}),
+      ...(init?.headers ?? {}),
+    },
   });
 
   if (!response.ok) {

@@ -247,7 +247,16 @@ function toErrorMessage(error: unknown) {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
-    const response = await fetch(`${API_URL}${path}`, init);
+    const response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(import.meta.env.VITE_GATEWAY_API_KEY
+          ? { "x-api-key": import.meta.env.VITE_GATEWAY_API_KEY }
+          : {}),
+        ...(init?.headers ?? {}),
+      },
+    });
     const payload = await response.json();
 
     if (!response.ok) {
