@@ -37,10 +37,12 @@ export function formatPrice(candidate: ProductCandidate) {
   if (candidate.price_text) {
     return candidate.price_text;
   }
-  if (candidate.price_pence !== null) {
-    const amount = candidate.price_pence / 100;
-    return `${candidate.currency ?? "GBP"} ${amount.toFixed(2)}`;
+
+  const pricePence = typeof candidate.price_pence === "number" ? candidate.price_pence : null;
+  if (pricePence !== null && pricePence > 0) {
+    return `£${(pricePence / 100).toFixed(2)}`;
   }
+
   return "Price TBC";
 }
 

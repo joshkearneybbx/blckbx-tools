@@ -1,0 +1,65 @@
+.content-hub {
+  --ch-bg: #e8e5e0;
+  --ch-surface: #fafaf8;
+  --ch-surface-soft: #f3f0ea;
+  --ch-border: rgba(10, 10, 10, 0.1);
+  --ch-text: #0a0a0a;
+  --ch-muted: rgba(10, 10, 10, 0.62);
+  --ch-accent: #e7c51c;
+
+  min-height: 100vh;
+  background: var(--ch-bg);
+  color: var(--ch-text);
+  font-family: var(--font-sans);
+}
+
+.content-hub * {
+  box-sizing: border-box;
+}
+
+.content-hub .ch-panel,
+.content-hub .ch-panel-soft,
+.content-hub .ch-card,
+.content-hub .ch-pill {
+  border-radius: 0;
+}
+
+.content-hub .ch-panel {
+  border: 1px solid var(--ch-border);
+  background: var(--ch-surface);
+}
+
+.content-hub .ch-panel-soft {
+  border: 1px solid var(--ch-border);
+  background: var(--ch-surface-soft);
+}
+
+.content-hub .ch-card {
+  border: 1px solid var(--ch-border);
+  background: rgba(255, 255, 255, 0.55);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.content-hub .ch-card:hover {
+  border-color: rgba(10, 10, 10, 0.22);
+  transform: translateY(-1px);
+}
+
+.content-hub .ch-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(10, 10, 10, 0.48);
+}
+
+.content-hub .ch-pill {
+  border: 1px solid rgba(10, 10, 10, 0.12);
+  background: rgba(231, 197, 28, 0.16);
+  color: var(--ch-text);
+  padding: 0.25rem 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

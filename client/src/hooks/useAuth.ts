@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { pb, type User } from '@/lib/pocketbase';
 import { isToolSlug, type ToolSlug } from '@/lib/tool-access';
 
-function normalizeAllowedTools(value: unknown): ToolSlug[] {
+type AllowedToolValue = ToolSlug | 'all';
+
+function normalizeAllowedTools(value: unknown): AllowedToolValue[] {
   if (!Array.isArray(value)) return [];
 
-  return value.filter((tool): tool is ToolSlug => (
-    typeof tool === 'string' && isToolSlug(tool)
+  return value.filter((tool): tool is AllowedToolValue => (
+    typeof tool === 'string' && (tool === 'all' || isToolSlug(tool))
   ));
 }
 
@@ -14,19 +16,41 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(pb.authStore.model as User | null);
   const [isLoading, setIsLoading] = useState(true);
   const allowedTools = normalizeAllowedTools(user?.allowed_tools);
-  const hasAccess = (slug: ToolSlug): boolean => allowedTools.includes(slug);
+  const hasAccess = (slug: ToolSlug): boolean => (
+    allowedTools.includes('all') || allowedTools.includes(slug)
+  );
 
   useEffect(() => {
-    // Check if auth is valid on mount
-    setIsLoading(false);
-    setUser(pb.authStore.model as User | null);
+    let cancelled = false;
+
+    const syncAuth = async () => {
+      try {
+        if (pb.authStore.isValid) {
+          await pb.collection('users').authRefresh();
+        }
+      } catch {
+        pb.authStore.clear();
+      } finally {
+        if (!cancelled) {
+          setUser(pb.authStore.model as User | null);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void syncAuth();
 
     // Listen for auth changes
     const unsubscribe = pb.authStore.onChange(() => {
-      setUser(pb.authStore.model as User | null);
+      if (!cancelled) {
+        setUser(pb.authStore.model as User | null);
+      }
     });
 
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

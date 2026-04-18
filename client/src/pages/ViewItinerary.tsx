@@ -232,7 +232,7 @@ function SortableTravelItem({
                     arrivalDate: resolvedLegDates[idx]?.arrivalDate,
                     departureDate: resolvedLegDates[idx + 1]?.departureDate,
                   })) && (
-                    <div className="px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm flex items-center gap-2">
+                    <div className="px-4 py-2 bg-[#F5F3F0] text-[#6B6865] text-sm flex items-center gap-2">
                       <span className="font-medium">Layover:</span> {leg.layoverDuration || calculateLayover(leg.arrivalTime || '', legs[idx + 1]?.departureTime || '', {
                         arrivalDate: resolvedLegDates[idx]?.arrivalDate,
                         departureDate: resolvedLegDates[idx + 1]?.departureDate,
@@ -338,8 +338,8 @@ function SortableTravelItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-[12px] bg-white shadow-sm overflow-hidden transition-shadow ${
-        isDragging ? 'shadow-xl ring-2 ring-[#E7C51C]' : ''
+      className={`bg-[#F5F3F0] border border-[#D4D0CB] overflow-hidden transition-shadow ${
+        isDragging ? 'shadow-xl ring-2 ring-[#0A0A0A]' : ''
       }`}
     >
       {/* Header with optional drag handle and travel type */}
@@ -463,8 +463,8 @@ function DestinationSection({
   };
 
   return (
-    <Card id={`section-destination-${destination.id}`} className="overflow-hidden rounded-[12px]">
-      <CardHeader className="bg-[#232220] text-white">
+    <Card id={`section-destination-${destination.id}`} className="overflow-hidden">
+      <CardHeader className="bg-[#0A0A0A] text-white">
         <div className="flex items-start justify-between">
           <div>
             <CardTitle className="text-2xl flex items-center gap-2 text-white">
@@ -488,7 +488,7 @@ function DestinationSection({
               href={destination.weatherUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-[#E07A5F] underline hover:opacity-80 flex items-center gap-1"
+              className="text-sm text-[#0A0A0A] underline hover:opacity-80 flex items-center gap-1"
             >
               <ExternalLink className="w-4 h-4" />
               Weather
@@ -500,7 +500,7 @@ function DestinationSection({
         {/* Travel Section */}
         {travelSegments.length > 0 && (
           <div>
-            <h3 className="font-semibold text-lg mb-4 text-[#1a1a1a]">
+            <h3 className="font-semibold text-lg mb-4 text-[#0A0A0A]">
               {destIndex === 0 ? 'Outbound Travel' : `Travel to ${destination.name}`}
             </h3>
             <div className="space-y-4">
@@ -514,7 +514,7 @@ function DestinationSection({
         {/* Accommodation Section */}
         {accommodations.length > 0 && (
           <div>
-            <h3 className="font-semibold text-lg mb-4 text-[#1a1a1a]">
+            <h3 className="font-semibold text-lg mb-4 text-[#0A0A0A]">
               Accommodation
             </h3>
             <div className="space-y-4">
@@ -528,7 +528,7 @@ function DestinationSection({
         {/* Activities Section */}
         {activities.length > 0 && (
           <div>
-            <h3 className="font-semibold text-lg mb-4 text-[#1a1a1a]">
+            <h3 className="font-semibold text-lg mb-4 text-[#0A0A0A]">
               Activities & Experiences
             </h3>
             <div className="space-y-4">
@@ -542,7 +542,7 @@ function DestinationSection({
         {/* Dining Section */}
         {dining.length > 0 && (
           <div>
-            <h3 className="font-semibold text-lg mb-4 text-[#1a1a1a]">
+            <h3 className="font-semibold text-lg mb-4 text-[#0A0A0A]">
               Restaurants & Dining
             </h3>
             <div className="space-y-4">
@@ -556,7 +556,7 @@ function DestinationSection({
         {/* Bars Section */}
         {bars.length > 0 && (
           <div>
-            <h3 className="font-semibold text-lg mb-4 text-[#1a1a1a]">
+            <h3 className="font-semibold text-lg mb-4 text-[#0A0A0A]">
               Bars & Nightlife
             </h3>
             <div className="space-y-4">
@@ -584,7 +584,7 @@ function DestinationSection({
 
 function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; travellers?: any[] }) {
   const getSegmentIcon = () => {
-    const iconClass = "w-5 h-5 text-[#E7C51C]";
+    const iconClass = "w-5 h-5 text-[#0A0A0A]";
     switch (segment.type) {
       case 'flight': return <Plane className={iconClass} />;
       case 'train': return <Train className={iconClass} />;
@@ -635,7 +635,7 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
   }
 
   return (
-    <div className="p-4 rounded-[12px] bg-white shadow-sm">
+    <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
       <div className="flex items-center gap-3 mb-3">
         {getSegmentIcon()}
         <h4 className="font-semibold">{getSegmentLabel()}</h4>
@@ -720,11 +720,11 @@ function UnifiedContentCard({
   ];
 
   return (
-    <div className="p-6 rounded-[12px] bg-white shadow-sm">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <h3 className="font-semibold text-xl text-[#1a1a1a]">{name}</h3>
+    <div className="p-6 bg-[#F5F3F0] border border-[#D4D0CB]">
+      <div className="flex flex-col items-start mb-3 gap-2">
+        <h3 className="font-semibold text-xl text-[#0A0A0A]">{name}</h3>
         {priceBadge && (
-          <span className="bg-[#E7C51C] text-[#1a1a1a] px-3 py-1 rounded-full text-sm font-bold whitespace-nowrap">
+          <span className="bg-[#0A0A0A] text-white px-3 py-1 text-sm font-bold self-stretch">
             {priceBadge}
           </span>
         )}
@@ -748,7 +748,7 @@ function UnifiedContentCard({
                 href={googleMapsLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-[#E07A5F] underline hover:opacity-80"
+                className="inline-flex items-center gap-2 text-sm text-[#0A0A0A] underline hover:opacity-80"
               >
                 <ExternalLink className="w-4 h-4" />
                 View on Google Maps
@@ -759,7 +759,7 @@ function UnifiedContentCard({
                 href={websiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-[#E07A5F] underline hover:opacity-80"
+                className="inline-flex items-center gap-2 text-sm text-[#0A0A0A] underline hover:opacity-80"
               >
                 <ExternalLink className="w-4 h-4" />
                 View Website
@@ -770,18 +770,18 @@ function UnifiedContentCard({
       )}
 
       {detailRows.length > 0 && (
-        <div className="mb-4 p-4 rounded-[8px] bg-[#FFBB95] space-y-2">
+        <div className="mb-4 p-4 bg-[#0A0A0A] space-y-2">
           {detailRows.map((detail, idx) => (
             <p key={`${detail.label}-${idx}`} className="text-sm">
-              <span className="font-medium text-[#1a1a1a]">{detail.label}:</span>{" "}
-              <span className="text-[#555555] whitespace-pre-wrap">{detail.value}</span>
+              <span className="font-medium text-white">{detail.label}:</span>{" "}
+              <span className="text-white/80 whitespace-pre-wrap">{detail.value}</span>
             </p>
           ))}
         </div>
       )}
 
       {imageUrl && (
-        <div className="mt-4 w-full aspect-video overflow-hidden rounded-[8px]">
+        <div className="mt-4 w-full aspect-video overflow-hidden">
           <img
             src={imageUrl}
             alt={name}
@@ -1581,7 +1581,7 @@ export default function ViewItinerary() {
               </h1>
               
               {/* Share URL */}
-              <div className="flex items-center justify-center gap-2 p-3 bg-muted rounded-lg max-w-2xl mx-auto">
+              <div className="flex items-center justify-center gap-2 p-3 bg-muted max-w-2xl mx-auto">
                 <p className="text-sm text-muted-foreground truncate flex-1 flex items-center gap-2">
                   <Link2 className="w-4 h-4" />
                   {window.location.href}
@@ -1641,7 +1641,7 @@ export default function ViewItinerary() {
                         href={travelDetails.weatherUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-[#E07A5F] underline hover:opacity-80"
+                        className="inline-flex items-center gap-2 text-[#0A0A0A] underline hover:opacity-80"
                         data-testid="link-weather"
                       >
                         Click here to see live weather
@@ -1653,20 +1653,20 @@ export default function ViewItinerary() {
             </div>
 
             {isListProject && listSummaryCategories.length > 0 && (
-              <div className="max-w-2xl mx-auto pt-6 mt-2 border-t border-[#E8E4DE]">
-                <p className="text-xs tracking-wide uppercase text-[#C1B9AE] mb-3">What&apos;s Inside</p>
+              <div className="max-w-2xl mx-auto pt-6 mt-2 border-t border-[#D4D0CB]">
+                <p className="text-xs tracking-wide uppercase text-[#B8B3AD] mb-3">What&apos;s Inside</p>
                 <div className="space-y-2">
                   {listSummaryCategories.map(({ key, label, count, Icon }) => (
                     <div key={key} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2 text-[#232220]">
+                      <div className="flex items-center gap-2 text-[#0A0A0A]">
                         <Icon className="w-4 h-4" />
                         <span>{label}</span>
                       </div>
-                      <span className="font-semibold text-[#232220]">{count}</span>
+                      <span className="font-semibold text-[#0A0A0A]">{count}</span>
                     </div>
                   ))}
                 </div>
-                <div className="pt-3 mt-3 border-t border-[#E8E4DE] text-sm text-muted-foreground">
+                <div className="pt-3 mt-3 border-t border-[#D4D0CB] text-sm text-muted-foreground">
                   {totalListItems} {totalListItems === 1 ? 'place' : 'places'} in this guide
                 </div>
               </div>
@@ -1683,7 +1683,7 @@ export default function ViewItinerary() {
                     {travellers.map((traveller, index) => {
                       const isChild = traveller.type?.toLowerCase?.()?.includes?.('child') || false;
                       return (
-                        <div key={traveller.id} className="flex items-center justify-between p-4 rounded-[12px] bg-white shadow-sm">
+                        <div key={traveller.id} className="flex items-center justify-between p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <div>
                             <p className="font-medium" data-testid={`text-traveller-name-${index}`}>{traveller.name}</p>
                             <p className="text-sm text-muted-foreground" data-testid={`text-traveller-type-${index}`}>
@@ -1842,43 +1842,43 @@ export default function ViewItinerary() {
                   <CardContent>
                     <div className="grid md:grid-cols-2 gap-4">
                       {helpfulInformation.localEmergency && (
-                        <div className="p-4 rounded-[12px] bg-white shadow-sm">
+                        <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <p className="font-medium text-sm mb-1">Local Emergency</p>
                           <p className="text-sm">{helpfulInformation.localEmergency}</p>
                         </div>
                       )}
                       {helpfulInformation.nearestEmbassy && (
-                        <div className="p-4 rounded-[12px] bg-white shadow-sm">
+                        <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <p className="font-medium text-sm mb-1">Nearest Embassy</p>
                           <p className="text-sm">{helpfulInformation.nearestEmbassy}</p>
                         </div>
                       )}
                       {helpfulInformation.travelInsurance && (
-                        <div className="p-4 rounded-[12px] bg-white shadow-sm">
+                        <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <p className="font-medium text-sm mb-1">Travel Insurance</p>
                           <p className="text-sm">{helpfulInformation.travelInsurance}</p>
                         </div>
                       )}
                       {helpfulInformation.airlineCustomerService && (
-                        <div className="p-4 rounded-[12px] bg-white shadow-sm">
+                        <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <p className="font-medium text-sm mb-1">Airline Customer Service</p>
                           <p className="text-sm">{helpfulInformation.airlineCustomerService}</p>
                         </div>
                       )}
                       {helpfulInformation.localMedicalClinic && (
-                        <div className="p-4 rounded-[12px] bg-white shadow-sm">
+                        <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <p className="font-medium text-sm mb-1">Local Medical Clinic</p>
                           <p className="text-sm">{helpfulInformation.localMedicalClinic}</p>
                         </div>
                       )}
                       {helpfulInformation.transportContacts && (
-                        <div className="p-4 rounded-[12px] bg-white shadow-sm">
+                        <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <p className="font-medium text-sm mb-1">Transport Contacts</p>
                           <p className="text-sm">{helpfulInformation.transportContacts}</p>
                         </div>
                       )}
                       {customHelpfulFields.map((field, idx) => (
-                        <div key={`helpful-custom-${idx}`} className="p-4 rounded-[12px] bg-white shadow-sm">
+                        <div key={`helpful-custom-${idx}`} className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
                           <p className="font-medium text-sm mb-1">{field.label}</p>
                           <p className="text-sm whitespace-pre-wrap">{field.value}</p>
                         </div>
@@ -1896,7 +1896,7 @@ export default function ViewItinerary() {
               </p>
               <a
                 href={`mailto:${itinerary.assistantEmail}`}
-                className="block text-sm text-[#E07A5F] underline hover:opacity-80"
+                className="block text-sm text-[#0A0A0A] underline hover:opacity-80"
                 data-testid="link-assistant-email"
               >
                 {itinerary.assistantEmail}

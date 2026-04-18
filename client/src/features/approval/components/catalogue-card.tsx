@@ -101,9 +101,9 @@ const fieldClasses =
 const readOnlyFieldClasses =
   "w-full border border-[var(--sand-300)] bg-[var(--sand-100)] px-3 py-3 text-sm text-[var(--sand-700)] outline-none";
 
-function uniqueTags(values: string[]) {
+function uniqueTags(values: string[] | undefined) {
   return Array.from(
-    new Set(values.map((value) => value.trim()).filter(Boolean))
+    new Set((values ?? []).map((value) => value.trim()).filter(Boolean))
   );
 }
 
@@ -111,7 +111,7 @@ function buildSuggestedTags(
   tagsSuggested: string[] = [],
   tagsNew: NewTagSuggestion[] = []
 ) {
-  return uniqueTags([...tagsSuggested, ...tagsNew.map((tag) => tag.slug)]);
+  return uniqueTags([...(tagsSuggested ?? []), ...(tagsNew ?? []).map((tag) => tag.slug)]);
 }
 
 function createEditDraft(candidate: CatalogueItem): EditDraft {
@@ -142,7 +142,7 @@ function createEditDraft(candidate: CatalogueItem): EditDraft {
     sourceName: candidate.source_name ?? "",
     isBlckbxApproved: candidate.is_blckbx_approved ?? false,
     contentScope: candidate.content_scope ?? "general",
-    tags: [...candidate.tags],
+    tags: [...(candidate.tags ?? [])],
     tagsPendingReview: [...(candidate.tags_pending_review ?? [])],
     tagsSuggested: buildSuggestedTags(candidate.tags_suggested, candidate.tags_new),
     tagsNew: [...(candidate.tags_new ?? [])],
@@ -209,12 +209,17 @@ function buildEditPayload(candidate: CatalogueItem, draft: EditDraft) {
   const trimmedCandidateUrl = draft.candidateUrl.trim();
   const trimmedSourceUrl = draft.sourceUrl.trim();
   const trimmedSourceName = draft.sourceName.trim();
+  const safeTags = draft.tags ?? [];
+  const safePendingTags = draft.tagsPendingReview ?? [];
+  const safeSuggestedTags = draft.tagsSuggested ?? [];
+  const safeTagsNew = draft.tagsNew ?? [];
+  const safeEndorsements = draft.endorsements ?? [];
   const normalizedPricePence = draft.pricePence.trim() === "" ? null : Number(draft.pricePence);
-  const normalizedTags = uniqueTags(draft.tags);
-  const normalizedPending = uniqueTags(draft.tagsPendingReview);
-  const normalizedSuggested = uniqueTags(draft.tagsSuggested);
-  const normalizedTagsNew = draft.tagsNew.filter((tag) => normalizedSuggested.includes(tag.slug));
-  const normalizedEndorsements = draft.endorsements
+  const normalizedTags = uniqueTags(safeTags);
+  const normalizedPending = uniqueTags(safePendingTags);
+  const normalizedSuggested = uniqueTags(safeSuggestedTags);
+  const normalizedTagsNew = safeTagsNew.filter((tag) => normalizedSuggested.includes(tag.slug));
+  const normalizedEndorsements = safeEndorsements
     .map((endorsement) => ({
       source: endorsement.source.trim(),
       award: endorsement.award.trim(),
@@ -255,9 +260,12 @@ function buildEditPayload(candidate: CatalogueItem, draft: EditDraft) {
   if ("price_text" in candidate && trimmedPriceText !== (candidate.price_text ?? "")) {
     changes.price_text = trimmedPriceText || null;
   }
+  let imageChanged = false;
+
   if (candidate.collection === "product_candidates") {
     if (draft.imageUrl.trim() !== (candidate.image_url ?? "")) {
       changes.image_url = draft.imageUrl.trim() || null;
+      imageChanged = true;
     }
     if (trimmedCandidateUrl !== (candidate.product_url ?? "")) {
       changes.product_url = trimmedCandidateUrl || null;
@@ -271,6 +279,7 @@ function buildEditPayload(candidate: CatalogueItem, draft: EditDraft) {
   } else {
     if (draft.imageUrl.trim() !== (candidate.hero_image_url ?? "")) {
       changes.hero_image_url = draft.imageUrl.trim() || null;
+      imageChanged = true;
     }
     if (trimmedCandidateUrl !== (candidate.source_url ?? "")) {
       changes.source_url = trimmedCandidateUrl;
@@ -290,6 +299,10 @@ function buildEditPayload(candidate: CatalogueItem, draft: EditDraft) {
     if (trimmedConfidence !== (candidate.confidence ?? "")) {
       changes.confidence = trimmedConfidence || null;
     }
+  }
+
+  if (imageChanged) {
+    changes.image_needs_review = false;
   }
 
   if (arrayChanged(candidate.tags, normalizedTags)) {
@@ -377,11 +390,9 @@ function formatCoordinate(value: number, positiveSuffix: string, negativeSuffix:
 
 function BlckbxApprovedBadge() {
   return (
-    <img
-      src="/box.png"
-      alt="BlckBx Approved"
-      className="absolute left-[10px] top-[10px] z-10 h-8 w-8 "
-    />
+    <span className="approval-card__bx-badge" aria-label="BlckBx approved">
+      BX
+    </span>
   );
 }
 
@@ -417,7 +428,7 @@ function GeoStatusBadge({ candidate }: { candidate: GeoCandidate }) {
   return (
     <span
       title={tooltip}
-      className="inline-flex items-center gap-1.5 border border-[var(--sand-300)] bg-white px-2.5 py-1 text-xs text-[var(--sand-900)]"
+      className="approval-card__meta-badge"
     >
       <span aria-hidden="true" className="text-[12px] leading-none">
         📍
@@ -426,11 +437,22 @@ function GeoStatusBadge({ candidate }: { candidate: GeoCandidate }) {
         aria-hidden="true"
         className={classNames(
           "h-2 w-2",
-          needsReview ? "bg-[var(--black)]" : "bg-[var(--success)]"
+          needsReview ? "bg-[var(--cat-amber)]" : "bg-[var(--cat-green)]"
         )}
       />
     </span>
   );
+}
+
+function getReviewBadges(candidate: CatalogueItem) {
+  const badges: Array<"image" | "location"> = [];
+  if (candidate.image_needs_review === true) {
+    badges.push("image");
+  }
+  if ("geo_needs_review" in candidate && candidate.geo_needs_review === true) {
+    badges.push("location");
+  }
+  return badges;
 }
 
 export function CatalogueGrid({
@@ -448,7 +470,8 @@ export function CatalogueGrid({
   onEdit,
   onTagsChange,
   onListsChange,
-  onCreateList
+  onCreateList,
+  categoryClass
 }: {
   candidates: CatalogueItem[];
   gridMode: GridMode;
@@ -471,11 +494,13 @@ export function CatalogueGrid({
     candidate: CatalogueItem,
     payload: { name: string; list_type: string; occasion?: string; year?: string }
   ) => Promise<ListOption>;
+  categoryClass?: string;
 }) {
   return (
     <div
       className={classNames(
-        "grid auto-rows-fr gap-4",
+        "approval-card-grid grid auto-rows-fr gap-6",
+        categoryClass,
         gridMode === 2 ? "xl:grid-cols-2" : "xl:grid-cols-3",
         "md:grid-cols-2"
       )}
@@ -564,7 +589,7 @@ export function CompactList({
     <div className="space-y-3">
       {candidates.map((candidate) => {
         const assignedLists = lists.filter((list) =>
-          candidate.assigned_lists.includes(list._key)
+          (candidate.assigned_lists ?? []).includes(list._key)
         );
         const imageUrl =
           candidate.collection === "product_candidates"
@@ -710,11 +735,14 @@ function CatalogueCard({
   const [addingTag, setAddingTag] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
+  const assignedListKeys = candidate.assigned_lists ?? [];
+  const candidateTags = candidate.tags ?? [];
+  const candidateSuggestedThemes = candidate.suggested_themes ?? [];
   const selectedLists = lists.filter((list) =>
-    candidate.assigned_lists.includes(list._key)
+    assignedListKeys.includes(list._key)
   );
   const availableLists = lists.filter(
-    (list) => !candidate.assigned_lists.includes(list._key)
+    (list) => !assignedListKeys.includes(list._key)
   );
 
   function commitTag() {
@@ -724,7 +752,7 @@ function CatalogueCard({
       setNewTag("");
       return;
     }
-    onTagsChange([...candidate.tags, normalized]);
+    onTagsChange([...(candidate.tags ?? []), normalized]);
     setAddingTag(false);
     setNewTag("");
   }
@@ -793,11 +821,11 @@ function CatalogueCard({
   return (
     <article
       className={classNames(
-        "flex h-full flex-col overflow-hidden border border-[var(--sand-300)] bg-white transition hover:border-[var(--black)]",
+        "approval-card approval-card--product flex h-full flex-col overflow-hidden border transition",
         isExiting ? "opacity-0 duration-200" : "opacity-100"
       )}
     >
-      <div className="relative aspect-[4/3] w-full bg-[var(--sand-100)]">
+      <div className="approval-card__image-wrap relative w-full bg-[var(--cat-bg-sidebar)]">
         {selectionEnabled ? (
           <button
             type="button"
@@ -806,10 +834,8 @@ function CatalogueCard({
               onToggleSelect?.();
             }}
             className={classNames(
-              "absolute left-3 top-3 z-20 inline-flex h-4 w-4 items-center justify-center border-2 text-[10px] leading-none",
-              selected
-                ? "border-[var(--black)] bg-[var(--black)] text-[var(--white)]"
-                : "border-[var(--sand-300)] bg-white text-transparent"
+              "approval-card__checkbox absolute right-3 top-3 z-20 inline-flex items-center justify-center",
+              selected && "is-selected"
             )}
             aria-label={selected ? "Deselect item" : "Select item"}
           >
@@ -822,34 +848,38 @@ function CatalogueCard({
             alt={candidate.name}
             loading="lazy"
             referrerPolicy="no-referrer"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="approval-card__image absolute inset-0 h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm uppercase tracking-[0.18em] text-[var(--sand-700)]">
+          <div className="approval-card__image-fallback flex h-full items-center justify-center">
             No image
           </div>
         )}
         {candidate.is_blckbx_approved ? <BlckbxApprovedBadge /> : null}
-        {candidate.content_tab === "shopping" && candidate.already_in_catalogue ? (
-          <span className="absolute left-4 top-[52px] border border-[var(--sand-300)] bg-white px-3 py-1 text-xs font-medium text-[var(--sand-900)]">
-            Already in catalogue
-          </span>
-        ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="space-y-2">
-          <p className="text-[0.7rem] uppercase tracking-[0.18em] text-[var(--sand-700)]">
-            {candidate.source_name} - {candidate.scrape_source}
-          </p>
-          <ReviewPriorityBadges candidate={candidate} />
-          <EndorsementBadgeRow endorsements={candidate.endorsements} />
+      <div className="approval-card__body flex flex-1 flex-col">
+        <div className="approval-card__tags-row">
+          <Pill tone="data">{candidate.content_type}</Pill>
+          {getReviewBadges(candidate).map((badge) => (
+            <Pill key={badge} tone="review">{badge}</Pill>
+          ))}
+          {candidate.priority === "fast_track" ? <Pill tone="amber">Fast track</Pill> : null}
+          {candidate.requested_by_client_name ? (
+            <Pill tone="data">{candidate.requested_by_client_name}</Pill>
+          ) : null}
+        </div>
+
+        <div className="approval-card__content space-y-3">
+          <p className="approval-card__source-label">{candidate.source_name}</p>
           <CardBody candidate={candidate} />
           {candidate.description ? (
-            <p className="line-clamp-3 text-sm leading-6 text-[var(--sand-900)]">
-              {candidate.description}
-            </p>
+            <p className="approval-card__description line-clamp-3">{candidate.description}</p>
           ) : null}
+          {candidate.content_tab === "shopping" && candidate.already_in_catalogue ? (
+            <span className="approval-card__meta-badge">Already in catalogue</span>
+          ) : null}
+          <EndorsementBadgeRow endorsements={candidate.endorsements} />
         </div>
 
         {link ? (
@@ -857,14 +887,14 @@ function CatalogueCard({
             href={link.href}
             target="_blank"
             rel="noreferrer"
-            className="truncate text-sm text-[var(--text)] underline decoration-[var(--sand-400)] underline-offset-4"
+            className="approval-card__source-url truncate"
           >
             {link.label}
           </a>
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          {candidate.suggested_themes.map((theme) => (
+          {candidateSuggestedThemes.map((theme) => (
             <Pill key={theme} tone="theme">
               {theme}
             </Pill>
@@ -874,12 +904,12 @@ function CatalogueCard({
         <div className="space-y-2">
           <Label>Tags</Label>
           <div className="flex flex-wrap gap-2">
-            {candidate.tags.map((tag) => (
+            {candidateTags.map((tag) => (
               <Pill key={tag} tone="neutral">
                 <span>{tag}</span>
                 <button
                   type="button"
-                  onClick={() => onTagsChange(candidate.tags.filter((item) => item !== tag))}
+                  onClick={() => onTagsChange(candidateTags.filter((item) => item !== tag))}
                   className="text-[var(--sand-700)] transition hover:text-[var(--text)]"
                 >
                   x
@@ -921,10 +951,10 @@ function CatalogueCard({
           <Label>Add to list</Label>
           <ListSelector
             availableLists={availableLists}
-            onAssign={(listKey) => onListsChange([...candidate.assigned_lists, listKey])}
+            onAssign={(listKey) => onListsChange([...assignedListKeys, listKey])}
             onCreateList={async (payload) => {
               const list = await onCreateList(payload);
-              onListsChange([...candidate.assigned_lists, list._key]);
+              onListsChange([...assignedListKeys, list._key]);
             }}
           />
           <div className="flex flex-wrap gap-2">
@@ -935,7 +965,7 @@ function CatalogueCard({
                   type="button"
                   onClick={() =>
                     onListsChange(
-                      candidate.assigned_lists.filter((item) => item !== list._key)
+                      assignedListKeys.filter((item) => item !== list._key)
                     )
                   }
                   className="text-[var(--list-text)] transition hover:opacity-70"
@@ -983,12 +1013,12 @@ function CatalogueCard({
               error={rejectError}
             />
           ) : (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="approval-card__actions grid grid-cols-3 gap-[2px]">
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => setIsEditing(true)}
-                className="border border-[var(--sand-300)] bg-white px-4 py-3 text-sm text-[var(--sand-900)] transition hover:border-[var(--black)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="approval-card__action approval-card__action--secondary"
               >
                 Edit
               </button>
@@ -996,7 +1026,7 @@ function CatalogueCard({
                 type="button"
                 disabled={busy || (candidate.content_tab === "shopping" && !!candidate.already_in_catalogue)}
                 onClick={() => setApprovePrompt(true)}
-                className="border border-[var(--black)] bg-[var(--black)] px-4 py-3 text-sm font-medium text-[var(--white)] transition hover:bg-[var(--white)] hover:text-[var(--black)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="approval-card__action approval-card__action--primary"
               >
                 Approve
               </button>
@@ -1004,7 +1034,7 @@ function CatalogueCard({
                 type="button"
                 disabled={busy}
                 onClick={() => setIsRejecting(true)}
-                className="border border-[var(--sand-300)] bg-[var(--white)] px-4 py-3 text-sm text-[var(--sand-900)] transition hover:border-[var(--error)] hover:text-[var(--error)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="approval-card__action approval-card__action--secondary"
               >
                 Reject
               </button>
@@ -1037,27 +1067,23 @@ function ProductCardBody({ candidate }: { candidate: ProductCandidate }) {
   return (
     <>
       <div>
-        <h2 className="font-display text-xl font-medium leading-tight text-[var(--text)]">
-          {candidate.name}
-        </h2>
-        {candidate.brand ? (
-          <p className="mt-1 text-sm text-[var(--sand-900)]">{candidate.brand}</p>
-        ) : null}
+        <h2 className="approval-card__title">{candidate.name}</h2>
+        {candidate.brand ? <p className="approval-card__extracted-title">{candidate.brand}</p> : null}
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="text-lg font-medium text-[var(--text)]">{formatPrice(candidate)}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-lg font-medium text-[var(--cat-text-primary)]">{formatPrice(candidate)}</p>
         <span
           className={classNames(
-            "border px-3 py-1 text-xs font-medium",
+            "approval-card__meta-badge",
             candidate.availability === "in_stock"
-              ? "border-[var(--approved-green)] bg-[var(--approved-bg)] text-[var(--approved-text)]"
-              : "border-[var(--rejected-red)] bg-[var(--rejected-bg)] text-[var(--rejected-text)]"
+              ? "border-[var(--cat-green)] bg-[var(--cat-green-bg)] text-[var(--cat-green)]"
+              : "border-[var(--cat-amber-pill-border)] bg-[var(--cat-amber-bg)] text-[var(--cat-amber)]"
           )}
         >
           {formatAvailability(candidate.availability)}
         </span>
         {candidate.url_status === "broken" ? (
-          <span className="border border-[var(--rejected-red)] bg-[var(--rejected-bg)] px-3 py-1 text-xs font-medium text-[var(--rejected-text)]">
+          <span className="approval-card__meta-badge border-[var(--cat-amber-pill-border)] bg-[var(--cat-amber-bg)] text-[var(--cat-amber)]">
             URL may be broken
           </span>
         ) : null}
@@ -1125,7 +1151,7 @@ function TrendCatalogueCard({
   return (
     <article
       className={classNames(
-        "flex h-full flex-col overflow-hidden border border-[var(--sand-300)] bg-white transition hover:border-[var(--black)]",
+        "approval-card approval-card--trend flex h-full flex-col overflow-hidden border transition",
         isExiting ? "opacity-0 duration-200" : "opacity-100"
       )}
     >
@@ -1135,10 +1161,9 @@ function TrendCatalogueCard({
         selected={selected}
         onToggleSelect={onToggleSelect}
       />
-      <div className="border-b border-[var(--sand-300)] bg-[linear-gradient(135deg,rgba(245,243,240,0.9),rgba(255,255,255,1))] px-4 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <ReviewPriorityBadges candidate={candidate} />
-          <GeoStatusBadge candidate={candidate} />
+
+      <div className="approval-card__body flex flex-1 flex-col">
+        <div className="approval-card__tags-row">
           <Pill tone="data">{candidate.content_type}</Pill>
           {candidate.content_type === "guide" && candidate.destination ? (
             <Pill tone="data">{candidate.destination}</Pill>
@@ -1149,48 +1174,29 @@ function TrendCatalogueCard({
             </Pill>
           ) : null}
           {candidate.content_type !== "guide" && candidate.confidence ? (
-            <Pill
-              tone={
-                candidate.confidence === "high"
-                  ? "green"
-                  : candidate.confidence === "medium"
-                    ? "amber"
-                    : "red"
-              }
-            >
+            <Pill tone={candidate.confidence === "high" ? "green" : "neutral"}>
               {candidate.confidence} confidence
             </Pill>
           ) : null}
-          {candidate.content_type !== "guide" && candidate.location ? (
-            <Pill tone="data">{candidate.location}</Pill>
-          ) : null}
+          {getReviewBadges(candidate).map((badge) => (
+            <Pill key={badge} tone="review">{badge}</Pill>
+          ))}
+          <ReviewPriorityBadges candidate={candidate} />
+          <GeoStatusBadge candidate={candidate} />
         </div>
-        {candidate.endorsements?.length ? (
-          <div className="mt-2">
-            <EndorsementBadgeRow endorsements={candidate.endorsements} />
-          </div>
-        ) : null}
-      </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="space-y-3">
+        <div className="approval-card__content space-y-3">
           <div>
-            <p className="text-[0.7rem] uppercase tracking-[0.18em] text-[var(--sand-700)]">
-              {candidate.source_name}
-            </p>
-            <h2 className="mt-2 font-display text-xl font-medium leading-tight text-[var(--text)]">
-              {candidate.name}
-            </h2>
+            <p className="approval-card__source-label">{candidate.source_name}</p>
+            <h2 className="approval-card__title">{candidate.name}</h2>
           </div>
 
           {candidate.content_type === "guide" && candidate.travel_assistant_note ? (
-            <p className="line-clamp-4 text-sm leading-6 text-[var(--sand-900)]">
-              {candidate.travel_assistant_note}
-            </p>
+            <p className="approval-card__description line-clamp-4">{candidate.travel_assistant_note}</p>
           ) : candidate.description ? (
             <p
               className={classNames(
-                "text-sm leading-6 text-[var(--sand-900)]",
+                "approval-card__description",
                 isResearch ? "" : "line-clamp-3"
               )}
             >
@@ -1199,19 +1205,21 @@ function TrendCatalogueCard({
           ) : null}
 
           {candidate.signal_phrase ? (
-            <p className="text-sm italic text-[var(--sand-900)]">“{candidate.signal_phrase}”</p>
+            <p className="approval-card__extracted-title">“{candidate.signal_phrase}”</p>
           ) : null}
 
           {candidate.source_excerpt ? (
-            <p className="line-clamp-4 text-sm leading-6 text-[var(--sand-900)]">
-              {candidate.source_excerpt}
-            </p>
+            <p className="approval-card__description line-clamp-4">{candidate.source_excerpt}</p>
           ) : null}
 
+          {candidate.location && candidate.content_type !== "guide" ? (
+            <p className="approval-card__extracted-title">{candidate.location}</p>
+          ) : null}
+
+          <EndorsementBadgeRow endorsements={candidate.endorsements} />
+
           {isResearch && candidate.scraped_at ? (
-            <p className="text-sm text-[var(--sand-900)]">
-              Found {formatDate(candidate.scraped_at)}
-            </p>
+            <p className="approval-card__extracted-title">Found {formatDate(candidate.scraped_at)}</p>
           ) : null}
         </div>
 
@@ -1221,7 +1229,7 @@ function TrendCatalogueCard({
             target="_blank"
             rel="noreferrer"
             className={classNames(
-              "text-sm text-[var(--text)] underline decoration-[var(--sand-400)] underline-offset-4",
+              "approval-card__source-url",
               isResearch ? "" : "truncate"
             )}
           >
@@ -1254,12 +1262,12 @@ function TrendCatalogueCard({
               error={rejectError}
             />
           ) : (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="approval-card__actions grid grid-cols-3 gap-[2px]">
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => setIsEditing(true)}
-                className="border border-[var(--sand-300)] bg-white px-4 py-3 text-sm text-[var(--sand-900)] transition hover:border-[var(--black)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="approval-card__action approval-card__action--secondary"
               >
                 Edit
               </button>
@@ -1267,7 +1275,7 @@ function TrendCatalogueCard({
                 type="button"
                 disabled={busy}
                 onClick={onShowApprove}
-                className="border border-[var(--black)] bg-[var(--black)] px-4 py-3 text-sm font-medium text-[var(--white)] transition hover:bg-[var(--white)] hover:text-[var(--black)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="approval-card__action approval-card__action--primary"
               >
                 Approve
               </button>
@@ -1275,7 +1283,7 @@ function TrendCatalogueCard({
                 type="button"
                 disabled={busy}
                 onClick={onShowReject}
-                className="border border-[var(--sand-300)] bg-[var(--white)] px-4 py-3 text-sm text-[var(--sand-900)] transition hover:border-[var(--error)] hover:text-[var(--error)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="approval-card__action approval-card__action--secondary"
               >
                 Reject
               </button>
@@ -1470,7 +1478,7 @@ function TrendHeroImage({
 }) {
   const imageUrl = candidate.hero_image_url || candidate.cover_images?.[0] || null;
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--sand-100)]">
+    <div className="approval-card__image-wrap relative w-full overflow-hidden bg-[var(--cat-bg-sidebar)]">
       {selectionEnabled ? (
         <button
           type="button"
@@ -1479,10 +1487,8 @@ function TrendHeroImage({
             onToggleSelect?.();
           }}
           className={classNames(
-            "absolute left-3 top-3 z-20 inline-flex h-4 w-4 items-center justify-center border-2 text-[10px] leading-none",
-            selected
-              ? "border-[var(--black)] bg-[var(--black)] text-[var(--white)]"
-              : "border-[var(--sand-300)] bg-white text-transparent"
+            "approval-card__checkbox absolute right-3 top-3 z-20 inline-flex items-center justify-center",
+            selected && "is-selected"
           )}
           aria-label={selected ? "Deselect item" : "Select item"}
         >
@@ -1495,10 +1501,10 @@ function TrendHeroImage({
           alt={candidate.name}
           loading="lazy"
           referrerPolicy="no-referrer"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="approval-card__image absolute inset-0 h-full w-full object-cover"
         />
       ) : (
-        <div className="flex h-full items-center justify-center bg-[var(--sand-100)] text-[0.72rem] uppercase tracking-[0.18em] text-[var(--sand-700)]">
+        <div className="approval-card__image-fallback flex h-full items-center justify-center">
           No image
         </div>
       )}
@@ -1572,7 +1578,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
       target.focus();
       setPendingEndorsementFocus(null);
     }
-  }, [draft.endorsements.length, pendingEndorsementFocus]);
+  }, [(draft.endorsements ?? []).length, pendingEndorsementFocus]);
 
   const pricePreview = formatPencePreview(draft.pricePence);
   const isProduct = candidate.collection === "product_candidates";
@@ -1588,7 +1594,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
       setNewTag("");
       return;
     }
-    updateDraft("tags", uniqueTags([...draft.tags, normalized]));
+    updateDraft("tags", uniqueTags([...(draft.tags ?? []), normalized]));
     setNewTag("");
   }
 
@@ -1968,12 +1974,12 @@ const EditCandidateModal = memo(function EditCandidateModal({
             <section className="space-y-3 border-t border-[var(--sand-300)] pt-4">
               <Label>Tags</Label>
               <div className="flex flex-wrap gap-2">
-                {draft.tags.map((tag) => (
+                {(draft.tags ?? []).map((tag) => (
                   <Pill key={tag} tone="neutral">
                     <span>{tag}</span>
                     <button
                       type="button"
-                      onClick={() => updateDraft("tags", draft.tags.filter((item) => item !== tag))}
+                      onClick={() => updateDraft("tags", (draft.tags ?? []).filter((item) => item !== tag))}
                       className="text-[var(--sand-700)] transition hover:text-[var(--text)]"
                     >
                       x
@@ -1997,19 +2003,19 @@ const EditCandidateModal = memo(function EditCandidateModal({
                   placeholder="+ add tag"
                 />
               </div>
-              {draft.tagsPendingReview.length ? (
+              {(draft.tagsPendingReview ?? []).length ? (
                 <TagBucket
                   label="Pending review"
-                  items={draft.tagsPendingReview}
+                  items={draft.tagsPendingReview ?? []}
                   renderActions={(tag) => (
                     <>
                       <button
                         type="button"
                         onClick={() => {
-                          updateDraft("tags", uniqueTags([...draft.tags, tag]));
+                          updateDraft("tags", uniqueTags([...(draft.tags ?? []), tag]));
                           updateDraft(
                             "tagsPendingReview",
-                            draft.tagsPendingReview.filter((item) => item !== tag)
+                            (draft.tagsPendingReview ?? []).filter((item) => item !== tag)
                           );
                         }}
                         className="text-[var(--sand-900)]"
@@ -2021,7 +2027,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                         onClick={() =>
                           updateDraft(
                             "tagsPendingReview",
-                            draft.tagsPendingReview.filter((item) => item !== tag)
+                            (draft.tagsPendingReview ?? []).filter((item) => item !== tag)
                           )
                         }
                         className="text-[var(--sand-700)]"
@@ -2033,23 +2039,23 @@ const EditCandidateModal = memo(function EditCandidateModal({
                   tone="pending"
                 />
               ) : null}
-              {draft.tagsSuggested.length ? (
+              {(draft.tagsSuggested ?? []).length ? (
                 <TagBucket
                   label="Suggested"
-                  items={draft.tagsSuggested}
+                  items={draft.tagsSuggested ?? []}
                   renderActions={(tag) => (
                     <>
                       <button
                         type="button"
                         onClick={() => {
-                          updateDraft("tags", uniqueTags([...draft.tags, tag]));
+                          updateDraft("tags", uniqueTags([...(draft.tags ?? []), tag]));
                           updateDraft(
                             "tagsSuggested",
-                            draft.tagsSuggested.filter((item) => item !== tag)
+                            (draft.tagsSuggested ?? []).filter((item) => item !== tag)
                           );
                           updateDraft(
                             "tagsNew",
-                            draft.tagsNew.filter((item) => item.slug !== tag)
+                            (draft.tagsNew ?? []).filter((item) => item.slug !== tag)
                           );
                         }}
                         className="text-[var(--sand-900)]"
@@ -2061,11 +2067,11 @@ const EditCandidateModal = memo(function EditCandidateModal({
                         onClick={() => {
                           updateDraft(
                             "tagsSuggested",
-                            draft.tagsSuggested.filter((item) => item !== tag)
+                            (draft.tagsSuggested ?? []).filter((item) => item !== tag)
                           );
                           updateDraft(
                             "tagsNew",
-                            draft.tagsNew.filter((item) => item.slug !== tag)
+                            (draft.tagsNew ?? []).filter((item) => item.slug !== tag)
                           );
                         }}
                         className="text-[var(--sand-700)]"
@@ -2187,7 +2193,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                     <div className="space-y-2">
                       <Label>Cover images</Label>
                       <div className="grid gap-3 md:grid-cols-3">
-                        {candidate.cover_images.map((imageUrl, index) => (
+                        {(candidate.cover_images ?? []).map((imageUrl, index) => (
                           <div
                             key={`${imageUrl}-${index}`}
                             className="relative h-28 overflow-hidden border border-[var(--sand-300)] bg-[var(--sand-100)]"
@@ -2209,7 +2215,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                     <div className="space-y-2">
                       <Label>Linked POIs</Label>
                       <div className="space-y-2">
-                        {candidate.features_poi.map((poi, index) => (
+                        {(candidate.features_poi ?? []).map((poi, index) => (
                           <div
                             key={`${poi._key ?? poi.name}-${index}`}
                             className="border border-[var(--sand-300)] bg-white px-4 py-3"
@@ -2245,7 +2251,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
             <section className="space-y-3 border-t border-[var(--sand-300)] pt-4">
               <Label>Endorsements</Label>
               <div className="space-y-2">
-                {draft.endorsements.map((endorsement, index) => (
+                {(draft.endorsements ?? []).map((endorsement, index) => (
                   <div key={`${index}-${endorsement.source}-${endorsement.award}`} className="flex items-start gap-2">
                     <input
                       ref={(element) => {
@@ -2255,7 +2261,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                       onChange={(event) =>
                         updateDraft(
                           "endorsements",
-                          draft.endorsements.map((item, itemIndex) =>
+                          (draft.endorsements ?? []).map((item, itemIndex) =>
                             itemIndex === index
                               ? { ...item, source: event.target.value }
                               : item
@@ -2270,7 +2276,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                       onChange={(event) =>
                         updateDraft(
                           "endorsements",
-                          draft.endorsements.map((item, itemIndex) =>
+                          (draft.endorsements ?? []).map((item, itemIndex) =>
                             itemIndex === index
                               ? { ...item, award: event.target.value }
                               : item
@@ -2288,7 +2294,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                       onChange={(event) =>
                         updateDraft(
                           "endorsements",
-                          draft.endorsements.map((item, itemIndex) =>
+                          (draft.endorsements ?? []).map((item, itemIndex) =>
                             itemIndex === index
                               ? {
                                   ...item,
@@ -2306,7 +2312,7 @@ const EditCandidateModal = memo(function EditCandidateModal({
                       onClick={() =>
                         updateDraft(
                           "endorsements",
-                          draft.endorsements.filter((_, itemIndex) => itemIndex !== index)
+                          (draft.endorsements ?? []).filter((_, itemIndex) => itemIndex !== index)
                         )
                       }
                       className="mt-3 text-sm text-[var(--sand-700)] transition hover:text-[var(--text)]"
@@ -2321,14 +2327,14 @@ const EditCandidateModal = memo(function EditCandidateModal({
                 type="button"
                 onClick={() => {
                   updateDraft("endorsements", [
-                    ...draft.endorsements,
+                    ...(draft.endorsements ?? []),
                     {
                       source: "",
                       award: "",
                       year: new Date().getFullYear()
                     }
                   ]);
-                  setPendingEndorsementFocus(draft.endorsements.length);
+                  setPendingEndorsementFocus((draft.endorsements ?? []).length);
                 }}
                 className="text-sm text-[var(--sand-700)] underline decoration-[var(--sand-500)] underline-offset-4 transition hover:text-[var(--text)]"
               >
@@ -2509,7 +2515,7 @@ function TagBucket({
   tone
 }: {
   label: string;
-  items: string[];
+  items: string[] | undefined;
   renderActions: (tag: string) => ReactNode;
   tone: "pending" | "suggested";
 }) {
@@ -2517,7 +2523,7 @@ function TagBucket({
     <div className="space-y-2">
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--sand-700)]">{label}</p>
       <div className="flex flex-wrap gap-2">
-        {items.map((tag) => (
+        {(items ?? []).map((tag) => (
           <span
             key={tag}
             className={classNames(
@@ -2677,23 +2683,28 @@ export function Pill({
   tone
 }: {
   children: React.ReactNode;
-  tone: "theme" | "neutral" | "list" | "data" | "amber" | "green" | "red";
+  tone: "theme" | "neutral" | "list" | "data" | "amber" | "green" | "red" | "review";
 }) {
   return (
     <span
       className={classNames(
-        "inline-flex items-center gap-2 border px-3 py-1.5 text-sm",
+        "inline-flex items-center gap-2 border px-[10px] py-[4px] text-[10px] uppercase tracking-[0.08em]",
         tone === "theme" &&
-          "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--text)]",
+          "border-[var(--cat-border)] bg-transparent text-[var(--cat-text-body)]",
         tone === "neutral" &&
-          "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--sand-900)]",
+          "border-[var(--cat-border)] bg-transparent text-[var(--cat-text-body)]",
         tone === "list" &&
-          "border-[var(--list-border)] bg-[var(--list-background)] text-[var(--list-text)]",
+          "border-[var(--cat-border)] bg-[var(--cat-bg-sidebar)] text-[var(--cat-text-primary)]",
         tone === "data" &&
-          "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--sand-900)]",
-        tone === "amber" && "border-[var(--black)] bg-[var(--sand-100)] text-[var(--text)]",
-        tone === "green" && "border-[var(--approved-green)] bg-[var(--approved-bg)] text-[var(--approved-text)]",
-        tone === "red" && "border-[var(--rejected-red)] bg-[var(--rejected-bg)] text-[var(--rejected-text)]"
+          "border-[var(--cat-border)] bg-transparent text-[var(--cat-text-body)]",
+        tone === "amber" &&
+          "border-[var(--cat-amber-pill-border)] bg-[var(--cat-amber-bg)] font-medium text-[var(--cat-amber)]",
+        tone === "green" &&
+          "border-[var(--cat-green)] bg-[var(--cat-green-bg)] text-[var(--cat-green)]",
+        tone === "red" &&
+          "border-[var(--cat-amber-pill-border)] bg-[var(--cat-amber-bg)] text-[var(--cat-amber)]",
+        tone === "review" &&
+          "border-[var(--cat-amber)] bg-[var(--cat-amber-bg)] font-medium text-[var(--cat-amber)]"
       )}
     >
       {children}

@@ -33,7 +33,7 @@ import type {
   StayingInFilter,
   TrendCandidate
 } from "../lib/types";
-import { contentTabs, reviewerOptions } from "../lib/types";
+import { contentTabs } from "../lib/types";
 import { classNames, contentTabLabel, statusLabel } from "../lib/utils";
 import {
   CatalogueGrid,
@@ -42,7 +42,7 @@ import {
 } from "./catalogue-card";
 
 const gridModes: GridMode[] = [2, 3];
-const tabOrder: CatalogueStatus[] = ["pending", "rejected"];
+const tabOrder = ["pending", "rejected"] as const;
 const pendingPageSize = 12;
 const compactPageSize = 50;
 const SUBCATEGORY_MAP: Partial<
@@ -131,6 +131,8 @@ type CatalogueQueryResult = {
   pages: number;
 };
 
+type ReviewFilter = "all_flagged" | "image" | "location" | "both" | null;
+
 function candidateId(candidate: CatalogueItem) {
   return `${candidate.collection}:${candidate._key}`;
 }
@@ -139,17 +141,48 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function replaceCatalogueItem(items: CatalogueItem[], updated: CatalogueItem) {
+function normalizeCatalogueItemArrays(item: CatalogueItem): CatalogueItem {
+  const base = {
+    ...item,
+    tags: item.tags ?? [],
+    tags_pending_review: item.tags_pending_review ?? [],
+    tags_suggested: item.tags_suggested ?? [],
+    tags_new: item.tags_new ?? [],
+    endorsements: item.endorsements ?? [],
+    assigned_lists: item.assigned_lists ?? [],
+    suggested_themes: item.suggested_themes ?? []
+  } as CatalogueItem;
+
+  if (item.collection === "product_candidates") {
+    return base;
+  }
+
+  return {
+    ...base,
+    cover_images: item.cover_images ?? [],
+    features_poi: item.features_poi ?? []
+  } as CatalogueItem;
+}
+
+function replaceCatalogueItem(items: CatalogueItem[] | undefined, updated: CatalogueItem) {
+  const safeItems = items ?? [];
   let changed = false;
-  const nextItems = items.map((item) => {
-    if (item._key === updated._key && item.collection === updated.collection) {
+  const normalizedUpdated = normalizeCatalogueItemArrays(updated);
+  const nextItems = safeItems.map((item) => {
+    const normalizedItem = normalizeCatalogueItemArrays(item);
+
+    if (
+      normalizedItem._key === normalizedUpdated._key &&
+      normalizedItem.collection === normalizedUpdated.collection
+    ) {
       changed = true;
-      return updated;
+      return normalizedUpdated;
     }
-    return item;
+
+    return normalizedItem;
   });
 
-  return changed ? nextItems : items;
+  return changed ? nextItems : safeItems;
 }
 
 function patchCatalogueResult(
@@ -160,9 +193,13 @@ function patchCatalogueResult(
     return current;
   }
 
-  const nextItems = replaceCatalogueItem(current.items, updated);
-  if (nextItems === current.items) {
-    return current;
+  const safeCurrentItems = current.items ?? [];
+  const nextItems = replaceCatalogueItem(safeCurrentItems, updated);
+  if (nextItems === safeCurrentItems) {
+    return {
+      ...current,
+      items: safeCurrentItems.map((item) => normalizeCatalogueItemArrays(item))
+    };
   }
 
   return {
@@ -186,7 +223,8 @@ export function CatalogueApp() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [reviewer, setReviewer, reviewerReady] = usePersistentState<ReviewerName>(
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>(null);
+  const [reviewer, , reviewerReady] = usePersistentState<ReviewerName>(
     "catalogue-reviewer",
     "Kath"
   );
@@ -208,7 +246,7 @@ export function CatalogueApp() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab, contentTab, stayingInFilter, selectedSubcategory]);
+  }, [debouncedSearch, activeTab, contentTab, stayingInFilter, selectedSubcategory, reviewFilter]);
 
   useEffect(() => {
     if (contentTab !== "staying_in") {
@@ -227,7 +265,7 @@ export function CatalogueApp() {
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [activeTab, contentTab, page, stayingInFilter, selectedSubcategory, debouncedSearch]);
+  }, [activeTab, contentTab, page, stayingInFilter, selectedSubcategory, debouncedSearch, reviewFilter]);
 
   const statsQuery = useQuery({
     queryKey: ["catalogue-stats"],
@@ -531,14 +569,22 @@ export function CatalogueApp() {
           ? updateRecommendation(candidate._key, changes)
         : updateTrendCandidate(candidate._key, changes),
     onError: mutationOptions.onError,
-    onSuccess: async (updated) => {
+    onSuccess: async (updated, variables) => {
+      const normalizedUpdated = normalizeCatalogueItemArrays({
+        ...updated,
+        ...(variables.changes.image_needs_review === false ? { image_needs_review: false } : {}),
+        ...(variables.candidate.collection !== "product_candidates" && variables.changes.geo_needs_review === false
+          ? { geo_needs_review: false }
+          : {})
+      } as CatalogueItem);
+
       queryClient.setQueriesData<CatalogueQueryResult>(
         { queryKey: ["catalogue"] },
-        (current) => patchCatalogueResult(current, updated)
+        (current) => patchCatalogueResult(current, normalizedUpdated)
       );
       queryClient.setQueriesData<CatalogueQueryResult>(
         { queryKey: ["travel-library"] },
-        (current) => patchCatalogueResult(current, updated)
+        (current) => patchCatalogueResult(current, normalizedUpdated)
       );
 
       setToast({ tone: "success", message: "Candidate updated." });
@@ -570,6 +616,8 @@ export function CatalogueApp() {
       };
 
   const totalPages = Math.max(1, Math.ceil((pendingQuery.data?.total ?? 0) / pendingPageSize));
+  const catalogueCategoryClass = `category-${contentTab.replace(/_/g, "-")}`;
+  const isCurrentFetching = activeTab === "pending" ? pendingQuery.isFetching : rejectedQuery.isFetching;
   const isLoading = !(gridReady && reviewerReady);
   const lists = listsQuery.data?.items ?? [];
   const subcategoryOptions = isRequestsTab(contentTab) ? [] : SUBCATEGORY_MAP[contentTab] ?? [];
@@ -594,7 +642,7 @@ export function CatalogueApp() {
       : travelCountQuery.data?.pagination.total ?? 0;
   sidebarCounts.staying_in = trendStats?.by_category.staying_in?.pending ?? 0;
 
-  const activeView = useMemo(() => {
+  const currentPageItems = useMemo(() => {
     if (activeTab === "pending") {
       return pendingQuery.data?.items ?? [];
     }
@@ -604,6 +652,56 @@ export function CatalogueApp() {
     pendingQuery.data?.items,
     rejectedQuery.data?.items
   ]);
+
+  const reviewCounts = useMemo(() => {
+    const image = currentPageItems.filter((candidate) => candidate.image_needs_review === true).length;
+    const location = currentPageItems.filter(
+      (candidate) => "geo_needs_review" in candidate && candidate.geo_needs_review === true
+    ).length;
+    const both = currentPageItems.filter(
+      (candidate) =>
+        candidate.image_needs_review === true &&
+        "geo_needs_review" in candidate &&
+        candidate.geo_needs_review === true
+    ).length;
+    const allFlagged = currentPageItems.filter(
+      (candidate) =>
+        candidate.image_needs_review === true ||
+        ("geo_needs_review" in candidate && candidate.geo_needs_review === true)
+    ).length;
+
+    return { allFlagged, image, location, both };
+  }, [currentPageItems]);
+
+  const activeView = useMemo(() => {
+    if (!reviewFilter) {
+      return currentPageItems;
+    }
+
+    return currentPageItems.filter((candidate) => {
+      const imageNeedsReview = candidate.image_needs_review === true;
+      const locationNeedsReview = "geo_needs_review" in candidate && candidate.geo_needs_review === true;
+
+      switch (reviewFilter) {
+        case "all_flagged":
+          return imageNeedsReview || locationNeedsReview;
+        case "image":
+          return imageNeedsReview;
+        case "location":
+          return locationNeedsReview;
+        case "both":
+          return imageNeedsReview && locationNeedsReview;
+        default:
+          return true;
+      }
+    });
+  }, [currentPageItems, reviewFilter]);
+
+  useEffect(() => {
+    if (reviewCounts.allFlagged === 0 && reviewFilter !== null) {
+      setReviewFilter(null);
+    }
+  }, [reviewCounts.allFlagged, reviewFilter]);
 
   const visibleSelectedIds = selectedIds.filter((id) =>
     activeView.some((candidate) => candidateId(candidate) === id)
@@ -746,155 +844,80 @@ export function CatalogueApp() {
   }
 
   return (
-    <main className="min-h-screen bg-transparent p-3 md:p-5">
-      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] w-full max-w-[1520px] overflow-hidden border border-[var(--sand-300)] bg-[var(--white)] min-[900px]:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="hidden min-[900px]:flex min-[900px]:h-full min-[900px]:flex-col min-[900px]:border-r min-[900px]:border-[var(--sand-300)] min-[900px]:bg-white">
-          <div className="px-6 py-7">
-            <p className="font-display text-[2rem] italic leading-none text-[var(--text)]">
-              Blck Book
-            </p>
-            <p className="mt-2 text-[0.78rem] uppercase tracking-[0.22em] text-[var(--sand-900)]">
-              Approval Catalogue
-            </p>
+    <main className="approval-app-shell">
+      <div className="approval-layout">
+        <aside className="approval-sidebar hidden min-[900px]:flex">
+          <div className="approval-sidebar__brand">
+            <p className="approval-sidebar__brand-title">Blck Book</p>
+            <p className="approval-sidebar__brand-subtitle">Approval catalogue</p>
           </div>
 
-          <nav className="flex-1 px-3">
-            <div className="space-y-1.5">
+          <nav className="approval-sidebar__nav">
+            {contentTabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setContentTab(tab)}
+                className={classNames(
+                  "approval-sidebar__nav-item",
+                  contentTab === tab && "is-active"
+                )}
+              >
+                <span>{contentTabLabel(tab)}</span>
+                <span className="approval-sidebar__count">{sidebarCounts[tab] ?? 0}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <section className="approval-main">
+          <div className="approval-mobile-header min-[900px]:hidden">
+            <p className="approval-sidebar__brand-title">Blck Book</p>
+            <p className="approval-sidebar__brand-subtitle">Approval catalogue</p>
+            <div className="approval-mobile-nav">
               {contentTabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setContentTab(tab)}
                   className={classNames(
-                    "flex w-full items-center justify-between border-l-[3px] px-4 py-3 text-left text-[13px] transition",
-                    contentTab === tab
-                      ? "border-l-[var(--black)] bg-[var(--sand-100)] text-[var(--text)] font-medium"
-                      : "border-l-transparent text-[var(--sand-900)] hover:bg-[var(--sand-100)] hover:text-[var(--text)]"
+                    "approval-mobile-nav__item",
+                    contentTab === tab && "is-active"
                   )}
                 >
                   <span>{contentTabLabel(tab)}</span>
-                  <span
-                    className={classNames(
-                      "border px-2 py-0.5 text-xs",
-                      contentTab === tab
-                        ? "border-[var(--black)] bg-[var(--black)] text-[var(--white)] font-medium"
-                        : "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--sand-900)]"
-                    )}
-                  >
-                    {sidebarCounts[tab] ?? 0}
-                  </span>
+                  <span className="approval-mobile-nav__count">{sidebarCounts[tab] ?? 0}</span>
                 </button>
               ))}
             </div>
-          </nav>
-
-          <div className="border-t border-[var(--sand-300)] px-6 py-5">
-            <label className="block text-[11px] uppercase tracking-[0.18em] text-[var(--sand-700)]">
-              Reviewer
-            </label>
-            <select
-              value={reviewer}
-              onChange={(event) => setReviewer(event.target.value as ReviewerName)}
-              className="mt-2 w-full border border-[var(--sand-300)] bg-[var(--white)] px-3 py-3 text-sm text-[var(--text)] outline-none focus:border-[var(--black)]"
-            >
-              {reviewerOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
           </div>
 
-        </aside>
-
-        <section className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b border-[var(--sand-300)] bg-[var(--white)] px-4 py-5 md:px-8 min-[900px]:hidden">
-            <p className="font-display text-[1.8rem] italic leading-none text-[var(--text)]">
-              Blck Book
-            </p>
-            <p className="mt-2 text-[0.78rem] uppercase tracking-[0.22em] text-[var(--sand-900)]">
-              Approval Catalogue
-            </p>
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-              {contentTabs.map((tab) => (
+          <div className="approval-main__header">
+            <div className="approval-status-tabs">
+              {tabOrder.map((tab) => (
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setContentTab(tab)}
+                  onClick={() => setActiveTab(tab)}
                   className={classNames(
-                    "border px-3 py-2 text-sm whitespace-nowrap",
-                    contentTab === tab
-                      ? "border-[var(--black)] bg-[var(--sand-100)] text-[var(--text)] font-medium"
-                      : "border-[var(--sand-300)] bg-[var(--white)] text-[var(--sand-900)]"
+                    "approval-status-tab",
+                    activeTab === tab && "is-active"
                   )}
                 >
-                  {contentTabLabel(tab)} ({sidebarCounts[tab] ?? 0})
+                  <span>{statusLabel(tab)}</span>
+                  <span className="approval-status-tab__count">{tabCounts[tab]}</span>
                 </button>
               ))}
             </div>
-            <div className="mt-4">
-              <label className="block text-[11px] uppercase tracking-[0.18em] text-[var(--sand-700)]">
-                Reviewer
-              </label>
-              <select
-                value={reviewer}
-                onChange={(event) => setReviewer(event.target.value as ReviewerName)}
-                className="mt-2 w-full border border-[var(--sand-300)] bg-[var(--white)] px-3 py-3 text-sm text-[var(--text)] outline-none focus:border-[var(--black)]"
-              >
-                {reviewerOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          <div className="border-b border-[var(--sand-300)] px-4 pt-4 md:px-8 min-[900px]:pt-6">
-              <div className="flex flex-wrap gap-3">
-                {tabOrder.map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    className={classNames(
-                      "group relative flex items-center gap-2 px-4 pb-4 pt-2 text-sm transition",
-                      activeTab === tab ? "text-[var(--text)] font-medium" : "text-[var(--sand-900)]"
-                    )}
-                  >
-                    <span>{statusLabel(tab)}</span>
-                    <span
-                      className={classNames(
-                        "border px-2 py-0.5 text-xs",
-                        activeTab === tab
-                          ? "border-[var(--black)] bg-[var(--black)] text-[var(--white)] font-medium"
-                          : "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--sand-900)]"
-                      )}
-                    >
-                      {tabCounts[tab]}
-                    </span>
-                    <span
-                      className={classNames(
-                        "absolute inset-x-0 bottom-0 h-[2px] transition",
-                        activeTab === tab ? "bg-[var(--black)]" : "bg-transparent"
-                      )}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-          <div className="border-b border-[var(--sand-300)] px-4 py-4 md:px-8">
             {subcategoryOptions.length ? (
-              <div className="mb-3 mt-2 flex flex-wrap gap-2">
+              <div className="approval-category-pills">
                 <button
                   type="button"
                   onClick={() => setSelectedSubcategory(null)}
                   className={classNames(
-                    "border px-3.5 py-1.5 text-[13px] transition",
-                    selectedSubcategory === null
-                      ? "border-[var(--black)] bg-[var(--black)] font-medium text-[var(--white)]"
-                      : "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--sand-900)]"
+                    "approval-filter-pill",
+                    selectedSubcategory === null && "is-active"
                   )}
                 >
                   All
@@ -905,10 +928,8 @@ export function CatalogueApp() {
                     type="button"
                     onClick={() => setSelectedSubcategory(option.slug)}
                     className={classNames(
-                      "border px-3.5 py-1.5 text-[13px] transition",
-                      selectedSubcategory === option.slug
-                        ? "border-[var(--black)] bg-[var(--black)] font-medium text-[var(--white)]"
-                        : "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--sand-900)]"
+                      "approval-filter-pill",
+                      selectedSubcategory === option.slug && "is-active"
                     )}
                   >
                     {option.label}
@@ -917,9 +938,36 @@ export function CatalogueApp() {
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <label className="flex flex-1 items-center gap-3 border border-[var(--sand-300)] bg-white px-4 py-3">
-                <span className="text-sm text-[var(--sand-700)]">Search</span>
+            {reviewCounts.allFlagged > 0 ? (
+              <div className="approval-review-bar">
+                <span className="approval-review-bar__label">Needs review</span>
+                {[
+                  { key: "all_flagged" as const, label: "All flagged", count: reviewCounts.allFlagged },
+                  { key: "image" as const, label: "Image", count: reviewCounts.image },
+                  { key: "location" as const, label: "Location", count: reviewCounts.location },
+                  { key: "both" as const, label: "Both", count: reviewCounts.both }
+                ]
+                  .filter((option) => option.count > 0)
+                  .map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() =>
+                        setReviewFilter((current) => (current === option.key ? null : option.key))
+                      }
+                      className={classNames(
+                        "approval-review-pill",
+                        reviewFilter === option.key && "is-active"
+                      )}
+                    >
+                      {option.label} {option.count}
+                    </button>
+                  ))}
+              </div>
+            ) : null}
+
+            <div className="approval-toolbar">
+              <label className="approval-search">
                 <input
                   value={search}
                   onChange={(event) =>
@@ -933,43 +981,36 @@ export function CatalogueApp() {
                       ? "Name, brand, tags"
                       : "Name, description, location"
                   }
-                  className="w-full border-none bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--sand-500)]"
+                  className="approval-search__input"
                 />
               </label>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-[var(--sand-900)]">Columns</span>
-                <div className="flex border border-[var(--sand-300)] bg-[var(--sand-100)] p-1">
-                  {gridModes.map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setGridMode(mode)}
-                      className={classNames(
-                        "px-4 py-2 text-sm transition",
-                        gridMode === mode
-                          ? "bg-[var(--black)] text-[var(--white)]"
-                          : "text-[var(--sand-900)]"
-                      )}
-                    >
-                      {mode} col
-                    </button>
-                  ))}
-                </div>
+              <div className="approval-grid-toggle" role="group" aria-label="Grid columns">
+                {gridModes.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setGridMode(mode)}
+                    className={classNames(
+                      "approval-grid-toggle__button",
+                      gridMode === mode && "is-active"
+                    )}
+                  >
+                    {mode} col
+                  </button>
+                ))}
               </div>
             </div>
 
             {contentTab === "staying_in" ? (
-              <div className="mt-4 flex gap-2">
+              <div className="approval-subcategory-tabs">
                 {(["all", "recipe", "entertainment"] as StayingInFilter[]).map((filter) => (
                   <button
                     key={filter}
                     type="button"
                     onClick={() => setStayingInFilter(filter)}
                     className={classNames(
-                      "border px-4 py-2 text-sm transition",
-                      stayingInFilter === filter
-                        ? "border-[var(--black)] bg-[var(--black)] text-[var(--white)]"
-                        : "border-[var(--sand-300)] bg-[var(--sand-100)] text-[var(--sand-900)]"
+                      "approval-subcategory-tab",
+                      stayingInFilter === filter && "is-active"
                     )}
                   >
                     {filter === "all"
@@ -983,7 +1024,7 @@ export function CatalogueApp() {
             ) : null}
           </div>
 
-          <div className="flex-1 px-4 py-5 md:px-8">
+          <div className="approval-main__content">
             {isLoading ||
             statsQuery.isLoading ||
             trendStatsQuery.isLoading ||
@@ -1002,112 +1043,124 @@ export function CatalogueApp() {
               travelCountQuery.isError ||
               listsQuery.isError ? (
               <ErrorState />
-            ) : !activeView.length ? (
+            ) : !currentPageItems.length ? (
               <EmptyState contentTab={contentTab} status={activeTab} />
-            ) : activeTab === "pending" ? (
-              <>
-                <div className="mb-4 flex items-center justify-between text-sm text-[var(--sand-900)]">
-                  <span>{activeView.length} items on this page</span>
-                  {pendingQuery.isFetching ? <span>Refreshing…</span> : null}
-                </div>
-                <CatalogueGrid
-                  candidates={activeView}
-                  gridMode={gridMode}
-                  lists={lists}
-                  currentUser={reviewer}
-                  busyKey={busyKey}
-                  exitingIds={exitingIds}
-                  selectionEnabled
-                  selectedIds={selectedIds}
-                  onToggleSelect={(candidate) => {
-                    const id = candidateId(candidate);
-                    setSelectedIds((current) =>
-                      current.includes(id)
-                        ? current.filter((selectedId) => selectedId !== id)
-                        : [...current, id]
-                    );
-                  }}
-                  onApprove={(candidate, reason) => {
-                    void approveCandidateNow(candidate, reason);
-                  }}
-                  onReject={(candidate, payload) =>
-                    rejectMutation.mutate({
-                      key: candidate._key,
-                      collection: candidate.collection,
-                      rejectionReason: payload.reason,
-                      rejectionPreset: payload.rejectionPreset,
-                      decidedBy: reviewer
-                    })
-                  }
-                  onEdit={(candidate, changes) =>
-                    editMutation.mutateAsync({
-                      candidate,
-                      changes
-                    })
-                  }
-                  onTagsChange={(candidate, tags) =>
-                    tagsMutation.mutate({
-                      key: candidate._key,
-                      tags
-                    })
-                  }
-                  onListsChange={(candidate, assignedLists) =>
-                    listsMutation.mutate({
-                      key: candidate._key,
-                      assignedLists
-                    })
-                  }
-                  onCreateList={handleCreateList}
-                />
-                {visibleSelectedIds.length ? (
-                  <div className="sticky bottom-4 mt-5 flex flex-col gap-3 border border-[var(--black)] bg-[var(--black)] px-4 py-4 text-sm text-[var(--white)] md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedIds([])}
-                        className="inline-flex h-6 w-6 items-center justify-center border border-[var(--white)] text-[var(--white)]"
-                        aria-label="Clear selection"
-                      >
-                        ×
-                      </button>
-                      <span>{visibleSelectedIds.length} selected</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedIds(activeView.map((candidate) => candidateId(candidate)))
-                        }
-                        className="text-[var(--white)] underline underline-offset-4"
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        disabled={bulkApproving}
-                        onClick={() => void handleBulkApprove()}
-                        className="border border-[var(--white)] bg-[var(--white)] px-4 py-2 font-medium text-[var(--black)] disabled:opacity-50"
-                      >
-                        {bulkApproving ? "Approving..." : "Approve Selected"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-                <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
-              </>
             ) : (
-              <CompactList
-                candidates={activeView}
-                lists={lists}
-                type={activeTab}
-                busyKey={busyKey}
-                onRestore={(candidate: CatalogueItem) =>
-                  restoreMutation.mutate({
-                    key: candidate._key,
-                    collection: candidate.collection
-                  })
-                }
-              />
+              <>
+                <div className="approval-item-count-row">
+                  <span className="approval-item-count">
+                    {activeView.length} item{activeView.length === 1 ? "" : "s"} on this page
+                  </span>
+                  {isCurrentFetching ? <span>Refreshing…</span> : null}
+                </div>
+
+                {!activeView.length ? (
+                  <div className="approval-empty-filter-state">
+                    No items match the selected review filter.
+                  </div>
+                ) : activeTab === "pending" ? (
+                  <>
+                    <CatalogueGrid
+                      candidates={activeView}
+                      gridMode={gridMode}
+                      categoryClass={catalogueCategoryClass}
+                      lists={lists}
+                      currentUser={reviewer}
+                      busyKey={busyKey}
+                      exitingIds={exitingIds}
+                      selectionEnabled
+                      selectedIds={selectedIds}
+                      onToggleSelect={(candidate) => {
+                        const id = candidateId(candidate);
+                        setSelectedIds((current) =>
+                          current.includes(id)
+                            ? current.filter((selectedId) => selectedId !== id)
+                            : [...current, id]
+                        );
+                      }}
+                      onApprove={(candidate, reason) => {
+                        void approveCandidateNow(candidate, reason);
+                      }}
+                      onReject={(candidate, payload) =>
+                        rejectMutation.mutate({
+                          key: candidate._key,
+                          collection: candidate.collection,
+                          rejectionReason: payload.reason,
+                          rejectionPreset: payload.rejectionPreset,
+                          decidedBy: reviewer
+                        })
+                      }
+                      onEdit={(candidate, changes) =>
+                        editMutation.mutateAsync({
+                          candidate,
+                          changes
+                        })
+                      }
+                      onTagsChange={(candidate, tags) =>
+                        tagsMutation.mutate({
+                          key: candidate._key,
+                          tags
+                        })
+                      }
+                      onListsChange={(candidate, assignedLists) =>
+                        listsMutation.mutate({
+                          key: candidate._key,
+                          assignedLists
+                        })
+                      }
+                      onCreateList={handleCreateList}
+                    />
+                    {visibleSelectedIds.length ? (
+                      <div className="approval-bulk-bar">
+                        <div className="approval-bulk-bar__summary">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedIds([])}
+                            className="approval-bulk-bar__clear"
+                            aria-label="Clear selection"
+                          >
+                            ×
+                          </button>
+                          <span>{visibleSelectedIds.length} selected</span>
+                        </div>
+                        <div className="approval-bulk-bar__actions">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedIds(activeView.map((candidate) => candidateId(candidate)))
+                            }
+                            className="approval-bulk-bar__link"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            disabled={bulkApproving}
+                            onClick={() => void handleBulkApprove()}
+                            className="approval-bulk-bar__button"
+                          >
+                            {bulkApproving ? "Approving..." : "Approve Selected"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                    <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+                  </>
+                ) : (
+                  <CompactList
+                    candidates={activeView}
+                    lists={lists}
+                    type={activeTab}
+                    busyKey={busyKey}
+                    onRestore={(candidate: CatalogueItem) =>
+                      restoreMutation.mutate({
+                        key: candidate._key,
+                        collection: candidate.collection
+                      })
+                    }
+                  />
+                )}
+              </>
             )}
           </div>
         </section>
@@ -1116,10 +1169,8 @@ export function CatalogueApp() {
       {toast ? (
         <div
           className={classNames(
-            "fixed bottom-5 right-5 border border-[var(--black)] px-4 py-3 text-sm",
-            toast.tone === "success"
-              ? "bg-[var(--black)] text-[var(--white)]"
-              : "bg-[var(--error)] text-white"
+            "approval-toast",
+            toast.tone === "success" ? "is-success" : "is-error"
           )}
         >
           {toast.message}
@@ -1131,9 +1182,9 @@ export function CatalogueApp() {
 
 function ErrorState() {
   return (
-    <div className="border border-[var(--error)] bg-[var(--error-light)] px-6 py-10 text-center">
-      <p className="font-display text-2xl text-[var(--text)]">Could not load catalogue data</p>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--sand-900)]">
+    <div className="approval-state-card approval-state-card--error">
+      <p className="font-display text-2xl text-[var(--cat-text-primary)]">Could not load catalogue data</p>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--cat-text-secondary)]">
         Could not connect to the API. Make sure inspiration-gateway is running on port 3002.
       </p>
     </div>
@@ -1142,11 +1193,11 @@ function ErrorState() {
 
 function LoadingState() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 3 }).map((_, index) => (
         <div
           key={index}
-          className="min-h-[420px] animate-pulse border border-[var(--sand-300)] bg-[var(--sand-100)]"
+          className="min-h-[420px] animate-pulse border border-[var(--cat-border)] bg-[var(--cat-bg-card)]"
         />
       ))}
     </div>
@@ -1163,23 +1214,23 @@ function PaginationControls({
   onPageChange: (page: number) => void;
 }) {
   return (
-    <div className="mt-6 flex items-center justify-between border border-[var(--sand-300)] bg-[var(--sand-100)] px-4 py-3">
+    <div className="approval-pagination">
       <button
         type="button"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
-        className="border border-transparent px-3 py-2 text-sm text-[var(--sand-900)] transition hover:border-[var(--black)] hover:bg-white hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="approval-pagination__button"
       >
         Previous
       </button>
-      <p className="text-sm text-[var(--sand-900)]">
+      <p className="approval-pagination__summary">
         Page {page} of {totalPages}
       </p>
       <button
         type="button"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
-        className="border border-transparent px-3 py-2 text-sm text-[var(--sand-900)] transition hover:border-[var(--black)] hover:bg-white hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="approval-pagination__button"
       >
         Next
       </button>

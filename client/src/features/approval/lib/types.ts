@@ -56,6 +56,7 @@ type CandidateBase = {
   tags_new?: NewTagSuggestion[];
   endorsements?: Endorsement[];
   is_blckbx_approved?: boolean;
+  image_needs_review?: boolean | null;
   requested_by_client?: string | null;
   requested_by_client_name?: string | null;
   content_scope?: ContentScope;

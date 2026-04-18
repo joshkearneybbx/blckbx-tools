@@ -14,6 +14,11 @@ services:
       - ./pocketbase/pb_migrations:/pb_migrations
     environment:
       - N8N_AUTOFILL_WEBHOOK_URL=${N8N_AUTOFILL_WEBHOOK_URL}
+      - CH_INGEST_SECRET=${CH_INGEST_SECRET}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
+      - OPENROUTER_IMAGE_MODEL=${OPENROUTER_IMAGE_MODEL}
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
       interval: 30s

@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   ClipboardCheck,
   Search,
+  Newspaper,
 } from "lucide-react";
 import { ToolCard, type Tool } from "@/components/ToolCard";
 import logoUrl from "@assets/blckbx-logo.png";
@@ -46,6 +47,16 @@ const tools: LauncherTool[] = [
     icon: Search,
     href: "/research",
     status: "active",
+  },
+  {
+    slug: "content-hub",
+    id: "content-hub",
+    name: "Content Hub",
+    description: "Editorial trends, newsletters, Instagram posts, and content assets",
+    icon: Newspaper,
+    href: "/content-hub",
+    status: "active",
+    badge: "New",
   },
   {
     slug: "travel-hub",

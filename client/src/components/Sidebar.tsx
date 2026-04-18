@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, LayoutDashboard, ClipboardCheck, Search } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, LayoutDashboard, ClipboardCheck, Search, Newspaper } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -111,6 +111,14 @@ export function Sidebar() {
             icon={Search}
             label="Research Hub"
             active={location.startsWith("/research")}
+          />
+        )}
+        {hasAccess("content-hub") && (
+          <SidebarLink
+            to="/content-hub"
+            icon={Newspaper}
+            label="Content Hub"
+            active={location.startsWith("/content-hub")}
           />
         )}
         {hasAccess("travel-hub") && (

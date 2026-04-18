@@ -34,6 +34,7 @@ type ProductApiCandidate = {
   primary_image?: string | null;
   hero_image_url?: string | null;
   image_source?: string | null;
+  image_needs_review?: boolean | null;
   signal_phrase?: string | null;
   content_focus?: string | null;
   position?: number | null;
@@ -105,6 +106,7 @@ type TrendApiCandidate = {
   geo_place_name?: string | null;
   geo_match_type?: GeoMatchType | null;
   geo_needs_review?: boolean | null;
+  image_needs_review?: boolean | null;
   destination?: string | null;
   travel_assistant_note?: string | null;
   cover_images?: string[] | null;
@@ -180,6 +182,7 @@ type RecommendationApiItem = {
   geo_place_name?: string | null;
   geo_match_type?: GeoMatchType | null;
   geo_needs_review?: boolean | null;
+  image_needs_review?: boolean | null;
   content_type?: string | null;
   category?: string | null;
   subcategory?: string | null;
@@ -318,6 +321,7 @@ function mapCandidate(candidate: ProductApiCandidate): ProductCandidate {
     resolved_url: candidate.resolved_url ?? null,
     candidate_url: candidate.candidate_url ?? null,
     image_source: candidate.image_source ?? null,
+    image_needs_review: candidate.image_needs_review ?? false,
     signal_phrase: candidate.signal_phrase ?? null,
     content_focus: candidate.content_focus ?? null,
     position: candidate.position ?? null,
@@ -398,6 +402,8 @@ function mapTrendCandidate(candidate: TrendApiCandidate): TrendCandidate {
       "geo_match_type" in candidate ? candidate.geo_match_type ?? null : undefined,
     geo_needs_review:
       "geo_needs_review" in candidate ? candidate.geo_needs_review ?? null : undefined,
+    image_needs_review:
+      "image_needs_review" in candidate ? candidate.image_needs_review ?? null : undefined,
     destination: candidate.destination ?? null,
     travel_assistant_note: candidate.travel_assistant_note ?? null,
     cover_images: candidate.cover_images ?? [],
@@ -488,6 +494,8 @@ function mapRecommendationCandidate(candidate: RecommendationApiItem): Recommend
       "geo_match_type" in candidate ? candidate.geo_match_type ?? null : undefined,
     geo_needs_review:
       "geo_needs_review" in candidate ? candidate.geo_needs_review ?? null : undefined,
+    image_needs_review:
+      "image_needs_review" in candidate ? candidate.image_needs_review ?? null : undefined,
     source_name: candidate.source_name ?? "Travel Hub",
     source_url: candidate.source_url ?? null,
     scrape_source: "travel_hub",

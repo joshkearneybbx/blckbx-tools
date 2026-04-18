@@ -27,6 +27,7 @@ import ClientInterests from "@/features/research/pages/ClientInterests";
 import ResearchLists from "@/features/research/pages/ResearchLists";
 import ResearchListDetail from "@/features/research/pages/ResearchListDetail";
 import ApprovalPage from "@/features/approval/ApprovalPage";
+import ContentHubPage from "@/features/content-hub/ContentHubPage";
 import TravelHubPage from "@/features/travel-hub/TravelHubPage";
 
 // Create a new QueryClient instance
@@ -230,6 +231,20 @@ function Router() {
               <ResearchLayout>
                 <ResearchAddItem />
               </ResearchLayout>
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/content-hub">
+          {() => (
+            <ToolGuard slug="content-hub">
+              <ContentHubPage />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/content-hub/:rest*">
+          {() => (
+            <ToolGuard slug="content-hub">
+              <Redirect to="/content-hub" replace />
             </ToolGuard>
           )}
         </Route>

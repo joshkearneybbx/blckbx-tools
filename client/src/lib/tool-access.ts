@@ -2,6 +2,7 @@ export type ToolSlug =
   | "foh"
   | "approval"
   | "research"
+  | "content-hub"
   | "travel-hub"
   | "itinerary"
   | "task-guide"
@@ -12,6 +13,7 @@ export const TOOL_SLUGS: ToolSlug[] = [
   "foh",
   "approval",
   "research",
+  "content-hub",
   "travel-hub",
   "itinerary",
   "task-guide",
