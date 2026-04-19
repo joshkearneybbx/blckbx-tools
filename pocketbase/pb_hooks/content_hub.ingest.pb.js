@@ -191,6 +191,75 @@ routerAdd('POST', '/api/ch/ingest', function (c) {
       return saveRecord(record, data || {});
     };
 
+    var saveExistingTrendRecord = function (existingRecord, data, nowIso, newSignalCount) {
+      for (var key in data) {
+        if (!Object.prototype.hasOwnProperty.call(data, key)) {
+          continue;
+        }
+
+        if (data[key] === undefined) {
+          continue;
+        }
+
+        existingRecord.set(key, data[key]);
+      }
+
+      console.log('[ch/ingest] saving existing trend:', existingRecord.id, 'new last_seen_at:', nowIso, 'new signal_count:', newSignalCount);
+
+      var savedOrError = null;
+      try {
+        if ($app.dao && typeof $app.dao === 'function') {
+          var dao = $app.dao();
+          if (dao && typeof dao.saveRecord === 'function') {
+            savedOrError = dao.saveRecord(existingRecord);
+          } else {
+            savedOrError = $app.save(existingRecord);
+          }
+        } else {
+          savedOrError = $app.save(existingRecord);
+        }
+
+        console.log('[ch/ingest] save result for', existingRecord.id, ':', savedOrError);
+      } catch (saveError) {
+        savedOrError = saveError && saveError.message ? saveError.message : String(saveError || 'unknown save error');
+        console.log('[ch/ingest] save result for', existingRecord.id, ':', savedOrError);
+        throw saveError;
+      }
+
+      var persistedRecord = null;
+      if ($app.dao && typeof $app.dao === 'function') {
+        var verifyDao = $app.dao();
+        if (verifyDao && typeof verifyDao.findRecordById === 'function') {
+          try {
+            persistedRecord = verifyDao.findRecordById('ch_trends', existingRecord.id);
+          } catch (verifyDaoError) {}
+        }
+      }
+
+      if (!persistedRecord) {
+        persistedRecord = $app.findRecordById('ch_trends', existingRecord.id);
+      }
+
+      if (!persistedRecord) {
+        throw new Error('existing trend save verification failed: record not found after save');
+      }
+
+      var persistedLastSeenAt = normalizeDate(persistedRecord.get('last_seen_at'));
+      var expectedLastSeenMs = Date.parse(nowIso);
+      var actualLastSeenMs = persistedLastSeenAt ? Date.parse(persistedLastSeenAt) : NaN;
+      var lastSeenMatches = !isNaN(expectedLastSeenMs) && !isNaN(actualLastSeenMs) && Math.abs(actualLastSeenMs - expectedLastSeenMs) < 2000;
+      var persistedSignalCount = safeInteger(persistedRecord.get('signal_count'), 0);
+
+      if (!lastSeenMatches || persistedSignalCount !== newSignalCount) {
+        throw new Error(
+          'existing trend save verification failed: persisted last_seen_at=' + persistedRecord.get('last_seen_at') +
+          ' persisted signal_count=' + persistedSignalCount
+        );
+      }
+
+      return persistedRecord;
+    };
+
     var isOlderThanDays = function (dateValue, nowMs, days) {
       var parsed = normalizeDate(dateValue);
       if (!parsed) {
@@ -380,29 +449,32 @@ routerAdd('POST', '/api/ch/ingest', function (c) {
           var shouldIncrementSignalCount = !signalCountedTopicKeys[topicKey];
 
           if (trendRecord) {
-            var mergedRawPayload = mergeObjects(trendRecord.get('raw_payload'), trend.raw_payload);
-            var isResurfaced = isOlderThanDays(trendRecord.get('last_seen_at'), nowMs, 14);
+            var existing = trendRecord;
+            var mergedRawPayload = mergeObjects(existing.get('raw_payload'), trend.raw_payload);
+            var isResurfaced = isOlderThanDays(existing.get('last_seen_at'), nowMs, 14);
 
             if (isResurfaced) {
               mergedRawPayload = appendResurfacedAt(mergedRawPayload, nowIso);
             }
 
-            trendRecord = saveRecord(trendRecord, {
+            var newSignalCount = safeInteger(existing.get('signal_count'), 0) + (shouldIncrementSignalCount ? 1 : 0);
+
+            trendRecord = saveExistingTrendRecord(existing, {
               topic_key: topicKey,
               topic: topic,
-              category: hasOwn(trend, 'category') ? (trend.category || null) : trendRecord.get('category'),
-              status: isResurfaced ? 'active' : (trendRecord.get('status') || 'active'),
-              last_seen_at: runStartedAt,
-              signal_count: safeInteger(trendRecord.get('signal_count'), 0) + (shouldIncrementSignalCount ? 1 : 0),
-              velocity: Math.max(safeNumber(trendRecord.get('velocity'), 0), safeNumber(trend.velocity, 0)),
-              views: Math.max(safeNumber(trendRecord.get('views'), 0), safeNumber(trend.views, 0)),
-              suggested_title: hasOwn(trend, 'suggested_title') ? normalizeString(trend.suggested_title) : normalizeString(trendRecord.get('suggested_title')),
-              angle: hasOwn(trend, 'angle') ? normalizeString(trend.angle) : normalizeString(trendRecord.get('angle')),
-              seo_short_tail: hasOwn(trend, 'seo_short_tail') ? normalizeStringArray(trend.seo_short_tail) : normalizeStringArray(trendRecord.get('seo_short_tail')),
-              seo_long_tail: hasOwn(trend, 'seo_long_tail') ? normalizeStringArray(trend.seo_long_tail) : normalizeStringArray(trendRecord.get('seo_long_tail')),
-              geo_questions: hasOwn(trend, 'geo_questions') ? normalizeStringArray(trend.geo_questions) : normalizeStringArray(trendRecord.get('geo_questions')),
+              category: hasOwn(trend, 'category') ? (trend.category || null) : existing.get('category'),
+              status: isResurfaced ? 'active' : (existing.get('status') || 'active'),
+              last_seen_at: nowIso,
+              signal_count: newSignalCount,
+              velocity: Math.max(safeNumber(existing.get('velocity'), 0), safeNumber(trend.velocity, 0)),
+              views: Math.max(safeNumber(existing.get('views'), 0), safeNumber(trend.views, 0)),
+              suggested_title: hasOwn(trend, 'suggested_title') ? normalizeString(trend.suggested_title) : normalizeString(existing.get('suggested_title')),
+              angle: hasOwn(trend, 'angle') ? normalizeString(trend.angle) : normalizeString(existing.get('angle')),
+              seo_short_tail: hasOwn(trend, 'seo_short_tail') ? normalizeStringArray(trend.seo_short_tail) : normalizeStringArray(existing.get('seo_short_tail')),
+              seo_long_tail: hasOwn(trend, 'seo_long_tail') ? normalizeStringArray(trend.seo_long_tail) : normalizeStringArray(existing.get('seo_long_tail')),
+              geo_questions: hasOwn(trend, 'geo_questions') ? normalizeStringArray(trend.geo_questions) : normalizeStringArray(existing.get('geo_questions')),
               raw_payload: mergedRawPayload,
-            });
+            }, nowIso, newSignalCount);
 
             if (!updatedTopicKeysThisRun[topicKey]) {
               trendsUpdated += 1;
@@ -414,8 +486,8 @@ routerAdd('POST', '/api/ch/ingest', function (c) {
               topic: topic,
               category: trend.category || null,
               status: 'active',
-              first_seen_at: runStartedAt,
-              last_seen_at: runStartedAt,
+              first_seen_at: nowIso,
+              last_seen_at: nowIso,
               signal_count: 1,
               velocity: safeNumber(trend.velocity, 0),
               views: safeNumber(trend.views, 0),
