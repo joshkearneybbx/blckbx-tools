@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { pb, type User } from '@/lib/pocketbase';
 import { isToolSlug, type ToolSlug } from '@/lib/tool-access';
 
 type AllowedToolValue = ToolSlug | 'all';
+
+type AuthSnapshot = {
+  user: User | null;
+  isLoading: boolean;
+};
 
 function normalizeAllowedTools(value: unknown): AllowedToolValue[] {
   if (!Array.isArray(value)) return [];
@@ -12,44 +17,83 @@ function normalizeAllowedTools(value: unknown): AllowedToolValue[] {
   ));
 }
 
+let authSnapshot: AuthSnapshot = {
+  user: pb.authStore.model as User | null,
+  isLoading: true,
+};
+
+const authListeners = new Set<(snapshot: AuthSnapshot) => void>();
+let authInitPromise: Promise<void> | null = null;
+let authStoreUnsubscribe: (() => void) | null = null;
+
+function emitAuthSnapshot() {
+  authListeners.forEach((listener) => {
+    listener(authSnapshot);
+  });
+}
+
+function setAuthSnapshot(nextSnapshot: AuthSnapshot) {
+  authSnapshot = nextSnapshot;
+  emitAuthSnapshot();
+}
+
+function ensureAuthStoreSubscription() {
+  if (authStoreUnsubscribe) {
+    return;
+  }
+
+  authStoreUnsubscribe = pb.authStore.onChange(() => {
+    setAuthSnapshot({
+      user: pb.authStore.model as User | null,
+      isLoading: false,
+    });
+  });
+}
+
+async function ensureAuthInitialized() {
+  ensureAuthStoreSubscription();
+
+  if (!authSnapshot.isLoading) {
+    return;
+  }
+
+  if (authInitPromise) {
+    return authInitPromise;
+  }
+
+  authInitPromise = (async () => {
+    try {
+      if (pb.authStore.isValid) {
+        await pb.collection('users').authRefresh();
+      }
+    } catch {
+      pb.authStore.clear();
+    } finally {
+      setAuthSnapshot({
+        user: pb.authStore.model as User | null,
+        isLoading: false,
+      });
+      authInitPromise = null;
+    }
+  })();
+
+  return authInitPromise;
+}
+
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(pb.authStore.model as User | null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [snapshot, setSnapshot] = useState<AuthSnapshot>(authSnapshot);
+  const { user, isLoading } = snapshot;
   const allowedTools = normalizeAllowedTools(user?.allowed_tools);
   const hasAccess = (slug: ToolSlug): boolean => (
     allowedTools.includes('all') || allowedTools.includes(slug)
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    const syncAuth = async () => {
-      try {
-        if (pb.authStore.isValid) {
-          await pb.collection('users').authRefresh();
-        }
-      } catch {
-        pb.authStore.clear();
-      } finally {
-        if (!cancelled) {
-          setUser(pb.authStore.model as User | null);
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void syncAuth();
-
-    // Listen for auth changes
-    const unsubscribe = pb.authStore.onChange(() => {
-      if (!cancelled) {
-        setUser(pb.authStore.model as User | null);
-      }
-    });
+    authListeners.add(setSnapshot);
+    void ensureAuthInitialized();
 
     return () => {
-      cancelled = true;
-      unsubscribe();
+      authListeners.delete(setSnapshot);
     };
   }, []);
 
@@ -77,7 +121,6 @@ export function useAuth() {
         allowed_tools: []
       });
 
-      // Auto-login after registration
       await login(email, password);
       return userData;
     } catch (error: any) {
@@ -91,16 +134,13 @@ export function useAuth() {
 
   const loginWithGoogle = async () => {
     try {
-      // Step 1: Initiate OAuth flow - this redirects to Google
       const redirectUrl = `${window.location.origin}/oauth/callback`;
       const authData = await pb.collection('users').authWithOAuth2({
         provider: 'google',
         redirectUrl: redirectUrl,
-        create: true, // Auto-create user if they don't exist
+        create: true,
       });
 
-      // PocketBase will redirect the browser to Google automatically
-      // The authData here contains the redirect URL
       return authData;
     } catch (error: any) {
       throw new Error(error.message || 'OAuth login failed');

@@ -115,7 +115,7 @@ export function Sidebar() {
         )}
         {hasAccess("content-hub") && (
           <SidebarLink
-            to="/content-hub"
+            to="/content-hub/trends"
             icon={Newspaper}
             label="Content Hub"
             active={location.startsWith("/content-hub")}

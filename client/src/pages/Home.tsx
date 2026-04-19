@@ -54,7 +54,7 @@ const tools: LauncherTool[] = [
     name: "Content Hub",
     description: "Editorial trends, newsletters, Instagram posts, and content assets",
     icon: Newspaper,
-    href: "/content-hub",
+    href: "/content-hub/trends",
     status: "active",
     badge: "New",
   },

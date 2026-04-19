@@ -27,7 +27,10 @@ import ClientInterests from "@/features/research/pages/ClientInterests";
 import ResearchLists from "@/features/research/pages/ResearchLists";
 import ResearchListDetail from "@/features/research/pages/ResearchListDetail";
 import ApprovalPage from "@/features/approval/ApprovalPage";
-import ContentHubPage from "@/features/content-hub/ContentHubPage";
+import ContentHubBlogComposerPage from "@/features/content-hub/pages/ContentHubBlogComposerPage";
+import ContentHubComposerPlaceholder from "@/features/content-hub/pages/ContentHubComposerPlaceholder";
+import ContentHubTrendDetailPage from "@/features/content-hub/pages/ContentHubTrendDetailPage";
+import ContentHubTrendsPage from "@/features/content-hub/pages/ContentHubTrendsPage";
 import TravelHubPage from "@/features/travel-hub/TravelHubPage";
 
 // Create a new QueryClient instance
@@ -234,17 +237,45 @@ function Router() {
             </ToolGuard>
           )}
         </Route>
+        <Route path="/content-hub/compose/blog/:trendId">
+          {() => (
+            <ToolGuard slug="content-hub">
+              <ContentHubBlogComposerPage />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/content-hub/compose/ig/:trendId">
+          {() => (
+            <ToolGuard slug="content-hub">
+              <ContentHubComposerPlaceholder kind="ig" />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/content-hub/trends/:id">
+          {() => (
+            <ToolGuard slug="content-hub">
+              <ContentHubTrendDetailPage />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/content-hub/trends">
+          {() => (
+            <ToolGuard slug="content-hub">
+              <ContentHubTrendsPage />
+            </ToolGuard>
+          )}
+        </Route>
         <Route path="/content-hub">
           {() => (
             <ToolGuard slug="content-hub">
-              <ContentHubPage />
+              <Redirect to="/content-hub/trends" replace />
             </ToolGuard>
           )}
         </Route>
         <Route path="/content-hub/:rest*">
           {() => (
             <ToolGuard slug="content-hub">
-              <Redirect to="/content-hub" replace />
+              <Redirect to="/content-hub/trends" replace />
             </ToolGuard>
           )}
         </Route>
