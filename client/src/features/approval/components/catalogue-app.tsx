@@ -66,7 +66,11 @@ const SUBCATEGORY_MAP: Partial<
     { slug: "beauty", label: "Beauty" },
     { slug: "tech_and_gadgets", label: "Tech & Gadgets" },
     { slug: "home", label: "Home" },
-    { slug: "kids", label: "Kids" }
+    { slug: "kids", label: "Kids" },
+    { slug: "books_and_reading", label: "Books & Reading" },
+    { slug: "fitness_and_wellness", label: "Fitness & Wellness" },
+    { slug: "food_and_drink", label: "Food & Drink" },
+    { slug: "jewellery_and_accessories", label: "Jewellery & Accessories" }
   ],
   travel: [
     { slug: "hotels_and_villas", label: "Hotels & Villas" },
@@ -724,19 +728,20 @@ export function CatalogueApp() {
     ]);
   }
 
-  async function approveCandidateNow(candidate: CatalogueItem, curationReason?: string) {
+  async function approveCandidateNow(candidate: CatalogueItem, approvalNote?: string) {
     const id = candidateId(candidate);
     setBusyApproveId(candidate._key);
     try {
       if (candidate.collection === "product_candidates") {
-        await updateCandidate(candidate._key, {
-          status: "approved",
-          reviewed_by: reviewer,
-          reviewed_at: new Date().toISOString(),
-          curation_reason: curationReason || null
+        const decision = await createCurationDecision({
+          candidate_key: candidate._key,
+          candidate_collection: "product_candidates",
+          decision: "approved",
+          decided_by: reviewer,
+          reason: approvalNote || undefined
         });
         try {
-          await promoteCandidates(reviewer, [candidate._key]);
+          await promoteCandidates(reviewer, [candidate._key], decision._key);
         } catch (error) {
           await updateCandidate(candidate._key, {
             status: "pending",
@@ -747,14 +752,15 @@ export function CatalogueApp() {
           throw error;
         }
       } else if (candidate.collection === "trend_candidates") {
-        await updateTrendCandidate(candidate._key, {
-          status: "approved",
-          reviewed_by: reviewer,
-          reviewed_at: new Date().toISOString(),
-          curation_reason: curationReason || null
+        const decision = await createCurationDecision({
+          candidate_key: candidate._key,
+          candidate_collection: "trend_candidates",
+          decision: "approved",
+          decided_by: reviewer,
+          reason: approvalNote || undefined
         });
         try {
-          await promoteTrendCandidates(reviewer, [candidate._key]);
+          await promoteTrendCandidates(reviewer, [candidate._key], decision._key);
         } catch (error) {
           await updateTrendCandidate(candidate._key, {
             status: "pending",
@@ -769,7 +775,7 @@ export function CatalogueApp() {
           curation_status: "approved",
           status: "active",
           curated_by: reviewer,
-          curation_reason: curationReason || null
+          curation_reason: approvalNote || null
         });
       }
 

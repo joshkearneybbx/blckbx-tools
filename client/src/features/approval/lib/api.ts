@@ -72,7 +72,6 @@ type ProductApiCandidate = {
         user_name?: string | null;
       }>
     | null;
-  promoted_to_key?: string | null;
   scraped_at?: string | null;
   created_at?: string | null;
   availability?: string | null;
@@ -143,7 +142,6 @@ type TrendApiCandidate = {
   rejection_reason?: string | null;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
-  promoted_to_key?: string | null;
   is_read?: boolean | null;
   is_saved?: boolean | null;
   scraped_at?: string | null;
@@ -361,7 +359,6 @@ function mapCandidate(candidate: ProductApiCandidate): ProductCandidate {
       note: entry.note ?? "",
       user_name: entry.user_name ?? undefined
     })),
-    promoted_to_key: candidate.promoted_to_key ?? null,
     created_at: candidate.created_at ?? candidate.scraped_at ?? new Date().toISOString(),
     url_status: "unknown"
   };
@@ -451,7 +448,6 @@ function mapTrendCandidate(candidate: TrendApiCandidate): TrendCandidate {
     confidence: candidate.confidence ?? null,
     signal_phrase: candidate.signal_phrase ?? null,
     source_excerpt: candidate.source_excerpt ?? null,
-    promoted_to_key: candidate.promoted_to_key ?? null,
     scraped_at: candidate.scraped_at ?? null,
     audit_log: (candidate.audit_log ?? []).map((entry) => ({
       action: entry.action ?? "",
@@ -523,7 +519,6 @@ function mapRecommendationCandidate(candidate: RecommendationApiItem): Recommend
     confidence: null,
     signal_phrase: null,
     source_excerpt: null,
-    promoted_to_key: null,
     scraped_at: null,
     destination: candidate.destination ?? null,
     travel_assistant_note: candidate.travel_assistant_note ?? null,
@@ -721,7 +716,8 @@ export async function createCurationDecision(data: {
 
 export async function promoteTrendCandidates(
   promotedBy: string,
-  keys?: string[]
+  keys?: string[],
+  decisionKey?: string
 ): Promise<{
   promoted: number;
   failed: number;
@@ -732,14 +728,16 @@ export async function promoteTrendCandidates(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       promoted_by: promotedBy,
-      ...(keys?.length ? { keys } : {})
+      ...(keys?.length ? { keys } : {}),
+      ...(decisionKey ? { decision_key: decisionKey } : {})
     })
   });
 }
 
 export async function promoteCandidates(
   promotedBy: string,
-  keys?: string[]
+  keys?: string[],
+  decisionKey?: string
 ): Promise<{
   promoted: number;
   failed: number;
@@ -750,7 +748,8 @@ export async function promoteCandidates(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       promoted_by: promotedBy,
-      ...(keys?.length ? { keys } : {})
+      ...(keys?.length ? { keys } : {}),
+      ...(decisionKey ? { decision_key: decisionKey } : {})
     })
   });
 }

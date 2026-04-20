@@ -150,3 +150,14 @@ export function applyCleared(content: string, clearedFlagIds: string[]): string 
     })
     .join("");
 }
+
+/**
+ * Removes [[?:...]] markers around a specific flagged span in the source text.
+ * Used when an editor clears a flag chip — the underlying text gets cleaned
+ * so the flag doesn't reappear on next render.
+ */
+export function stripFlagMarker(sourceText: string, flagText: string): string {
+  const escaped = flagText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`\\[\\[\\?:${escaped}\\]\\]`, "g");
+  return sourceText.replace(pattern, flagText);
+}

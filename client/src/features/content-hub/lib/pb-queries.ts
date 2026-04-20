@@ -11,6 +11,7 @@ import type {
   ContentHubTrendSourceRecord,
   ContentHubTrendsQueryResult,
   ContentHubTrendStatus,
+  IGCarouselContent,
 } from "../types";
 
 const SORT_MAP: Record<ContentHubSortKey, string> = {
@@ -26,6 +27,7 @@ const CONTENT_HUB_TREND_QUERY_KEY = ["content-hub-trend-live"] as const;
 const CONTENT_HUB_TREND_SOURCES_QUERY_KEY = ["content-hub-trend-sources-live"] as const;
 const CONTENT_HUB_ASSETS_QUERY_KEY = ["content-hub-assets-live"] as const;
 const CONTENT_HUB_BLOG_DRAFT_QUERY_KEY = ["content-hub-blog-draft-live"] as const;
+const CONTENT_HUB_IG_DRAFT_QUERY_KEY = ["content-hub-ig-draft-live"] as const;
 
 type TrendStatusTarget = Pick<ContentHubTrendRecord, "id" | "status" | "topic">;
 
@@ -78,6 +80,10 @@ function getTrendSourcesQueryKey(trendId: string) {
 
 function getBlogDraftQueryKey(trendId: string) {
   return [...CONTENT_HUB_BLOG_DRAFT_QUERY_KEY, trendId] as const;
+}
+
+function getIGDraftQueryKey(trendId: string) {
+  return [...CONTENT_HUB_IG_DRAFT_QUERY_KEY, trendId] as const;
 }
 
 function isPocketBaseNotFound(error: unknown) {
@@ -228,6 +234,91 @@ export function useContentHubBlogDraft(trendId?: string, enabled = true) {
   });
 }
 
+export async function fetchOrCreateIGDraft(trendId: string, userId: string) {
+  const existing = await pb.collection("ch_assets").getFirstListItem(
+    `type = "instagram_post" && trends ~ "${trendId}"`,
+    { requestKey: null },
+  ).catch(() => null);
+
+  if (existing) {
+    return existing as unknown as ContentHubAssetRecord;
+  }
+
+  return pb.collection("ch_assets").create(
+    {
+      type: "instagram_post",
+      status: "draft",
+      trends: [trendId],
+      created_by: userId,
+      title: "Untitled IG carousel",
+      content: {
+        cover: null,
+        items: [],
+        caption: "",
+        hashtags: [],
+      },
+      cleared_flags: [],
+    },
+    { requestKey: null },
+  ) as Promise<ContentHubAssetRecord>;
+}
+
+export async function updateIGDraft(
+  assetId: string,
+  content: IGCarouselContent,
+  options?: { clearedFlags?: string[] },
+) {
+  const payload: {
+    content: IGCarouselContent;
+    title: string;
+    cleared_flags?: string[];
+  } = {
+    content,
+    title: content.cover?.headline || "Untitled IG carousel",
+  };
+
+  if (options?.clearedFlags) {
+    payload.cleared_flags = options.clearedFlags;
+  }
+
+  return pb.collection("ch_assets").update(
+    assetId,
+    payload,
+    { requestKey: null },
+  ) as Promise<ContentHubAssetRecord>;
+}
+
+export async function clearIGFlag(assetId: string, currentClearedFlags: string[], flagText: string) {
+  const updated = [...currentClearedFlags, flagText];
+  return pb.collection("ch_assets").update(
+    assetId,
+    { cleared_flags: updated },
+    { requestKey: null },
+  ) as Promise<ContentHubAssetRecord>;
+}
+
+export function useContentHubIGDraft(trendId?: string, enabled = true) {
+  return useQuery<ContentHubAssetRecord>({
+    queryKey: trendId ? getIGDraftQueryKey(trendId) : [...CONTENT_HUB_IG_DRAFT_QUERY_KEY, "missing-id"],
+    queryFn: async () => {
+      if (!trendId) {
+        throw new Error("Trend id is required");
+      }
+
+      const userId = pb.authStore.model?.id;
+      if (!userId) {
+        throw new Error("Authenticated user is required");
+      }
+
+      return fetchOrCreateIGDraft(trendId, userId);
+    },
+    enabled: pb.authStore.isValid && Boolean(trendId) && enabled,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
 export function useContentHubTrendCount() {
   return useQuery<number>({
     queryKey: CONTENT_HUB_TREND_COUNT_QUERY_KEY,
@@ -370,6 +461,29 @@ export function useUpdateClearedFlags() {
     },
     onSuccess: async (updatedDraft, variables) => {
       queryClient.setQueryData(getBlogDraftQueryKey(variables.trendId), updatedDraft);
+      await queryClient.invalidateQueries({ queryKey: CONTENT_HUB_ASSETS_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateContentHubIGDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ContentHubAssetRecord,
+    unknown,
+    {
+      assetId: string;
+      trendId: string;
+      content: IGCarouselContent;
+      clearedFlags?: string[];
+    }
+  >({
+    mutationFn: async ({ assetId, content, clearedFlags }) => {
+      return updateIGDraft(assetId, content, { clearedFlags });
+    },
+    onSuccess: async (updatedDraft, variables) => {
+      queryClient.setQueryData(getIGDraftQueryKey(variables.trendId), updatedDraft);
       await queryClient.invalidateQueries({ queryKey: CONTENT_HUB_ASSETS_QUERY_KEY });
     },
   });

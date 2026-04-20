@@ -78,6 +78,57 @@ export interface ContentHubAssetRecord {
   updated: string;
 }
 
+export interface IGCover {
+  headline: string;
+  image_query: string;
+  image_url?: string;
+  image_thumbnail_url?: string;
+  image_source_url?: string;
+  image_candidates?: ImageSearchResult[]; // page-state only, not persisted
+}
+
+export interface IGItem {
+  name: string;
+  body: string;
+  image_query: string;
+  image_url?: string;
+  image_thumbnail_url?: string;
+  image_source_url?: string;
+  image_candidates?: ImageSearchResult[]; // page-state only, not persisted
+}
+
+export interface IGCarouselContent {
+  cover: IGCover;
+  items: IGItem[];
+  caption: string;
+  hashtags: string[];
+  meta_note?: string;
+}
+
+export interface IGGenerationMeta {
+  model: string;
+  temperature: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  estimated_cost_usd: number;
+  style_guide_id: string;
+  search_query: string;
+  search_result_count: number;
+  item_count_requested: number;
+  item_count_actual: number;
+  generated_at: string;
+}
+
+export interface ImageSearchResult {
+  rank: number;
+  image_url: string;
+  source_url: string;
+  source_title: string;
+  source_domain: string;
+  width: number | null;
+  height: number | null;
+}
+
 export interface ContentHubTrendsQueryResult {
   trends: ContentHubTrendRecord[];
   sourcesByTrendId: Record<string, ContentHubTrendSourceRecord[]>;

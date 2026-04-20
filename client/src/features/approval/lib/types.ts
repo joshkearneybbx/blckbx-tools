@@ -94,7 +94,6 @@ export type ProductCandidate = CandidateBase & {
   category: string | null;
   gender_focus: string | null;
   age_suitability: string | null;
-  promoted_to_key: string | null;
   already_in_catalogue?: boolean;
 };
 
@@ -126,7 +125,6 @@ export type TrendCandidate = CandidateBase & {
   signal_phrase: string | null;
   source_excerpt: string | null;
   source_url: string;
-  promoted_to_key: string | null;
   scraped_at: string | null;
 };
 
@@ -155,7 +153,6 @@ export type RecommendationCandidate = CandidateBase & {
   confidence: TrendConfidence | null;
   signal_phrase: string | null;
   source_excerpt: string | null;
-  promoted_to_key: string | null;
   scraped_at: string | null;
   curation_status?: "draft" | "pending" | "approved" | "rejected" | null;
 };

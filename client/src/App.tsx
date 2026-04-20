@@ -28,7 +28,7 @@ import ResearchLists from "@/features/research/pages/ResearchLists";
 import ResearchListDetail from "@/features/research/pages/ResearchListDetail";
 import ApprovalPage from "@/features/approval/ApprovalPage";
 import ContentHubBlogComposerPage from "@/features/content-hub/pages/ContentHubBlogComposerPage";
-import ContentHubComposerPlaceholder from "@/features/content-hub/pages/ContentHubComposerPlaceholder";
+import ContentHubIGComposerPage from "@/features/content-hub/pages/ContentHubIGComposerPage";
 import ContentHubTrendDetailPage from "@/features/content-hub/pages/ContentHubTrendDetailPage";
 import ContentHubTrendsPage from "@/features/content-hub/pages/ContentHubTrendsPage";
 import TravelHubPage from "@/features/travel-hub/TravelHubPage";
@@ -247,7 +247,7 @@ function Router() {
         <Route path="/content-hub/compose/ig/:trendId">
           {() => (
             <ToolGuard slug="content-hub">
-              <ContentHubComposerPlaceholder kind="ig" />
+              <ContentHubIGComposerPage />
             </ToolGuard>
           )}
         </Route>

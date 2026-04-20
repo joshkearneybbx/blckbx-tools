@@ -31,7 +31,6 @@ export const candidateSchema = z.object({
   subcategory: z.string().nullable().optional(),
   gender_focus: z.string().nullable().optional(),
   age_suitability: z.string().nullable().optional(),
-  promoted_to_key: z.string().nullable().optional(),
   already_in_catalogue: z.boolean().optional(),
   location: z.string().nullable().optional(),
   confidence: z.enum(["low", "medium", "high"]).nullable().optional(),
