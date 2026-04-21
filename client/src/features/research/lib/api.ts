@@ -15,8 +15,6 @@ import { mockClientAccounts, mockRecipients } from "./mock-clients";
 import { mockTaskMatch } from "./mock-data";
 
 const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || "http://localhost:3002";
-const MEILISEARCH_URL = import.meta.env.VITE_MEILISEARCH_URL || "http://localhost:7700";
-const MEILISEARCH_API_KEY = import.meta.env.VITE_MEILISEARCH_API_KEY || "";
 const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_RESEARCH_WEBHOOK_URL || "";
 
 export const CURRENT_USER_KEY = "research_hub_local";
@@ -84,30 +82,27 @@ export async function fetchRecommendations(params: {
   q?: string;
   category?: string;
   subcategory?: string;
+  content_type?: string;
   is_blckbx_approved?: boolean;
   limit?: number;
   offset?: number;
 }): Promise<SearchResponse<Recommendation>> {
-  const body: Record<string, unknown> = {
-    q: params.q || "",
-    limit: params.limit || 24,
-    offset: params.offset || 0,
-  };
-  const filters: string[] = ['content_type != "list"'];
+  const searchParams = new URLSearchParams();
 
-  if (params.category) filters.push(`category = "${params.category}"`);
-  if (params.subcategory) filters.push(`subcategory = "${params.subcategory}"`);
-  if (params.is_blckbx_approved) filters.push("is_blckbx_approved = true");
-  body.filter = filters.join(" AND ");
+  if (params.q) searchParams.set("q", params.q);
+  if (params.category) searchParams.set("category", params.category);
+  if (params.subcategory) searchParams.set("subcategory", params.subcategory);
+  if (params.content_type) {
+    searchParams.set("content_type", params.content_type);
+  } else {
+    // Research Hub search excludes lists (they have their own tab)
+    searchParams.set("content_type_exclude", "list");
+  }
+  if (params.is_blckbx_approved) searchParams.set("is_blckbx_approved", "true");
+  searchParams.set("limit", String(params.limit ?? 24));
+  searchParams.set("offset", String(params.offset ?? 0));
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (MEILISEARCH_API_KEY) headers.Authorization = `Bearer ${MEILISEARCH_API_KEY}`;
-
-  const response = await fetch(`${MEILISEARCH_URL}/indexes/recommendations/search`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const response = await gatewayFetch(`/search?${searchParams.toString()}`);
 
   if (!response.ok) {
     throw new Error(`Search error: ${response.status}`);
