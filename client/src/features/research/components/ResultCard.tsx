@@ -9,10 +9,10 @@ export function ResultCard({ item }: { item: Recommendation }) {
   const isGuide = item.content_type === "guide";
 
   return (
-    <article className="panel overflow-hidden transition-colors duration-150 hover:border-[var(--black)]">
-      <div className="relative aspect-[3/4] w-full bg-[linear-gradient(135deg,#f5f1eb,#e2ddd4)]">
+    <article className="search-result-card panel overflow-hidden transition-colors duration-150 hover:border-[var(--black)]">
+      <div className="search-result-card__image-wrap relative w-full bg-[linear-gradient(135deg,#f5f1eb,#e2ddd4)]">
         {item.image_url ? (
-          <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+          <img src={item.image_url} alt={item.name} className="search-result-card__image h-full w-full object-cover" />
         ) : (
           <div className="flex h-full items-center justify-center text-sm uppercase tracking-[0.18em] text-[var(--muted)]">
             No Image
@@ -21,11 +21,11 @@ export function ResultCard({ item }: { item: Recommendation }) {
         {item.is_blckbx_approved ? <BlckBxApprovedBadge className="absolute left-[10px] top-[10px]" /> : null}
       </div>
       <div className="space-y-3 p-5">
-        <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
+        <div className="search-result-card__source-label text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
           {sourceLabel} · {item.content_type}
         </div>
-        {item.brand ? <div className="text-sm text-[var(--muted)]">{item.brand}</div> : null}
-        <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
+        {item.brand ? <div className="search-result-card__brand text-sm text-[var(--muted)]">{item.brand}</div> : null}
+        <div className="search-result-card__meta flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
           <span className="font-medium text-[var(--text)]">{formatPrice(item)}</span>
           {item.in_stock ? (
             <span className="border border-[var(--approved-green)] bg-[var(--success-bg)] px-2.5 py-1 text-[12px] text-[#1b6e2d]">
@@ -34,7 +34,7 @@ export function ResultCard({ item }: { item: Recommendation }) {
           ) : null}
         </div>
         <EndorsementBadges endorsements={item.endorsements} />
-        <h3 className="font-serif text-[20px] leading-tight text-[var(--text)]">{item.name}</h3>
+        <h3 className="search-result-card__title font-serif text-[20px] leading-tight text-[var(--text)]">{item.name}</h3>
         {isGuide ? (
           <div className="flex flex-wrap gap-3 text-sm text-[var(--muted)]">
             {item.destination ? <span>{item.destination}</span> : null}

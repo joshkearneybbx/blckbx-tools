@@ -12,6 +12,7 @@ function normalizeDate(value: unknown): string {
 function normalizeRecord(record: Record<string, unknown>): BookingRecord {
   return {
     id: String(record.id),
+    persisted: true,
     status: (record.status as BookingStatus) || "draft",
     tripName: String(record.tripName ?? ""),
     bookingRef: String(record.bookingRef ?? ""),
@@ -25,6 +26,28 @@ function normalizeRecord(record: Record<string, unknown>): BookingRecord {
     created: record.created ? String(record.created) : undefined,
     updated: record.updated ? String(record.updated) : undefined,
   };
+}
+
+/**
+ * Resolve what to send to PocketBase for the coverImage file field.
+ *
+ * - Empty / falsy → send null to clear the field.
+ * - Full URL (starts with http/https) → omit entirely. This happens when the
+ *   value was populated from `pb.files.getUrl(...)` for UI preview (e.g. after
+ *   Import from Quote). Sending the URL would fail PocketBase's file validation.
+ * - data: URI → omit entirely. These come from client-side file readers before
+ *   the file is uploaded through the proper file upload path.
+ * - Otherwise treat as an existing filename already attached to this record
+ *   and pass through unchanged.
+ *
+ * Returns `undefined` to signal "omit this key from the payload".
+ */
+function resolveCoverImageForSave(value: string): string | null | undefined {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return undefined;
+  if (/^data:/i.test(trimmed)) return undefined;
+  return trimmed;
 }
 
 export async function fetchBookings(): Promise<BookingRecord[]> {
@@ -46,7 +69,9 @@ export async function saveBooking({
   booking: BookingRecord;
   status?: BookingStatus;
 }): Promise<BookingRecord> {
-  const payload = {
+  const coverImagePayload = resolveCoverImageForSave(booking.coverImage);
+
+  const payload: Record<string, unknown> = {
     user: pb.authStore.model?.id || "",
     status: status ?? booking.status,
     tripName: booking.tripName,
@@ -56,22 +81,17 @@ export async function saveBooking({
     clientFirstName: booking.clientFirstName,
     clientLastName: booking.clientLastName,
     welcomeMessage: booking.welcomeMessage,
-    coverImage: booking.coverImage,
     bookingData: booking.bookingData,
   };
 
+  if (coverImagePayload !== undefined) {
+    payload.coverImage = coverImagePayload;
+  }
+
   try {
-    // Try update first — if the record exists in PocketBase, update it
-    const record = await pb
-      .collection(COLLECTION)
-      .update(booking.id, payload)
-      .catch(async (err: { status?: number }) => {
-        // 404 means the record doesn't exist yet — create it
-        if (err?.status === 404) {
-          return pb.collection(COLLECTION).create(payload);
-        }
-        throw err;
-      });
+    const record = booking.persisted === false
+      ? await pb.collection(COLLECTION).create(payload)
+      : await pb.collection(COLLECTION).update(booking.id, payload);
 
     return normalizeRecord(record as unknown as Record<string, unknown>);
   } catch (err) {

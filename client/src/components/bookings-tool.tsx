@@ -92,7 +92,8 @@ function BookingsButton({
   disabled = false,
   icon: Icon,
   fullWidth = false,
-  className = ""
+  className = "",
+  title
 }: {
   label: string;
   onClick?: () => void;
@@ -101,12 +102,14 @@ function BookingsButton({
   icon?: LucideIcon;
   fullWidth?: boolean;
   className?: string;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       className={`inline-flex items-center justify-center gap-2 border px-5 py-2.5 text-sm font-medium transition rounded-none disabled:cursor-not-allowed disabled:opacity-50 ${buttonToneClasses[tone]} ${fullWidth ? "w-full" : ""} ${className}`}
     >
       {Icon ? <Icon className="h-4 w-4" /> : null}
@@ -543,11 +546,22 @@ export function BookingsTool() {
   function setActiveBooking(next: BookingRecord) {
     setBookings((current) => {
       const exists = current.some((item) => item.id === next.id);
-      const updated = exists
-        ? current.map((item) => (item.id === next.id ? next : item))
-        : [next, ...current];
+      if (exists) {
+        return current.map((item) => (item.id === next.id ? next : item));
+      }
 
-      return updated;
+      const isReplacingActiveDraft =
+        activeBooking != null &&
+        activeBooking.id !== next.id &&
+        activeBooking.persisted === false &&
+        next.persisted !== false &&
+        current.some((item) => item.id === activeBooking.id);
+
+      if (isReplacingActiveDraft) {
+        return current.map((item) => (item.id === activeBooking.id ? next : item));
+      }
+
+      return [next, ...current];
     });
     setActiveBookingId(next.id);
   }
@@ -577,14 +591,17 @@ export function BookingsTool() {
       return;
     }
 
-    await deleteBooking(activeBooking.id);
+    if (activeBooking.persisted !== false) {
+      await deleteBooking(activeBooking.id);
+    }
+
     setBookings((current) => current.filter((item) => item.id !== activeBooking.id));
     setActiveBookingId((current) => (current === activeBooking.id ? "" : current));
     setMessage("Booking deleted.");
   }
 
   async function downloadActiveBookingPdf() {
-    if (!activeBooking || isDownloadingPdf) {
+    if (!activeBooking || isDownloadingPdf || activeBooking.persisted === false) {
       return;
     }
 
@@ -620,23 +637,34 @@ export function BookingsTool() {
   }
 
   async function importFromQuote(quote: QuoteImportRecord) {
-    if (!activeBooking) {
-      return;
-    }
-
     const coverImageUrl = quote.coverPhoto ? pb.files.getUrl(quote as never, quote.coverPhoto) : "";
     const importedBooking = createBookingFromQuote(quote, {
-      currentBooking: activeBooking,
       coverImageUrl
     });
 
-    setActiveBooking(importedBooking);
     setIsImportModalOpen(false);
-    setMessage("Quote data imported.");
-    toast({
-      title: "Quote imported",
-      description: "Booking fields have been populated from the selected quote."
-    });
+
+    setActionState("saving");
+    try {
+      const saved = await saveBooking({ booking: importedBooking, status: importedBooking.status });
+      setActiveBooking(saved);
+      setMessage("Quote imported and saved.");
+      toast({
+        title: "Quote imported",
+        description: "Booking fields have been populated and saved as a draft."
+      });
+    } catch (err) {
+      console.error("Auto-save after import failed:", err);
+      setActiveBooking(importedBooking);
+      setMessage("Quote imported, but auto-save failed. Click Save Draft to retry.");
+      toast({
+        title: "Quote imported — not yet saved",
+        description: "Click Save Draft to retry saving the booking.",
+        variant: "destructive"
+      });
+    } finally {
+      setActionState("idle");
+    }
   }
 
   return (
@@ -751,7 +779,12 @@ export function BookingsTool() {
                   label={isDownloadingPdf ? "Preparing PDF..." : "Download PDF"}
                   icon={Download}
                   onClick={() => void downloadActiveBookingPdf()}
-                  disabled={isDownloadingPdf}
+                  disabled={isDownloadingPdf || activeBooking.persisted === false}
+                  title={
+                    activeBooking.persisted === false
+                      ? "Save the booking before downloading the PDF"
+                      : undefined
+                  }
                 />
                 <BookingsButton
                   label={actionState === "sending" ? "Sending..." : "Mark as Sent"}
@@ -1014,6 +1047,26 @@ export function BookingsTool() {
                         />
                       </Field>
                     ) : null}
+                    <Field label="Date of Birth" className="w-[180px]">
+                      <input
+                        className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
+                        type="date"
+                        value={passenger.dateOfBirth ?? ""}
+                        onChange={(event) =>
+                          patchBooking((booking) => ({
+                            ...booking,
+                            bookingData: {
+                              ...booking.bookingData,
+                              passengers: booking.bookingData.passengers.map((item) =>
+                                item.id === passenger.id
+                                  ? { ...item, dateOfBirth: event.target.value || undefined }
+                                  : item
+                              )
+                            }
+                          }))
+                        }
+                      />
+                    </Field>
                     <div className="ml-auto flex items-end gap-2">
                       <IconActionButton
                         onClick={() =>

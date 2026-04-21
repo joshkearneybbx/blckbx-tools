@@ -114,6 +114,7 @@ export function SearchCard() {
   const hasSearch = debouncedQuery.trim().length > 0;
   const canLoadMore = results.length < total;
   const visibleSubcategories = category === "all" ? [] : (SUBCATEGORY_MAP[category] ?? []);
+  const searchGridCategoryClass = `category-${category.replace(/_/g, "-")}`;
   const resultLabel = useMemo(() => {
     return hasSearch ? `${total} results for "${debouncedQuery}"` : `${total} results`;
   }, [debouncedQuery, hasSearch, total]);
@@ -210,10 +211,10 @@ export function SearchCard() {
       ) : null}
 
       {loading ? (
-        <div className="mt-8 grid gap-5 md:grid-cols-2">
+        <div className={`search-results-grid ${searchGridCategoryClass} mt-8`}>
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="panel overflow-hidden">
-              <div className="skeleton aspect-[3/4] w-full" />
+            <div key={index} className="search-result-card panel overflow-hidden">
+              <div className="search-result-card__image-wrap skeleton w-full" />
               <div className="space-y-3 p-5">
                 <div className="skeleton h-3 w-24" />
                 <div className="skeleton h-6 w-3/4" />
@@ -238,7 +239,7 @@ export function SearchCard() {
         </div>
       ) : (
         <>
-          <div className="mt-6 grid gap-5 md:grid-cols-2">
+          <div className={`search-results-grid ${searchGridCategoryClass} mt-6`}>
             {results.map((item) => (
               <ResultCard key={item._key} item={item} />
             ))}

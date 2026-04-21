@@ -195,19 +195,24 @@ function normalizeQuotePassengers(passengersValue: unknown, travellerTotal: unkn
   const passengers = Array.isArray(passengersValue) ? (passengersValue as QuotePassenger[]) : [];
   const normalized = passengers
     .map((passenger) => {
-      const type = toStringValue(passenger?.type) === "child" ? "child" : "adult";
+      const type: BookingPassenger["type"] =
+        toStringValue(passenger?.type) === "child" ? "child" : "adult";
       const name = toStringValue(passenger?.name);
+      const dateOfBirth = toStringValue(passenger?.dateOfBirth);
+      const dob = dateOfBirth ? tryParseDate(dateOfBirth) : "";
       if (!name && type === "adult") {
         return {
           ...emptyPassenger(),
           name: "",
-          type
+          type,
+          dateOfBirth: dob || undefined
         };
       }
       return {
         ...emptyPassenger(),
         name,
-        type
+        type,
+        dateOfBirth: dob || undefined
       };
     })
     .filter(Boolean);
@@ -228,12 +233,10 @@ function normalizeQuotePassengers(passengersValue: unknown, travellerTotal: unkn
 export function createBookingFromQuote(
   quote: QuoteRecordLike,
   options?: {
-    currentBooking?: BookingRecord;
     coverImageUrl?: string;
   }
 ): BookingRecord {
   const base = createEmptyBooking();
-  const currentBooking = options?.currentBooking;
   const quoteData = parseStoredQuoteData(quote.quoteData);
   const project = asRecord(quoteData.project);
   const destination = asRecord(quoteData.destination);
@@ -253,14 +256,10 @@ export function createBookingFromQuote(
     buildFlightSegment(outboundTravel),
     buildAccommodationSegment(accommodation),
     buildFlightSegment(returnTravel)
-  ].filter((segment): segment is BookingSegment => Boolean(segment));
+  ].filter((segment): segment is NonNullable<typeof segment> => Boolean(segment));
 
   return {
     ...base,
-    id: currentBooking?.id ?? base.id,
-    status: currentBooking?.status ?? base.status,
-    created: currentBooking?.created,
-    updated: currentBooking?.updated,
     tripName: toStringValue(project.name || quote.tripName),
     bookingRef: toStringValue(project.quoteReference || quote.quoteReference),
     departureDate,
@@ -382,7 +381,8 @@ export function createEmptyBooking(): BookingRecord {
   const today = new Date().toISOString().slice(0, 10);
 
   return {
-    id: createId("booking"),
+    id: createId("draft"),
+    persisted: false,
     status: "draft",
     tripName: "",
     bookingRef: "",

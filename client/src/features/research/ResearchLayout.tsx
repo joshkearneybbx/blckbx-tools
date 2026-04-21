@@ -1,51 +1,57 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { FileSearch, List, PlusSquare, UsersIcon } from "lucide-react";
 import { ToastProvider } from "./components/ToastProvider";
 import "./research.css";
 
 const navItems = [
-  { href: "/research", label: "Add Item", icon: PlusSquare },
-  { href: "/research/search", label: "Search", icon: FileSearch },
-  { href: "/research/task-matcher", label: "Task Matcher", icon: FileSearch },
-  { href: "/research/client-interests", label: "Client Interests", icon: UsersIcon },
-  { href: "/research/lists", label: "Lists", icon: List },
+  { href: "/research", label: "Add Item" },
+  { href: "/research/search", label: "Search" },
+  { href: "/research/task-matcher", label: "Task Matcher" },
+  { href: "/research/client-interests", label: "Client Interests" },
+  { href: "/research/lists", label: "Lists" },
 ];
 
 export function ResearchLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const tabsRef = useRef<HTMLElement | null>(null);
+  const normalizedLocation = location !== "/" ? location.replace(/\/+$/, "") : location;
+  const isActive = (pathPrefix: string, exact = false) =>
+    exact ? normalizedLocation === pathPrefix : normalizedLocation.startsWith(pathPrefix);
+
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLAnchorElement>("a.active")?.scrollIntoView({
+      block: "nearest",
+      inline: "center",
+    });
+  }, [normalizedLocation]);
 
   return (
     <ToastProvider>
-      <div className="research-hub min-h-screen bg-[var(--page-bg)] md:flex">
-        <aside className="flex w-full flex-col border-r border-[var(--border)] bg-white px-6 py-7 md:sticky md:top-0 md:min-h-screen md:max-w-[220px]">
-          <div>
-            <div className="font-serif text-[31px] italic leading-none text-[var(--text)]">Blck Book</div>
-            <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">Research Hub</div>
-          </div>
-          <nav className="mt-7 flex flex-col">
-            {navItems.map((item) => {
-              const active = item.href === "/research" ? location === "/research" : location.startsWith(item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={[
-                    "flex min-h-10 items-center gap-2 border-l-[3px] py-[10px] pl-4 text-[14px] text-[var(--muted)] transition-colors",
-                    active
-                      ? "border-[var(--black)] bg-[var(--sand-100)] font-medium text-[var(--text)]"
-                      : "border-transparent hover:text-[var(--text)]",
-                  ].join(" ")}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-        <main className="min-h-screen flex-1 px-4 py-4 md:px-6 md:py-6">
+      <div className="research-hub min-h-screen bg-[var(--page-bg)]">
+        <main className="research-hub__main px-4 py-4 md:px-6 md:py-6">
+          <header className="research-hub__header">
+            <div>
+              <div className="font-serif text-[31px] italic leading-none text-[var(--text)]">Blck Book</div>
+              <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">Research Hub</div>
+            </div>
+            <nav ref={tabsRef} className="research-hub-tabs" role="tablist">
+              {navItems.map((item) => {
+                const active = item.href === "/research" ? isActive(item.href, true) : isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    role="tab"
+                    aria-selected={active}
+                    className={active ? "active" : undefined}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </header>
           {children}
         </main>
       </div>

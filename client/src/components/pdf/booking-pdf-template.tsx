@@ -17,7 +17,13 @@ import {
   formatPassengerType
 } from "@/lib/bookings";
 import { bookingPdfHero, bookingPdfLogo } from "@/lib/booking-pdf-assets";
-import type { AccommodationSegment, BookingRecord, BookingSegment, FlightSegment } from "@/lib/types";
+import type {
+  AccommodationSegment,
+  BookingRecord,
+  BookingSegment,
+  FlightSegment,
+  TransferSegment
+} from "@/lib/types";
 
 Font.register({
   family: "Inter",
@@ -405,7 +411,7 @@ function Sidebar({
         <Link style={styles.sidebarText} src="mailto:travel@blckbx.co.uk">
           travel@blckbx.co.uk
         </Link>
-        <Text style={styles.sidebarText}>0700000</Text>
+        <Text style={styles.sidebarText}>02078647125</Text>
         <Text
           style={styles.sidebarPage}
           render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
@@ -460,14 +466,18 @@ function FlightCard({ segment }: { segment: FlightSegment }) {
           </View>
         </View>
 
-        <Text>
-          <Text style={styles.detailLabel}>PNR: </Text>
-          <Text style={styles.detailValue}>{segment.pnr || "-"}</Text>
-        </Text>
-        <Text>
-          <Text style={styles.detailLabel}>Airline: </Text>
-          <Text style={styles.detailValue}>{segment.airline || "-"}</Text>
-        </Text>
+        {segment.pnr ? (
+          <Text>
+            <Text style={styles.detailLabel}>PNR: </Text>
+            <Text style={styles.detailValue}>{segment.pnr}</Text>
+          </Text>
+        ) : null}
+        {segment.airline ? (
+          <Text>
+            <Text style={styles.detailLabel}>Airline: </Text>
+            <Text style={styles.detailValue}>{segment.airline}</Text>
+          </Text>
+        ) : null}
 
         {legs.map((leg, index) => (
           <View key={leg.id}>
@@ -526,38 +536,65 @@ function AccommodationCard({ segment }: { segment: AccommodationSegment }) {
       {segment.image ? <Image src={segment.image} style={styles.accommodationImage} /> : null}
       <View style={styles.segmentBody}>
         <Text style={styles.sectionTitle}>{segment.hotelName || "Accommodation"}</Text>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Room Type</Text>
-          <Text style={styles.detailValue}>{segment.roomType || "-"}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Board Basis</Text>
-          <Text style={styles.detailValue}>{segment.boardBasis || "-"}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Check-in</Text>
-          <Text style={styles.detailValue}>{formatLongDate(segment.checkInDate)}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Check-out</Text>
-          <Text style={styles.detailValue}>
-            {formatLongDate(segment.checkOutDate)} {segment.checkOutTime || ""}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Duration</Text>
-          <Text style={styles.detailValue}>{segment.duration || "-"}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Rooms</Text>
-          <Text style={styles.detailValue}>{String(segment.numberOfRooms || 1)}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Address</Text>
-          <Text style={styles.detailValue}>{segment.address || "-"}</Text>
-        </View>
+        {segment.roomType ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Room Type</Text>
+            <Text style={styles.detailValue}>{segment.roomType}</Text>
+          </View>
+        ) : null}
+        {segment.boardBasis ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Board Basis</Text>
+            <Text style={styles.detailValue}>{segment.boardBasis}</Text>
+          </View>
+        ) : null}
+        {segment.checkInDate ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Check-in</Text>
+            <Text style={styles.detailValue}>{formatLongDate(segment.checkInDate)}</Text>
+          </View>
+        ) : null}
+        {segment.checkOutDate ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Check-out</Text>
+            <Text style={styles.detailValue}>
+              {formatLongDate(segment.checkOutDate)} {segment.checkOutTime || ""}
+            </Text>
+          </View>
+        ) : null}
+        {segment.duration ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Duration</Text>
+            <Text style={styles.detailValue}>{segment.duration}</Text>
+          </View>
+        ) : null}
+        {typeof segment.numberOfRooms === "number" && segment.numberOfRooms > 0 ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Rooms</Text>
+            <Text style={styles.detailValue}>{String(segment.numberOfRooms)}</Text>
+          </View>
+        ) : null}
+        {segment.address ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Address</Text>
+            <Text style={styles.detailValue}>{segment.address}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
+  );
+}
+
+function hasTransferData(segment: TransferSegment): boolean {
+  return Boolean(
+    segment.company ||
+      segment.pickupTime ||
+      segment.pickupLocation ||
+      segment.dropoffLocation ||
+      segment.vehicleDetails ||
+      segment.contactNumber ||
+      segment.paymentStatus ||
+      segment.notes
   );
 }
 
@@ -570,41 +607,86 @@ function SegmentCard({ segment }: { segment: BookingSegment }) {
     return <AccommodationCard segment={segment} />;
   }
 
+  if (!hasTransferData(segment)) {
+    return null;
+  }
+
+  const hasPickup = Boolean(segment.pickupTime || segment.pickupLocation);
+  const pickupText =
+    segment.pickupTime && segment.pickupLocation
+      ? `${segment.pickupTime} from ${segment.pickupLocation}`
+      : segment.pickupTime || segment.pickupLocation;
+
   return (
     <View style={styles.segmentCard}>
       <View style={styles.segmentHeader}>
         <Text style={styles.segmentHeaderText}>{segment.label || "Transfer"}</Text>
       </View>
       <View style={styles.segmentBody}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Company</Text>
-          <Text style={styles.detailValue}>{segment.company || "-"}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Pickup</Text>
-          <Text style={styles.detailValue}>
-            {segment.pickupTime || "--:--"} from {segment.pickupLocation || "-"}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Dropoff</Text>
-          <Text style={styles.detailValue}>{segment.dropoffLocation || "-"}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Vehicle</Text>
-          <Text style={styles.detailValue}>{segment.vehicleDetails || "-"}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Contact</Text>
-          <Text style={styles.detailValue}>{segment.contactNumber || "-"}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Payment</Text>
-          <Text style={styles.detailValue}>{segment.paymentStatus || "-"}</Text>
-        </View>
+        {segment.company ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Company</Text>
+            <Text style={styles.detailValue}>{segment.company}</Text>
+          </View>
+        ) : null}
+        {hasPickup ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Pickup</Text>
+            <Text style={styles.detailValue}>{pickupText}</Text>
+          </View>
+        ) : null}
+        {segment.dropoffLocation ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Dropoff</Text>
+            <Text style={styles.detailValue}>{segment.dropoffLocation}</Text>
+          </View>
+        ) : null}
+        {segment.vehicleDetails ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Vehicle</Text>
+            <Text style={styles.detailValue}>{segment.vehicleDetails}</Text>
+          </View>
+        ) : null}
+        {segment.contactNumber ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Contact</Text>
+            <Text style={styles.detailValue}>{segment.contactNumber}</Text>
+          </View>
+        ) : null}
+        {segment.paymentStatus ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Payment</Text>
+            <Text style={styles.detailValue}>{segment.paymentStatus}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
+}
+
+/**
+ * Parse a currency-ish string like "£5,000" or "5000.50" to a number.
+ * Returns null if the string doesn't contain a parseable number.
+ */
+function parseCurrencyAmount(value: string): number | null {
+  if (!value) return null;
+  const cleaned = value.replace(/[^\d.-]/g, "");
+  if (!cleaned) return null;
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Format a number back into a currency string that matches the style of
+ * totalCost/depositPaid as typed by the user. Uses £ prefix and 2dp if the
+ * source values had a decimal point, 0dp otherwise.
+ */
+function formatRemainingBalance(total: number, deposit: number, sourceValues: string[]): string {
+  const remaining = total - deposit;
+  const hasDecimals = sourceValues.some((v) => v.includes("."));
+  const formatted = hasDecimals ? remaining.toFixed(2) : Math.round(remaining).toString();
+  const hasPoundPrefix = sourceValues.some((v) => v.trim().startsWith("£"));
+  return hasPoundPrefix ? `£${formatted}` : formatted;
 }
 
 export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
@@ -635,24 +717,46 @@ export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
         </View>
         <Text style={styles.greeting}>Hello {booking.clientFirstName || "there"},</Text>
         <Text style={styles.bodyText}>{booking.welcomeMessage}</Text>
-        <View style={styles.pricingCard}>
-          <View style={styles.pricingHeader}>
-            <Text style={styles.pricingHeaderLabel}>TOTAL COST</Text>
-            <Text style={styles.pricingHeaderValue}>{booking.bookingData.pricing.totalCost || "-"}</Text>
-          </View>
-          <View style={styles.pricingRow}>
-            <Text style={styles.pricingRowLabel}>Deposit Paid</Text>
-            <Text style={styles.pricingRowValue}>{booking.bookingData.pricing.depositPaid || "-"}</Text>
-          </View>
-          <View style={styles.pricingRow}>
-            <Text style={styles.pricingRowLabel}>Balance Due</Text>
-            <Text style={styles.pricingRowValue}>
-              {booking.bookingData.pricing.balanceDueDate
-                ? formatLongDate(booking.bookingData.pricing.balanceDueDate)
-                : "-"}
-            </Text>
-          </View>
-        </View>
+        {(() => {
+          const total = parseCurrencyAmount(booking.bookingData.pricing.totalCost);
+          const deposit = parseCurrencyAmount(booking.bookingData.pricing.depositPaid);
+          const remainingText =
+            total !== null && deposit !== null
+              ? formatRemainingBalance(total, deposit, [
+                  booking.bookingData.pricing.totalCost,
+                  booking.bookingData.pricing.depositPaid,
+                ])
+              : null;
+
+          return (
+            <View style={styles.pricingCard}>
+              <View style={styles.pricingHeader}>
+                <Text style={styles.pricingHeaderLabel}>TOTAL COST</Text>
+                <Text style={styles.pricingHeaderValue}>{booking.bookingData.pricing.totalCost || "-"}</Text>
+              </View>
+              {booking.bookingData.pricing.depositPaid ? (
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingRowLabel}>Deposit Paid</Text>
+                  <Text style={styles.pricingRowValue}>{booking.bookingData.pricing.depositPaid}</Text>
+                </View>
+              ) : null}
+              {remainingText !== null ? (
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingRowLabel}>Remaining Balance</Text>
+                  <Text style={styles.pricingRowValue}>{remainingText}</Text>
+                </View>
+              ) : null}
+              {booking.bookingData.pricing.balanceDueDate ? (
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingRowLabel}>Balance Due</Text>
+                  <Text style={styles.pricingRowValue}>
+                    {formatLongDate(booking.bookingData.pricing.balanceDueDate)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          );
+        })()}
       </Page>
 
       <Page size="A4" style={styles.page}>
@@ -670,6 +774,9 @@ export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
               }
             >
               <Text>{passenger.name || "Passenger name"}</Text>
+              <Text style={styles.detailLabel}>
+                {passenger.dateOfBirth ? `DOB: ${formatLongDate(passenger.dateOfBirth)}` : ""}
+              </Text>
               <Text style={styles.detailLabel}>{formatPassengerType(passenger)}</Text>
             </View>
           ))}

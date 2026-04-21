@@ -161,6 +161,7 @@ export type BookingPassenger = {
   name: string;
   type: "adult" | "child";
   age?: number;
+  dateOfBirth?: string;
 };
 
 export type TransferSegment = {
@@ -247,6 +248,7 @@ export type BookingData = {
 
 export type BookingRecord = {
   id: string;
+  persisted?: boolean;
   status: BookingStatus;
   tripName: string;
   bookingRef: string;
