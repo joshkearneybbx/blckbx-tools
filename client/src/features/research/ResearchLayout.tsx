@@ -4,8 +4,8 @@ import { ToastProvider } from "./components/ToastProvider";
 import "./research.css";
 
 const navItems = [
-  { href: "/research", label: "Add Item" },
-  { href: "/research/search", label: "Search" },
+  { href: "/research", label: "Search" },
+  { href: "/research/add", label: "Add Item" },
   { href: "/research/task-matcher", label: "Task Matcher" },
   { href: "/research/client-interests", label: "Client Interests" },
   { href: "/research/lists", label: "Lists" },

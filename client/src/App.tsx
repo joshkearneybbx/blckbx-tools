@@ -194,11 +194,11 @@ function Router() {
             </ToolGuard>
           )}
         </Route>
-        <Route path="/research/search">
+        <Route path="/research/add">
           {() => (
             <ToolGuard slug="research">
               <ResearchLayout>
-                <ResearchSearch />
+                <ResearchAddItem />
               </ResearchLayout>
             </ToolGuard>
           )}
@@ -232,7 +232,7 @@ function Router() {
           {() => (
             <ToolGuard slug="research">
               <ResearchLayout>
-                <ResearchAddItem />
+                <ResearchSearch />
               </ResearchLayout>
             </ToolGuard>
           )}
