@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   },
   passengerDob: {
     width: 130,
-    textAlign: "center"
+    textAlign: "left"
   },
   passengerType: {
     width: 100,
