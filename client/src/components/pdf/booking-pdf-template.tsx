@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   flightRoute: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#D4D0CB",
@@ -272,21 +272,22 @@ const styles = StyleSheet.create({
     color: "#0A0A0A",
     marginTop: 6
   },
+  flightDateText: {
+    fontSize: 9,
+    color: "#6B6865",
+    marginTop: 2
+  },
   flightPath: {
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 8
+    paddingHorizontal: 8
   },
   flightPathLine: {
-    width: "80%",
+    width: 60,
     height: 2,
-    backgroundColor: "#D4D0CB",
-    marginBottom: 6
-  },
-  flightPathDate: {
-    fontSize: 9,
-    color: "#6B6865"
+    backgroundColor: "#D4D0CB"
   },
   arrivalNextDayBadge: {
     fontSize: 8,
@@ -446,11 +447,27 @@ function FlightCard({ segment }: { segment: FlightSegment }) {
               <Text style={styles.airportTerminal}>{segment.departureTerminal}</Text>
             ) : null}
             <Text style={styles.flightTime}>{segment.departureTime || "--:--"}</Text>
+            {segment.departureDate ? (
+              <Text style={styles.flightDateText}>{formatLongDate(segment.departureDate)}</Text>
+            ) : null}
           </View>
 
-          <View style={styles.flightPath}>
-            <View style={styles.flightPathLine} />
-            <Text style={styles.flightPathDate}>{formatLongDate(segment.departureDate)}</Text>
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <View style={styles.flightPath}>
+              <View style={styles.flightPathLine} />
+              <Svg
+                width={14}
+                height={14}
+                viewBox="0 0 24 24"
+                style={{ marginHorizontal: 4, transform: "rotate(90deg)" }}
+              >
+                <Path
+                  d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+                  fill="#6B6865"
+                />
+              </Svg>
+              <View style={styles.flightPathLine} />
+            </View>
             {segment.arrivalNextDay ? (
               <Text style={styles.arrivalNextDayBadge}>+1 day</Text>
             ) : null}
@@ -463,6 +480,9 @@ function FlightCard({ segment }: { segment: FlightSegment }) {
               <Text style={styles.airportTerminal}>{segment.arrivalTerminal}</Text>
             ) : null}
             <Text style={styles.flightTime}>{segment.arrivalTime || "--:--"}</Text>
+            {segment.arrivalDate ? (
+              <Text style={styles.flightDateText}>{formatLongDate(segment.arrivalDate)}</Text>
+            ) : null}
           </View>
         </View>
 
@@ -494,7 +514,17 @@ function FlightCard({ segment }: { segment: FlightSegment }) {
                   <Text style={styles.legDate}>{formatLongDate(leg.departureDate)}</Text>
                 </View>
                 <View style={styles.legArrow}>
-                  <Text style={{ fontSize: 10, color: "#6B6865" }}>→</Text>
+                  <Svg
+                    width={14}
+                    height={14}
+                    viewBox="0 0 24 24"
+                    style={{ transform: "rotate(90deg)" }}
+                  >
+                    <Path
+                      d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+                      fill="#6B6865"
+                    />
+                  </Svg>
                 </View>
                 <View style={styles.legAirport}>
                   <Text style={styles.legCode}>{leg.arrivalCode || "---"}</Text>
@@ -665,28 +695,56 @@ function SegmentCard({ segment }: { segment: BookingSegment }) {
 }
 
 /**
- * Parse a currency-ish string like "£5,000" or "5000.50" to a number.
- * Returns null if the string doesn't contain a parseable number.
+ * Split a currency string into its prefix (currency code/symbol) and numeric
+ * value. Returns null if no number can be parsed.
+ *
+ * Examples:
+ *   "GBP 6,948.35" → { prefix: "GBP ", amount: 6948.35, hasThousands: true, decimalPlaces: 2 }
+ *   "£5000"        → { prefix: "£",    amount: 5000,    hasThousands: false, decimalPlaces: 0 }
+ *   "$1,000.00"    → { prefix: "$",    amount: 1000,    hasThousands: true,  decimalPlaces: 2 }
+ *   "5000.5"       → { prefix: "",     amount: 5000.5,  hasThousands: false, decimalPlaces: 1 }
+ *   "TBC"          → null
  */
-function parseCurrencyAmount(value: string): number | null {
+function parseCurrencyValue(value: string): {
+  prefix: string;
+  amount: number;
+  hasThousands: boolean;
+  decimalPlaces: number;
+} | null {
   if (!value) return null;
-  const cleaned = value.replace(/[^\d.-]/g, "");
-  if (!cleaned) return null;
-  const parsed = Number.parseFloat(cleaned);
-  return Number.isFinite(parsed) ? parsed : null;
+  const match = value.match(/^(\D*)([\d,]+(?:\.\d+)?)/);
+  if (!match) return null;
+  const [, prefix, numericPart] = match;
+  const cleanedNumeric = numericPart.replace(/,/g, "");
+  const parsed = Number.parseFloat(cleanedNumeric);
+  if (!Number.isFinite(parsed)) return null;
+  const decimalIndex = numericPart.indexOf(".");
+  const decimalPlaces = decimalIndex >= 0 ? numericPart.length - decimalIndex - 1 : 0;
+  return {
+    prefix,
+    amount: parsed,
+    hasThousands: numericPart.includes(","),
+    decimalPlaces,
+  };
 }
 
 /**
- * Format a number back into a currency string that matches the style of
- * totalCost/depositPaid as typed by the user. Uses £ prefix and 2dp if the
- * source values had a decimal point, 0dp otherwise.
+ * Format a remaining balance using the prefix and formatting conventions
+ * inferred from the source values. Prefers the total's formatting; falls back
+ * to the deposit's formatting if the total can't be parsed.
  */
-function formatRemainingBalance(total: number, deposit: number, sourceValues: string[]): string {
-  const remaining = total - deposit;
-  const hasDecimals = sourceValues.some((v) => v.includes("."));
-  const formatted = hasDecimals ? remaining.toFixed(2) : Math.round(remaining).toString();
-  const hasPoundPrefix = sourceValues.some((v) => v.trim().startsWith("£"));
-  return hasPoundPrefix ? `£${formatted}` : formatted;
+function formatRemainingBalance(totalValue: string, depositValue: string): string | null {
+  const total = parseCurrencyValue(totalValue);
+  const deposit = parseCurrencyValue(depositValue);
+  if (!total || !deposit) return null;
+
+  const remaining = total.amount - deposit.amount;
+  const dp = Math.max(total.decimalPlaces, deposit.decimalPlaces);
+  const fixed = remaining.toFixed(dp);
+  const formatted = total.hasThousands
+    ? fixed.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    : fixed;
+  return `${total.prefix}${formatted}`;
 }
 
 export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
@@ -718,15 +776,10 @@ export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
         <Text style={styles.greeting}>Hello {booking.clientFirstName || "there"},</Text>
         <Text style={styles.bodyText}>{booking.welcomeMessage}</Text>
         {(() => {
-          const total = parseCurrencyAmount(booking.bookingData.pricing.totalCost);
-          const deposit = parseCurrencyAmount(booking.bookingData.pricing.depositPaid);
-          const remainingText =
-            total !== null && deposit !== null
-              ? formatRemainingBalance(total, deposit, [
-                  booking.bookingData.pricing.totalCost,
-                  booking.bookingData.pricing.depositPaid,
-                ])
-              : null;
+          const remainingText = formatRemainingBalance(
+            booking.bookingData.pricing.totalCost,
+            booking.bookingData.pricing.depositPaid
+          );
 
           return (
             <View style={styles.pricingCard}>
