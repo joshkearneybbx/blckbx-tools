@@ -607,20 +607,38 @@ export function BookingsTool() {
 
     setIsDownloadingPdf(true);
 
+    let bookingForPdf = activeBooking;
     try {
-      const blob = await pdf(<BookingPDFTemplate booking={activeBooking} />).toBlob();
+      const saved = await saveBooking({ booking: activeBooking, status: activeBooking.status });
+      setActiveBooking(saved);
+      bookingForPdf = saved;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save the booking before generating the PDF.";
+      setMessage(`Save failed: ${errorMessage}`);
+      toast({
+        title: "Save failed — PDF not generated",
+        description: `${errorMessage} Your changes have not been saved. Please try again.`,
+        variant: "destructive"
+      });
+      setIsDownloadingPdf(false);
+      return;
+    }
+
+    try {
+      const blob = await pdf(<BookingPDFTemplate booking={bookingForPdf} />).toBlob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${(activeBooking.tripName || "booking").replace(/\s+/g, "-").toLowerCase()}.pdf`;
+      anchor.download = `${(bookingForPdf.tripName || "booking").replace(/\s+/g, "-").toLowerCase()}.pdf`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setMessage("Booking PDF downloaded.");
+      setMessage("Booking saved and PDF downloaded.");
       toast({
         title: "PDF ready",
-        description: "Booking PDF downloaded."
+        description: "Booking saved and PDF downloaded."
       });
     } catch (error) {
       const errorMessage =
@@ -628,7 +646,7 @@ export function BookingsTool() {
       setMessage(`Download failed: ${errorMessage}`);
       toast({
         title: "Download failed",
-        description: errorMessage,
+        description: `Booking was saved, but PDF generation failed: ${errorMessage}`,
         variant: "destructive"
       });
     } finally {

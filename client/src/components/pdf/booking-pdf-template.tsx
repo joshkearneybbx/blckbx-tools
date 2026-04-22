@@ -190,7 +190,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#D4D0CB",
     flexDirection: "row",
-    justifyContent: "space-between"
+    alignItems: "center"
+  },
+  passengerName: {
+    flex: 1
+  },
+  passengerDob: {
+    width: 130,
+    textAlign: "center"
+  },
+  passengerType: {
+    width: 100,
+    textAlign: "right"
   },
   warning: {
     backgroundColor: "#F5F3F0",
@@ -826,11 +837,11 @@ export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
                   : styles.passengerRow
               }
             >
-              <Text>{passenger.name || "Passenger name"}</Text>
-              <Text style={styles.detailLabel}>
+              <Text style={styles.passengerName}>{passenger.name || "Passenger name"}</Text>
+              <Text style={[styles.detailLabel, styles.passengerDob]}>
                 {passenger.dateOfBirth ? `DOB: ${formatLongDate(passenger.dateOfBirth)}` : ""}
               </Text>
-              <Text style={styles.detailLabel}>{formatPassengerType(passenger)}</Text>
+              <Text style={[styles.detailLabel, styles.passengerType]}>{formatPassengerType(passenger)}</Text>
             </View>
           ))}
         </View>
