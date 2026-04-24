@@ -16,8 +16,8 @@ import OAuthCallback from "@/pages/OAuthCallback";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ToolGuard from "@/components/ToolGuard";
 import { ComingSoon } from "@/components/ComingSoon";
-import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
+import TopDock from "@/components/layout/TopDock";
 import MealCraftPage from "@/pages/meals/MealCraftPage";
 import { ResearchLayout } from "@/features/research/ResearchLayout";
 import ResearchAddItem from "@/features/research/pages/ResearchAddItem";
@@ -46,14 +46,12 @@ const queryClient = new QueryClient({
 function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { isAuthenticated } = useAuth();
-  const showSidebar = isAuthenticated && location !== "/";
+  const showDock = isAuthenticated && location !== "/" && location !== "/login" && !location.startsWith("/oauth");
 
   return (
-    <div className="flex">
-      {showSidebar && <Sidebar />}
-      <main className={`flex-1 ${showSidebar ? "ml-0 md:ml-16" : ""}`}>
-        {children}
-      </main>
+    <div className="min-h-screen">
+      {showDock && <TopDock />}
+      <main>{children}</main>
     </div>
   );
 }

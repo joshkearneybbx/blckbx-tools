@@ -9,7 +9,6 @@ import type {
   Endorsement,
   GeoMatchType,
   GeoSource,
-  GridMode,
   ListOption,
   NewTagSuggestion,
   ProductCandidate,
@@ -457,7 +456,6 @@ function getReviewBadges(candidate: CatalogueItem) {
 
 export function CatalogueGrid({
   candidates,
-  gridMode,
   lists,
   currentUser,
   busyKey,
@@ -474,7 +472,6 @@ export function CatalogueGrid({
   categoryClass
 }: {
   candidates: CatalogueItem[];
-  gridMode: GridMode;
   lists: ListOption[];
   currentUser: string;
   busyKey?: string;
@@ -499,10 +496,8 @@ export function CatalogueGrid({
   return (
     <div
       className={classNames(
-        "approval-card-grid grid auto-rows-fr gap-6",
-        categoryClass,
-        gridMode === 2 ? "xl:grid-cols-2" : "xl:grid-cols-3",
-        "md:grid-cols-2"
+        "approval-card-grid auto-rows-fr",
+        categoryClass
       )}
     >
       {candidates.map((candidate) => (
@@ -530,7 +525,6 @@ export function CatalogueGrid({
 
 export function TravelLibraryGrid({
   candidates,
-  gridMode,
   mode,
   currentUser = "Kath",
   busyKey,
@@ -539,7 +533,6 @@ export function TravelLibraryGrid({
   onEdit
 }: {
   candidates: TrendCandidate[];
-  gridMode: GridMode;
   mode: "new" | "saved" | "all";
   currentUser?: string;
   busyKey?: string;
@@ -550,9 +543,7 @@ export function TravelLibraryGrid({
   return (
     <div
       className={classNames(
-        "grid auto-rows-fr gap-4",
-        gridMode === 2 ? "xl:grid-cols-2" : "xl:grid-cols-3",
-        "md:grid-cols-2"
+        "approval-card-grid auto-rows-fr"
       )}
     >
       {candidates.map((candidate) => (

@@ -349,6 +349,8 @@ function ImportFromQuoteModal({
     void pb
       .collection("blckbx_quotes")
       .getList(1, 50, {
+        // Options lists are early-stage shortlist PDFs, not bookable quotes, so keep them out of import.
+        filter: "mode = 'quote' || mode = null",
         sort: "-created",
         requestKey: null
       })

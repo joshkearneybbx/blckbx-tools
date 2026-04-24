@@ -27,7 +27,6 @@ import type {
   CatalogueItem,
   CatalogueStatus,
   ContentTab,
-  GridMode,
   ListOption,
   ReviewerName,
   StayingInFilter,
@@ -41,7 +40,6 @@ import {
   EmptyState
 } from "./catalogue-card";
 
-const gridModes: GridMode[] = [2, 3];
 const tabOrder = ["pending", "rejected"] as const;
 const pendingPageSize = 12;
 const compactPageSize = 50;
@@ -231,10 +229,6 @@ export function CatalogueApp() {
   const [reviewer, , reviewerReady] = usePersistentState<ReviewerName>(
     "catalogue-reviewer",
     "Kath"
-  );
-  const [gridMode, setGridMode, gridReady] = usePersistentState<GridMode>(
-    "catalogue-grid-mode",
-    2
   );
   const [toast, setToast] = useState<ToastState>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -622,7 +616,7 @@ export function CatalogueApp() {
   const totalPages = Math.max(1, Math.ceil((pendingQuery.data?.total ?? 0) / pendingPageSize));
   const catalogueCategoryClass = `category-${contentTab.replace(/_/g, "-")}`;
   const isCurrentFetching = activeTab === "pending" ? pendingQuery.isFetching : rejectedQuery.isFetching;
-  const isLoading = !(gridReady && reviewerReady);
+  const isLoading = !reviewerReady;
   const lists = listsQuery.data?.items ?? [];
   const subcategoryOptions = isRequestsTab(contentTab) ? [] : SUBCATEGORY_MAP[contentTab] ?? [];
   const sidebarCounts = isShoppingTab(contentTab)
@@ -990,21 +984,6 @@ export function CatalogueApp() {
                   className="approval-search__input"
                 />
               </label>
-              <div className="approval-grid-toggle" role="group" aria-label="Grid columns">
-                {gridModes.map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setGridMode(mode)}
-                    className={classNames(
-                      "approval-grid-toggle__button",
-                      gridMode === mode && "is-active"
-                    )}
-                  >
-                    {mode} col
-                  </button>
-                ))}
-              </div>
             </div>
 
             {contentTab === "staying_in" ? (
@@ -1068,7 +1047,6 @@ export function CatalogueApp() {
                   <>
                     <CatalogueGrid
                       candidates={activeView}
-                      gridMode={gridMode}
                       categoryClass={catalogueCategoryClass}
                       lists={lists}
                       currentUser={reviewer}

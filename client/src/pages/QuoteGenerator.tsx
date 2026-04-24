@@ -17,6 +17,7 @@ import {
   Camera,
   ArrowLeft,
   Save,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,8 +39,19 @@ import {
   type PassengerDetail,
   type QuoteData,
 } from "@/components/pdf/QuotePDFTemplate";
+import { OptionsListEditor } from "@/components/quote/OptionsListEditor";
+import {
+  OptionsListPDFTemplate,
+  type AccommodationOption,
+  type FlightLeg,
+  type FlightOption,
+  type OptionsListData,
+  type OptionsListOption,
+  type OptionsListType,
+} from "@/components/pdf/OptionsListPDFTemplate";
 
 type Status = "upload" | "processing" | "result" | "error";
+type QuoteMode = "quote" | "list";
 
 const DEFAULT_QUOTE_WEBHOOK_URL = "https://n8n.blckbx.co.uk/webhook/pts-import";
 const EDITABLE_INPUT_CLASS =
@@ -70,6 +82,37 @@ const EMPTY_FLIGHT: NonNullable<QuoteData["outboundTravel"]> = {
   arrivalTime: "",
   class: "",
   baggage: "",
+};
+
+const EMPTY_QUOTE_DATA: QuoteData = {
+  project: {
+    name: "",
+    quoteReference: "",
+  },
+  destination: {
+    name: "",
+    dates: "",
+    location: "",
+  },
+  travellers: {
+    total: "1",
+    adults: "1",
+    children: "0",
+  },
+  outboundTravel: { ...EMPTY_FLIGHT },
+  returnTravel: { ...EMPTY_FLIGHT },
+  accommodation: { ...EMPTY_ACCOMMODATION },
+  pricing: {
+    totalCost: "",
+    deposit: "",
+    depositDeadline: "",
+    balance: "",
+    balanceDeadline: "",
+  },
+  description: "",
+  additionalNotes: "",
+  activities: undefined,
+  notes: "",
 };
 
 function getWebhookUrl(): string {
@@ -253,6 +296,136 @@ function normalizeQuoteData(payload: unknown): QuoteData {
     activities: normalizeActivities(source.activities),
     notes: sanitizeValue(source.notes),
   };
+}
+
+function createEmptyLeg(): FlightLeg {
+  return {
+    id: crypto.randomUUID(),
+    flightNumber: "",
+    depAirport: "",
+    depDate: "",
+    depTime: "",
+    arrAirport: "",
+    arrDate: "",
+    arrTime: "",
+  };
+}
+
+function normalizeFlightLegs(value: unknown): FlightLeg[] {
+  if (!Array.isArray(value)) return [createEmptyLeg()];
+  const legs = value.reduce<FlightLeg[]>((acc, leg) => {
+    if (!leg || typeof leg !== "object") return acc;
+    const source = leg as Record<string, unknown>;
+    acc.push({
+      id: sanitizeValue(source.id) || crypto.randomUUID(),
+      flightNumber: sanitizeValue(source.flightNumber),
+      depAirport: sanitizeValue(source.depAirport).toUpperCase(),
+      depDate: sanitizeValue(source.depDate),
+      depTime: sanitizeValue(source.depTime),
+      arrAirport: sanitizeValue(source.arrAirport).toUpperCase(),
+      arrDate: sanitizeValue(source.arrDate),
+      arrTime: sanitizeValue(source.arrTime),
+    });
+    return acc;
+  }, []);
+  return legs.length > 0 ? legs : [createEmptyLeg()];
+}
+
+function getRawListOptions(payload: Record<string, unknown>): unknown[] {
+  return Array.isArray(payload.options) ? payload.options : [];
+}
+
+function inferListTypeFromOptions(options: unknown[]): OptionsListType {
+  const firstOption = options.find((option) => option && typeof option === "object") as Record<string, unknown> | undefined;
+  if (!firstOption) return "flight";
+
+  if (Array.isArray(firstOption.outboundLegs) || Array.isArray(firstOption.returnLegs) || "airlineName" in firstOption) {
+    return "flight";
+  }
+
+  return "accommodation";
+}
+
+function normalizeRecordMode(record: Record<string, unknown>, rawOptions: unknown[]): QuoteMode {
+  // Prefer the PocketBase mode field, but also treat records with quoteData.options as lists.
+  // This keeps older/in-flight records hydrating even if the schema default/mode field is missing.
+  return record.mode === "list" || rawOptions.length > 0 ? "list" : "quote";
+}
+
+function normalizeRecordListType(record: Record<string, unknown>, rawOptions: unknown[]): OptionsListType {
+  if (record.listType === "accommodation" || record.listType === "flight") {
+    return record.listType;
+  }
+
+  return inferListTypeFromOptions(rawOptions);
+}
+
+function normalizeOptions(value: unknown, listType: OptionsListType): OptionsListOption[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((option, index) => {
+      if (!option || typeof option !== "object") return null;
+      const source = option as Record<string, unknown>;
+      if (listType === "flight") {
+        return {
+          id: sanitizeValue(source.id) || crypto.randomUUID(),
+          airlineName: sanitizeValue(source.airlineName),
+          airlineIata: sanitizeValue(source.airlineIata).toUpperCase(),
+          outboundLegs: normalizeFlightLegs(source.outboundLegs),
+          returnLegs: normalizeFlightLegs(source.returnLegs),
+          baggage: sanitizeValue(source.baggage),
+          priceFromText: sanitizeValue(source.priceFromText).slice(0, 50),
+          notes: sanitizeValue(source.notes),
+          order: Number.isFinite(Number(source.order)) ? Number(source.order) : index,
+        } as FlightOption;
+      }
+
+      return {
+        id: sanitizeValue(source.id) || crypto.randomUUID(),
+        name: sanitizeValue(source.name),
+        location: sanitizeValue(source.location),
+        nights: sanitizeValue(source.nights),
+        bedrooms: sanitizeValue(source.bedrooms),
+        sleeps: sanitizeValue(source.sleeps),
+        boardBasis: sanitizeValue(source.boardBasis),
+        description: sanitizeValue(source.description),
+        photos: Array.isArray(source.photos) ? source.photos.map((photo) => sanitizeValue(photo)).filter(Boolean) : [],
+        priceFromText: sanitizeValue(source.priceFromText).slice(0, 50),
+        notes: sanitizeValue(source.notes),
+        order: Number.isFinite(Number(source.order)) ? Number(source.order) : index,
+      } as AccommodationOption;
+    })
+    .filter((option): option is OptionsListOption => Boolean(option))
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map((option, index) => ({ ...option, order: index }));
+}
+
+function buildOptionsListData(
+  currentQuoteData: QuoteData,
+  options: OptionsListOption[],
+  nextClientName: string
+): OptionsListData {
+  return {
+    project: {
+      name: currentQuoteData.project.name,
+      quoteReference: currentQuoteData.project.quoteReference,
+    },
+    destination: currentQuoteData.destination,
+    clientName: nextClientName.trim(),
+    additionalNotes: currentQuoteData.additionalNotes || "",
+    options: options.map((option, index) => ({ ...option, order: index })),
+  };
+}
+
+function buildListFilename(data: OptionsListData, listType: OptionsListType): string {
+  const projectName = sanitizeValue(data.project.name, "Options");
+  const suffix = listType === "flight" ? "Flight Options" : "Accommodation Options";
+  const normalized = `${projectName} - ${suffix}`
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${normalized || "Options"}.pdf`;
 }
 
 function normalizeClientName(payload: unknown): string {
@@ -449,6 +622,9 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   const [status, setStatus] = useState<Status>("upload");
   const [error, setError] = useState<string | null>(null);
   const [quoteData, setQuoteData] = useState<QuoteData | null>(null);
+  const [mode, setMode] = useState<QuoteMode>("quote");
+  const [listType, setListType] = useState<OptionsListType>("flight");
+  const [listOptions, setListOptions] = useState<OptionsListOption[]>([]);
   const [clientName, setClientName] = useState("");
   const [passengers, setPassengers] = useState<PassengerDetail[]>([createPassenger()]);
   const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
@@ -503,6 +679,9 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setStatus("upload");
     setError(null);
     setQuoteData(null);
+    setMode("quote");
+    setListType("flight");
+    setListOptions([]);
     setClientName("");
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
@@ -526,20 +705,80 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     }
   };
 
-  const buildStoredPayload = (currentQuoteData: QuoteData) => ({
-    ...currentQuoteData,
-    outboundTravel: isOutboundFlightIncluded
-      ? currentQuoteData.outboundTravel || { ...EMPTY_FLIGHT }
-      : null,
-    returnTravel: isReturnFlightIncluded
-      ? currentQuoteData.returnTravel || { ...EMPTY_FLIGHT }
-      : null,
-    accommodation: isAccommodationIncluded
-      ? currentQuoteData.accommodation || { ...EMPTY_ACCOMMODATION }
-      : null,
-    clientName: clientName.trim(),
-    passengers,
-  });
+  const startManualOptionsList = () => {
+    setSelectedFile(null);
+    setMode("list");
+    setListType("flight");
+    setListOptions([]);
+    setQuoteData({ ...EMPTY_QUOTE_DATA, project: { ...EMPTY_QUOTE_DATA.project } });
+    setClientName("");
+    setPassengers([createPassenger()]);
+    setCoverPhoto(null);
+    setTripPhotos([]);
+    setSavedRecordId(null);
+    setQuoteRecordStatus("draft");
+    setStatus("result");
+  };
+
+  const switchMode = (nextMode: QuoteMode) => {
+    if (nextMode === mode) return;
+    const confirmed = window.confirm(
+      "Switching mode will clear the current options/quote data. Trip details (client name, etc.) will be preserved. Continue?"
+    );
+    if (!confirmed) return;
+
+    setMode(nextMode);
+    if (nextMode === "list") {
+      setListOptions([]);
+      setIsOutboundFlightIncluded(false);
+      setIsReturnFlightIncluded(false);
+      setIsAccommodationIncluded(false);
+    } else {
+      setListOptions([]);
+      setIsOutboundFlightIncluded(true);
+      setIsReturnFlightIncluded(true);
+      setIsAccommodationIncluded(true);
+      updateQuoteData((current) => ({
+        ...current,
+        outboundTravel: current.outboundTravel || { ...EMPTY_FLIGHT },
+        returnTravel: current.returnTravel || { ...EMPTY_FLIGHT },
+        accommodation: current.accommodation || { ...EMPTY_ACCOMMODATION },
+      }));
+    }
+  };
+
+  const switchListType = (nextListType: OptionsListType) => {
+    if (nextListType === listType) return;
+    if (listOptions.length > 0) {
+      const confirmed = window.confirm(
+        "Switching mode will clear the current options/quote data. Trip details (client name, etc.) will be preserved. Continue?"
+      );
+      if (!confirmed) return;
+    }
+    setListType(nextListType);
+    setListOptions([]);
+  };
+
+  const buildStoredPayload = (currentQuoteData: QuoteData) => {
+    if (mode === "list") {
+      return buildOptionsListData(currentQuoteData, listOptions, clientName);
+    }
+
+    return {
+      ...currentQuoteData,
+      outboundTravel: isOutboundFlightIncluded
+        ? currentQuoteData.outboundTravel || { ...EMPTY_FLIGHT }
+        : null,
+      returnTravel: isReturnFlightIncluded
+        ? currentQuoteData.returnTravel || { ...EMPTY_FLIGHT }
+        : null,
+      accommodation: isAccommodationIncluded
+        ? currentQuoteData.accommodation || { ...EMPTY_ACCOMMODATION }
+        : null,
+      clientName: clientName.trim(),
+      passengers,
+    };
+  };
 
   const persistQuote = async ({
     silent = false,
@@ -556,13 +795,26 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     try {
       const formData = new FormData();
       formData.append("user", user.id);
-      formData.append("tripName", quoteData.project.name || "Untitled Quote");
-      formData.append("quoteReference", quoteData.project.quoteReference || "");
+      formData.append("tripName", quoteData.project.name || (mode === "list" ? "Untitled Options List" : "Untitled Quote"));
+      formData.append("quoteReference", mode === "list" ? "" : quoteData.project.quoteReference || "");
       formData.append("clientName", clientName.trim());
       formData.append("destination", quoteData.destination.name || "");
       formData.append("dates", quoteData.destination.dates || "");
       formData.append("status", statusToSave);
-      formData.append("quoteData", JSON.stringify(buildStoredPayload(quoteData)));
+      formData.append("mode", mode);
+      formData.append("listType", mode === "list" ? listType : "");
+      const storedPayload = buildStoredPayload(quoteData);
+      const payloadForStorage = mode === "list" && listType === "accommodation"
+        ? {
+            ...(storedPayload as OptionsListData),
+            options: (storedPayload as OptionsListData).options.map((option) => ({
+              ...(option as AccommodationOption),
+              // Photos live in PocketBase file fields option1Photos...option10Photos, not JSON.
+              photos: [],
+            })),
+          }
+        : storedPayload;
+      formData.append("quoteData", JSON.stringify(payloadForStorage));
 
       if (coverPhoto) {
         formData.append("coverPhoto", base64ToFile(coverPhoto, "cover-photo.jpg"));
@@ -571,6 +823,28 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       if (tripPhotos.length > 0) {
         tripPhotos.forEach((photo, index) => {
           formData.append("tripPhotos", base64ToFile(photo, `trip-photo-${index + 1}.jpg`));
+        });
+      }
+
+      if (mode === "list" && listType === "accommodation") {
+        if (savedRecordId) {
+          const existingRecord = await pb.collection("blckbx_quotes").getOne(savedRecordId, { requestKey: null });
+          // Rebuild all flat option photo fields from the current options array on every save.
+          // This keeps photos aligned after delete, reorder, and mid-array duplicate insertion.
+          for (let optionIndex = 0; optionIndex < 10; optionIndex += 1) {
+            const fieldName = `option${optionIndex + 1}Photos`;
+            const existingFiles = Array.isArray(existingRecord[fieldName]) ? existingRecord[fieldName] : [];
+            existingFiles.forEach((filename: string) => formData.append(`${fieldName}-`, filename));
+          }
+        }
+
+        (listOptions as AccommodationOption[]).slice(0, 10).forEach((option, optionIndex) => {
+          option.photos.slice(0, 6).forEach((photo, photoIndex) => {
+            formData.append(
+              `option${optionIndex + 1}Photos`,
+              base64ToFile(photo, `option-${optionIndex + 1}-photo-${photoIndex + 1}.jpg`)
+            );
+          });
         });
       }
 
@@ -584,8 +858,8 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       setQuoteRecordStatus(statusToSave);
       if (!silent) {
         toast({
-          title: "Quote saved",
-          description: statusToSave === "sent" ? "Quote marked as sent." : "Draft saved to Quotes.",
+          title: mode === "list" ? "Options list saved" : "Quote saved",
+          description: statusToSave === "sent" ? "Record marked as sent." : "Draft saved to Quotes.",
         });
       }
       return true;
@@ -621,9 +895,15 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         if (cancelled) return;
 
         const storedPayload = parseStoredQuoteData(record.quoteData);
+        const rawOptions = getRawListOptions(storedPayload);
+        const recordMode = normalizeRecordMode(record as unknown as Record<string, unknown>, rawOptions);
+        const recordListType = normalizeRecordListType(record as unknown as Record<string, unknown>, rawOptions);
         const normalized = normalizeQuoteData(storedPayload);
         const normalizedPassengers = normalizeStoredPassengers(storedPayload, normalized.travellers.total);
         const resolvedQuoteData = syncTravellersFromPassengers(normalizedPassengers, normalized) || normalized;
+        let nextListOptions: OptionsListOption[] = recordMode === "list"
+          ? normalizeOptions(rawOptions, recordListType)
+          : [];
 
         let nextCoverPhoto: string | null = null;
         if (record.coverPhoto) {
@@ -639,9 +919,26 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
           );
         }
 
+        if (recordMode === "list" && recordListType === "accommodation") {
+          nextListOptions = await Promise.all(
+            nextListOptions.map(async (option, optionIndex) => {
+              const fieldName = `option${optionIndex + 1}Photos`;
+              const filenames = Array.isArray(record[fieldName]) ? record[fieldName] : [];
+              if (filenames.length === 0) return option;
+              const photos = await Promise.all(
+                filenames.map((filename: string) => fileUrlToDataUrl(pb.files.getUrl(record, filename)))
+              );
+              return { ...(option as AccommodationOption), photos: photos.filter(Boolean) };
+            })
+          );
+        }
+
         if (cancelled) return;
 
         setSelectedFile(null);
+        setMode(recordMode);
+        setListType(recordListType);
+        setListOptions(nextListOptions);
         setQuoteData(resolvedQuoteData);
         setClientName(
           sanitizeValue(record.clientName) ||
@@ -652,9 +949,9 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         setTripPhotos(nextTripPhotos);
         setSavedRecordId(record.id);
         setQuoteRecordStatus(record.status === "sent" ? "sent" : "draft");
-        setIsOutboundFlightIncluded(hasFlightData(resolvedQuoteData.outboundTravel));
-        setIsReturnFlightIncluded(hasFlightData(resolvedQuoteData.returnTravel));
-        setIsAccommodationIncluded(hasAccommodationData(resolvedQuoteData.accommodation));
+        setIsOutboundFlightIncluded(recordMode === "quote" ? hasFlightData(resolvedQuoteData.outboundTravel) : false);
+        setIsReturnFlightIncluded(recordMode === "quote" ? hasFlightData(resolvedQuoteData.returnTravel) : false);
+        setIsAccommodationIncluded(recordMode === "quote" ? hasAccommodationData(resolvedQuoteData.accommodation) : false);
         setStatus("result");
       } catch (err) {
         if (cancelled) return;
@@ -699,6 +996,9 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setStatus("upload");
     setError(null);
     setQuoteData(null);
+    setMode("quote");
+    setListType("flight");
+    setListOptions([]);
     setClientName("");
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
@@ -737,6 +1037,9 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         () => createPassenger()
       );
 
+      setMode("quote");
+      setListType("flight");
+      setListOptions([]);
       setQuoteData(syncTravellersFromPassengers(initialPassengers, normalized));
       setClientName(extractedClientName);
       setPassengers(initialPassengers);
@@ -759,6 +1062,9 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         err instanceof Error ? err.message : "Failed to process the uploaded PDF.";
       setError(message);
       setQuoteData(null);
+      setMode("quote");
+      setListType("flight");
+      setListOptions([]);
       setClientName("");
       setPassengers([createPassenger()]);
       setCoverPhoto(null);
@@ -783,27 +1089,36 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     try {
       const pdfData = buildStoredPayload(quoteData);
       await persistQuote({ silent: true });
-      const blob = await pdf(
-        <QuotePDFTemplate
-          data={pdfData}
-          passengers={passengers}
-          coverPhotoUrl={coverPhoto || undefined}
-          tripPhotos={tripPhotos}
-          clientName={clientName.trim()}
-        />
-      ).toBlob();
+      const blob = mode === "list"
+        ? await pdf(
+            <OptionsListPDFTemplate
+              data={pdfData as OptionsListData}
+              listType={listType}
+              coverPhotoUrl={coverPhoto || undefined}
+              clientName={clientName.trim()}
+            />
+          ).toBlob()
+        : await pdf(
+            <QuotePDFTemplate
+              data={pdfData as QuoteData}
+              passengers={passengers}
+              coverPhotoUrl={coverPhoto || undefined}
+              tripPhotos={tripPhotos}
+              clientName={clientName.trim()}
+            />
+          ).toBlob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = buildFilename(pdfData);
+      anchor.download = mode === "list" ? buildListFilename(pdfData as OptionsListData, listType) : buildFilename(pdfData as QuoteData);
       anchor.click();
       URL.revokeObjectURL(url);
       toast({
-        title: "Quote PDF downloaded",
-        description: "The BLCK BX quote PDF has been generated successfully.",
+        title: mode === "list" ? "Options PDF downloaded" : "Quote PDF downloaded",
+        description: mode === "list" ? "The BLCK BX options PDF has been generated successfully." : "The BLCK BX quote PDF has been generated successfully.",
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to generate the quote PDF.";
+      const message = err instanceof Error ? err.message : "Failed to generate the PDF.";
       setError(message);
       setStatus("error");
       toast({
@@ -849,7 +1164,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
   const updateTravelField = (
     section: "outboundTravel" | "returnTravel",
-    field: keyof QuoteData["outboundTravel"],
+    field: keyof NonNullable<QuoteData["outboundTravel"]>,
     value: string
   ) => {
     updateQuoteData((current) => ({
@@ -859,7 +1174,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   };
 
   const updateAccommodationField = (
-    field: keyof QuoteData["accommodation"],
+    field: keyof NonNullable<QuoteData["accommodation"]>,
     value: string
   ) => {
     updateQuoteData((current) => ({
@@ -1165,6 +1480,15 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
                     Upload Another
                   </Button>
                 )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-[#D8D2C8] bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"
+                  onClick={startManualOptionsList}
+                >
+                  <ListChecks className="mr-2 h-4 w-4" />
+                  Create Options List
+                </Button>
                 </div>
               )}
             </CardContent>
@@ -1233,11 +1557,59 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
             </CardHeader>
             <CardContent className="pt-0">
               <p className="text-sm text-[#6B6B68]">
-                Quote reference:{" "}
+                {mode === "list" ? "Options list" : "Quote reference:"}{" "}
                 <span className="font-medium text-[#1A1A1A]">
-                  {quoteData.project.quoteReference || "Not set"}
+                  {mode === "list"
+                    ? listType === "flight" ? "Flights" : "Accommodation"
+                    : quoteData.project.quoteReference || "Not set"}
                 </span>
               </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#E6E5E0] bg-white">
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex flex-wrap gap-2 rounded-2xl bg-[#F5F3F0] p-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={`flex-1 rounded-xl ${mode === "quote" ? "bg-[#0A0A0A] text-white hover:bg-[#0A0A0A] hover:text-white" : "text-[#1A1A1A] hover:bg-white"}`}
+                  onClick={() => switchMode("quote")}
+                >
+                  Trip Quote
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={`flex-1 rounded-xl ${mode === "list" ? "bg-[#0A0A0A] text-white hover:bg-[#0A0A0A] hover:text-white" : "text-[#1A1A1A] hover:bg-white"}`}
+                  onClick={() => switchMode("list")}
+                >
+                  Options List
+                </Button>
+              </div>
+              {mode === "list" ? (
+                <div className="space-y-2 rounded-2xl border border-[#ECEAE5] bg-[#FAFAFA] p-4">
+                  <p className="text-sm font-medium text-[#1A1A1A]">What are you listing?</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className={listType === "flight" ? "bg-[#0A0A0A] text-white hover:bg-[#0A0A0A] hover:text-white" : "bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"}
+                      onClick={() => switchListType("flight")}
+                    >
+                      Flights
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className={listType === "accommodation" ? "bg-[#0A0A0A] text-white hover:bg-[#0A0A0A] hover:text-white" : "bg-white text-[#1A1A1A] hover:bg-[#F8F6F1]"}
+                      onClick={() => switchListType("accommodation")}
+                    >
+                      Accommodation
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -1253,11 +1625,13 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
                 value={clientName}
                 onChange={setClientName}
               />
-              <EditableRow
-                label="Quote Ref"
-                value={quoteData.project.quoteReference}
-                onChange={(value) => updateProjectField("quoteReference", value)}
-              />
+              {mode === "quote" ? (
+                <EditableRow
+                  label="Quote Ref"
+                  value={quoteData.project.quoteReference}
+                  onChange={(value) => updateProjectField("quoteReference", value)}
+                />
+              ) : null}
               <EditableRow
                 label="Destination"
                 value={quoteData.destination.name}
@@ -1268,15 +1642,18 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
                 value={quoteData.destination.dates}
                 onChange={(value) => updateDestinationField("dates", value)}
               />
-              <EditableRow
-                label="Passengers"
-                value={String(quoteData.travellers.total)}
-                onChange={updatePassengerCount}
-                type="number"
-                min={0}
-              />
+              {mode === "quote" ? (
+                <EditableRow
+                  label="Passengers"
+                  value={String(quoteData.travellers.total)}
+                  onChange={updatePassengerCount}
+                  type="number"
+                  min={0}
+                />
+              ) : null}
             </PreviewSection>
 
+            {mode === "quote" ? (
             <PreviewSection title="Pricing" icon={Wallet} accent>
               <EditableRow
                 label="Total Cost"
@@ -1304,8 +1681,11 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
                 onChange={(value) => updatePricingField("balanceDeadline", value)}
               />
             </PreviewSection>
+            ) : null}
           </div>
 
+          {mode === "quote" ? (
+          <>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <PreviewSection title="Outbound Flight" icon={Plane}>
               <div className="space-y-4">
@@ -1606,7 +1986,19 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
               )}
             </div>
           </PreviewSection>
+          </>
+          ) : null}
 
+          {mode === "list" ? (
+            <OptionsListEditor
+              listType={listType}
+              options={listOptions}
+              onChange={setListOptions}
+              onPhotoError={(message) => toast({ title: "Photos failed", description: message, variant: "destructive" })}
+            />
+          ) : null}
+
+          {mode === "quote" ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <PreviewSection title="Description" icon={FileOutput}>
             <textarea
@@ -1684,6 +2076,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
               </div>
             </PreviewSection>
           </div>
+          ) : null}
 
           <PreviewSection title="Additional Notes" icon={FileOutput}>
             <textarea
@@ -1916,7 +2309,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
                 ) : (
                   <>
                     <FileOutput className="mr-2 h-4 w-4" />
-                    Download Quote PDF
+                    {mode === "list" ? "Download Options PDF" : "Download Quote PDF"}
                   </>
                 )}
               </Button>

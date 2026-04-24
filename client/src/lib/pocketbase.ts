@@ -22,6 +22,7 @@ export interface User {
   profileImageUrl?: string;
   role: string;
   allowed_tools?: string[];
+  dock_collapsed?: boolean;
   created: string;
   updated: string;
 }

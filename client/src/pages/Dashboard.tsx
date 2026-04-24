@@ -35,7 +35,6 @@ import { Plus, Eye, Pencil, Trash2, Loader2, Search, Copy, BookTemplate, List, M
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useProjects, useDeleteProject, useDuplicateProject, useSaveAsTemplate, usePublishProject, type Project } from "@/hooks/useProjects";
-import { Header } from "@/components/layout/Header";
 
 type TabValue = "published" | "drafts" | "templates" | "lists";
 
@@ -218,7 +217,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-12">
         {/* Header Section */}

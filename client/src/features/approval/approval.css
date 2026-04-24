@@ -334,28 +334,6 @@
   border-color: var(--cat-text-secondary);
 }
 
-.approval-grid-toggle {
-  display: inline-flex;
-}
-
-.approval-grid-toggle__button {
-  font-size: 11px;
-  padding: 7px 14px;
-  border: 1px solid var(--cat-border);
-  background: transparent;
-  color: var(--cat-text-secondary);
-}
-
-.approval-grid-toggle__button:first-child {
-  border-right: none;
-}
-
-.approval-grid-toggle__button.is-active {
-  background: var(--cat-text-primary);
-  color: #fff;
-  border-color: var(--cat-text-primary);
-}
-
 .approval-subcategory-tabs {
   display: flex;
   gap: 24px;
@@ -396,7 +374,27 @@
 }
 
 .approval-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 24px;
+}
+
+@media (min-width: 640px) {
+  .approval-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .approval-card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1400px) {
+  .approval-card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .approval-card {

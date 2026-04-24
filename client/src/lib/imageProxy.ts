@@ -4,10 +4,9 @@
  * NOTE: This is primarily used when images haven't been pre-converted to base64.
  * For best results, use the imageToBase64 utility to convert images before rendering.
  *
- * The proxy is hosted at: https://n8n.blckbx.co.uk/webhook/image-proxy
+ * External images are routed through the app image proxy using a file extension
+ * so @react-pdf/renderer accepts the URL shape.
  */
-
-const PROXY_BASE_URL = 'https://n8n.blckbx.co.uk/webhook/image-proxy';
 
 /**
  * Check if a URL is from PocketBase (local, CORS-friendly)
@@ -40,12 +39,32 @@ function isLocalAsset(url: string): boolean {
   return url.startsWith('/');
 }
 
+function encodeBase64(value: string): string {
+  if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+    return window.btoa(value);
+  }
+
+  if (typeof btoa === 'function') {
+    return btoa(value);
+  }
+
+  return value;
+}
+
+function buildAppProxyUrl(url: string): string {
+  const encodedUrl = encodeBase64(url);
+  // Route external images through the PocketBase proxy hook (server-side,
+  // bypasses CORS). The .jpg suffix is required by @react-pdf/renderer's
+  // URL sniffing — the hook strips it before base64 decoding.
+  return `https://pocketbase.blckbx.co.uk/api/proxy-image/${encodedUrl}.jpg`;
+}
+
 /**
  * Returns a URL for image rendering in PDFs.
  *
  * - Data URIs (base64) are returned as-is EXCEPT WebP (not supported)
  * - PocketBase images are returned as-is (CORS-friendly)
- * - External images are proxied through n8n
+ * - External images are proxied through /api/proxy-image/{base64-url}.jpg
  *
  * @param originalUrl - The original image URL or base64 data URI
  * @returns Either the original URL/data URI or a proxied URL
@@ -91,8 +110,8 @@ export function getProxiedImageUrl(originalUrl: string): string {
     url = 'https:' + url;
   }
 
-  // External images - use proxy
-  return `${PROXY_BASE_URL}?url=${encodeURIComponent(url)}`;
+  // External images - use the app proxy to avoid CORS and keep a .jpg suffix for react-pdf.
+  return buildAppProxyUrl(url);
 }
 
 /**
