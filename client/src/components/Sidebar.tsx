@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, LayoutDashboard, ClipboardCheck, Search, Newspaper, ListChecks } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, BookOpen, LayoutDashboard, ClipboardCheck, Search, Newspaper, ListChecks } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -156,7 +156,7 @@ export function Sidebar() {
         {hasAccess("task-guide") && (
           <SidebarLink
             to="/task-guide"
-            icon={ClipboardList}
+            icon={BookOpen}
             label="Task Guide"
             active={location.startsWith("/task-guide")}
           />
