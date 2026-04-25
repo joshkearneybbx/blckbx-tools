@@ -13,7 +13,7 @@ import {
   UtensilsCrossed,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { pb } from "@/lib/pocketbase";
 import type { ToolSlug } from "@/lib/tool-access";
@@ -40,11 +40,10 @@ const PILLARS: Pillar[] = [
     label: "Content Hub",
     displayName: "Content\nHub",
     description: "Build content out of the latest trends",
-    eyebrow: "Most Used",
+    eyebrow: "Content",
     Icon: Instagram,
     collapsedBadge: { text: "New", variant: "new" },
     expandedBadge: "New",
-    defaultOpen: true,
   },
   {
     slug: "foh-dashboard",
@@ -85,7 +84,7 @@ const PILLARS: Pillar[] = [
     label: "Travel Hub",
     displayName: "Travel\nHub",
     description: "Make Booking and Quote documents for client needs",
-    eyebrow: "Bookings",
+    eyebrow: "Bookings & Quotes",
     Icon: Plane,
   },
   {
@@ -105,7 +104,7 @@ const PILLARS: Pillar[] = [
     label: "Shortlists",
     displayName: "Shortlists",
     description: "Curated comparison lists for clients",
-    eyebrow: "Compare",
+    eyebrow: "Build Option Lists",
     Icon: ListChecks,
   },
   {
@@ -115,7 +114,7 @@ const PILLARS: Pillar[] = [
     label: "Task Guide",
     displayName: "Task\nGuide",
     description: "Step-by-step task walkthroughs with partner lookups and saved drafts.",
-    eyebrow: "Playbook",
+    eyebrow: "Tasks",
     Icon: BookOpen,
     collapsedBadge: { text: "Testing", variant: "new" },
     expandedBadge: "Testing",
@@ -127,7 +126,7 @@ const PILLARS: Pillar[] = [
     label: "Big\nPurchases",
     displayName: "Big\nPurchases",
     description: "Log big purchases before you make them",
-    eyebrow: "Acquisitions",
+    eyebrow: "Purchases",
     Icon: ShoppingBag,
   },
   {
@@ -137,7 +136,7 @@ const PILLARS: Pillar[] = [
     label: "Meals",
     displayName: "Meals",
     description: "Plan and customise healthy meals",
-    eyebrow: "Kitchen",
+    eyebrow: "Recipes",
     Icon: UtensilsCrossed,
   },
 ];
@@ -177,6 +176,52 @@ export default function Home() {
     () => PILLARS.filter((pillar) => hasAccess(pillar.toolSlug)),
     [hasAccess]
   );
+
+  const [featuredSlug, setFeaturedSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    const computeFeatured = async () => {
+      try {
+        const userId = pb.authStore.model?.id;
+        if (!userId) return;
+
+        const records = await pb.collection('tool_usage').getFullList({
+          filter: `user = "${userId}"`,
+          fields: 'tool_slug',
+        });
+
+        if (records.length === 0) {
+          setFeaturedSlug(null);
+          return;
+        }
+
+        const counts = new Map<string, number>();
+        for (const record of records) {
+          const slug = record.tool_slug as string;
+          if (!slug) continue;
+          counts.set(slug, (counts.get(slug) || 0) + 1);
+        }
+
+        let winner: string | null = null;
+        let highest = 0;
+
+        for (const pillar of PILLARS) {
+          const count = counts.get(pillar.slug) || 0;
+          if (count > highest) {
+            highest = count;
+            winner = pillar.slug;
+          }
+        }
+
+        setFeaturedSlug(winner);
+      } catch (err) {
+        console.error('Failed to compute featured tool:', err);
+        setFeaturedSlug(null);
+      }
+    };
+
+    computeFeatured();
+  }, []);
 
   useEffect(() => {
     PILLARS.forEach((pillar) => {
@@ -541,7 +586,7 @@ export default function Home() {
                   <Link
                     key={pillar.slug}
                     href={pillar.route}
-                    className={`pillar${pillar.defaultOpen ? " default-open" : ""}`}
+                    className={`pillar${pillar.slug === featuredSlug ? " default-open" : ""}`}
                     onClick={() => handleToolClick(pillar)}
                   >
                     <div className="pillar-collapsed" aria-hidden="true">
@@ -561,7 +606,7 @@ export default function Home() {
                       />
                       <div className="pillar-expanded-inner">
                         <div className="pillar-top-row">
-                          <span className="pillar-eyebrow">{pillar.eyebrow}</span>
+                          <span className="pillar-eyebrow">{pillar.slug === featuredSlug ? 'Most Used' : pillar.eyebrow}</span>
                           {pillar.expandedBadge && (
                             <span className="pillar-badge-white">{pillar.expandedBadge}</span>
                           )}
