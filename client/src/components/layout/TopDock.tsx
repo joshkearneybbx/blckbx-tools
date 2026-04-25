@@ -80,6 +80,14 @@ const TOOL_ITEMS: DockItemConfig[] = [
     active: (location) => location.startsWith("/itinerary"),
   },
   {
+    key: "shortlists",
+    label: "Shortlists",
+    route: "/shortlists",
+    Icon: ListChecks,
+    toolSlug: "shortlists",
+    active: (location) => location.startsWith("/shortlists"),
+  },
+  {
     key: "task-guide",
     label: "Task Guide",
     route: "/task-guide",

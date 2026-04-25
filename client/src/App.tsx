@@ -32,6 +32,9 @@ import ContentHubIGComposerPage from "@/features/content-hub/pages/ContentHubIGC
 import ContentHubTrendDetailPage from "@/features/content-hub/pages/ContentHubTrendDetailPage";
 import ContentHubTrendsPage from "@/features/content-hub/pages/ContentHubTrendsPage";
 import TravelHubPage from "@/features/travel-hub/TravelHubPage";
+import ShortlistsDashboard from "@/features/shortlists/pages/ShortlistsDashboard";
+import ShortlistEditor from "@/features/shortlists/pages/ShortlistEditor";
+import ShortlistView from "@/features/shortlists/pages/ShortlistView";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -43,10 +46,20 @@ const queryClient = new QueryClient({
   },
 });
 
+const PUBLIC_SHARE_ROUTE_PATTERNS = [
+  /^\/shortlists\/(?!create$)[^/]+$/,
+  /^\/itinerary\/(?!create$|section-builder$)[^/]+$/,
+];
+
+function isPublicShareRoute(path: string): boolean {
+  return PUBLIC_SHARE_ROUTE_PATTERNS.some((pattern) => pattern.test(path));
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { isAuthenticated } = useAuth();
-  const showDock = isAuthenticated && location !== "/" && location !== "/login" && !location.startsWith("/oauth");
+  const hideChrome = isPublicShareRoute(location);
+  const showDock = isAuthenticated && !hideChrome && location !== "/" && location !== "/login" && !location.startsWith("/oauth");
 
   return (
     <div className="min-h-screen">
@@ -118,6 +131,32 @@ function Router() {
           {() => (
             <ToolGuard slug="itinerary">
               <Dashboard />
+            </ToolGuard>
+          )}
+        </Route>
+
+        {/* Shortlists Tool */}
+        <Route path="/shortlists/create">
+          {() => (
+            <ToolGuard slug="shortlists">
+              <ShortlistEditor mode="create" />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/shortlists/edit/:id">
+          {(params) => (
+            <ToolGuard slug="shortlists">
+              <ShortlistEditor mode="edit" id={params.id} />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/shortlists/:slug">
+          {(params) => <ShortlistView slug={params.slug} />}
+        </Route>
+        <Route path="/shortlists">
+          {() => (
+            <ToolGuard slug="shortlists">
+              <ShortlistsDashboard />
             </ToolGuard>
           )}
         </Route>

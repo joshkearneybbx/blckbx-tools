@@ -98,6 +98,16 @@ const PILLARS: Pillar[] = [
     Icon: MapPin,
   },
   {
+    slug: "shortlists",
+    toolSlug: "shortlists",
+    route: "/shortlists",
+    label: "Shortlists",
+    displayName: "Shortlists",
+    description: "Curated comparison lists for clients",
+    eyebrow: "Compare",
+    Icon: ListChecks,
+  },
+  {
     slug: "task-guide",
     toolSlug: "task-guide",
     route: "/task-guide",

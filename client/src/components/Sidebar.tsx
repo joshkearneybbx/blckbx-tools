@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, LayoutDashboard, ClipboardCheck, Search, Newspaper } from "lucide-react";
+import { Map, UtensilsCrossed, ReceiptPoundSterling, ClipboardList, LayoutDashboard, ClipboardCheck, Search, Newspaper, ListChecks } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import bxLogoUrl from "@assets/bx white.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,7 +30,7 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
           {label}
         </span>
         {badge && (
-          <span className="ml-auto text-xs bg-[#FAFAF8] text-[#0A0A0A] px-1.5 py-0.5 rounded-none opacity-0 group-hover:opacity-100">
+          <span className="ml-auto text-xs bg-[#FAFAF8] text-[#0A0A0A] px-1.5 py-0.5 opacity-0 group-hover:opacity-100">
             {badge}
           </span>
         )}
@@ -49,7 +49,7 @@ function SidebarLink({ to, icon: Icon, label, active, disabled, badge }: Sidebar
         {label}
       </span>
       {badge && (
-        <span className="ml-auto text-xs bg-[#FAFAF8] text-[#0A0A0A] px-1.5 py-0.5 rounded-none opacity-0 group-hover:opacity-100">
+        <span className="ml-auto text-xs bg-[#FAFAF8] text-[#0A0A0A] px-1.5 py-0.5 opacity-0 group-hover:opacity-100">
           {badge}
         </span>
       )}
@@ -129,6 +129,14 @@ export function Sidebar() {
             active={location.startsWith("/travel-hub")}
           />
         )}
+        {hasAccess("shortlists") && (
+          <SidebarLink
+            to="/shortlists"
+            icon={ListChecks}
+            label="Shortlists"
+            active={location.startsWith("/shortlists")}
+          />
+        )}
         {hasAccess("meals") && (
           <SidebarLink
             to="/meals"
@@ -159,7 +167,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full rounded-none bg-[#FAFAF8] text-[#0A0A0A] text-sm font-medium py-2 hover:bg-gray-200 transition-colors"
+            className="w-full bg-[#FAFAF8] text-[#0A0A0A] text-sm font-medium py-2 hover:bg-gray-200 transition-colors"
             data-testid="button-sidebar-signout"
           >
             Sign Out
