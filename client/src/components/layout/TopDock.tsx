@@ -16,6 +16,7 @@ import {
   Settings,
   type LucideIcon,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { pb } from "@/lib/pocketbase";
 import type { ToolSlug } from "@/lib/tool-access";
@@ -122,18 +123,37 @@ function getFirstName(user: ReturnType<typeof useAuth>["user"]) {
 function DockItem({ item, isActive, onNavigate }: { item: DockItemConfig; isActive: boolean; onNavigate: () => void }) {
   const Icon = item.Icon;
 
+  if (isActive) {
+    return (
+      <button
+        type="button"
+        className="dock-item active"
+        onClick={onNavigate}
+        aria-current="page"
+      >
+        <Icon size={20} aria-hidden="true" />
+        <span className="dock-label-inline">{item.label}</span>
+        {item.badge && <span className="dock-badge" aria-hidden="true" />}
+      </button>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      className={`dock-item ${isActive ? "active" : ""}`}
-      onClick={onNavigate}
-      aria-current={isActive ? "page" : undefined}
-      title={item.label}
-    >
-      <Icon size={20} aria-hidden="true" />
-      <span className="dock-label-inline">{item.label}</span>
-      {item.badge && <span className="dock-badge" aria-hidden="true" />}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="dock-item"
+          onClick={onNavigate}
+        >
+          <Icon size={20} aria-hidden="true" />
+          {item.badge && <span className="dock-badge" aria-hidden="true" />}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="dock-tooltip-content">
+        {item.label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -246,11 +266,14 @@ export default function TopDock() {
           transition: width 260ms cubic-bezier(0.2, 0.8, 0.2, 1), background 160ms ease, padding 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        .dock-item:hover,
         .dock-item.active {
           width: auto;
           padding: 0 14px 0 10px;
           background: #0A0A0A;
+        }
+
+        .dock-item:not(.active):hover {
+          background: rgba(10, 10, 10, 0.06);
         }
 
         .dock-item svg {
@@ -263,7 +286,6 @@ export default function TopDock() {
           transition: stroke 150ms;
         }
 
-        .dock-item:hover svg,
         .dock-item.active svg { stroke: #F5F3F0; }
 
         .dock-label-inline {
@@ -274,13 +296,12 @@ export default function TopDock() {
           font-weight: 500;
           letter-spacing: 0.02em;
           opacity: 0;
-          transition: opacity 200ms ease 80ms, max-width 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        .dock-item:hover .dock-label-inline,
         .dock-item.active .dock-label-inline {
           max-width: 200px;
           opacity: 1;
+          margin-left: 8px;
         }
 
         .dock-divider {
@@ -300,8 +321,18 @@ export default function TopDock() {
           background: #0A0A0A;
         }
 
-        .dock-item.active .dock-badge,
-        .dock-item:hover .dock-badge { display: none; }
+        .dock-item.active .dock-badge { display: none; }
+
+        .dock-tooltip-content {
+          background: #0A0A0A !important;
+          color: #F5F3F0 !important;
+          font-size: 11px !important;
+          font-weight: 500 !important;
+          letter-spacing: 0.02em !important;
+          padding: 5px 10px !important;
+          border-radius: 0 !important;
+          border: none !important;
+        }
 
         .dock-right {
           display: flex;
