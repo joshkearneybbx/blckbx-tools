@@ -48,14 +48,12 @@ const PILLARS: Pillar[] = [
   {
     slug: "foh-dashboard",
     toolSlug: "foh",
-    route: "/foh",
+    route: "https://foh-dashboard.blckbx.co.uk/",
     label: "FOH\nDashboard",
     displayName: "FOH\nDashboard",
     description: "Central hub for FOH assistants to track all their clients data",
     eyebrow: "Operations",
     Icon: LayoutDashboard,
-    collapsedBadge: { text: "Soon", variant: "default" },
-    expandedBadge: "Coming Soon",
   },
   {
     slug: "approval-catalogue",
@@ -582,7 +580,45 @@ export default function Home() {
               {visiblePillars.map((pillar) => {
                 const Icon = pillar.Icon;
 
-                return (
+                return pillar.route.startsWith("http") ? (
+                  <a
+                    key={pillar.slug}
+                    href={pillar.route}
+                    className={`pillar${pillar.slug === featuredSlug ? " default-open" : ""}`}
+                    onClick={() => handleToolClick(pillar)}
+                  >
+                    <div className="pillar-collapsed" aria-hidden="true">
+                      <div className="pillar-icon"><Icon size={16} /></div>
+                      <div className="pillar-label"><Lines text={pillar.label} /></div>
+                      {pillar.collapsedBadge && (
+                        <span className={`collapsed-badge ${pillar.collapsedBadge.variant === "new" ? "new" : ""}`}>
+                          {pillar.collapsedBadge.text}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="pillar-expanded">
+                      <div
+                        className="pillar-photo"
+                        style={{ backgroundImage: `url('/images/tools/${pillar.slug}.jpg')` }}
+                      />
+                      <div className="pillar-expanded-inner">
+                        <div className="pillar-top-row">
+                          <span className="pillar-eyebrow">{pillar.slug === featuredSlug ? 'Most Used' : pillar.eyebrow}</span>
+                          {pillar.expandedBadge && (
+                            <span className="pillar-badge-white">{pillar.expandedBadge}</span>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="pillar-display-name"><Lines text={pillar.displayName} /></div>
+                          <p className="pillar-desc">{pillar.description}</p>
+                          <span className="pillar-cta">Open tool <ArrowRight aria-hidden="true" /></span>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                ) : (
                   <Link
                     key={pillar.slug}
                     href={pillar.route}
