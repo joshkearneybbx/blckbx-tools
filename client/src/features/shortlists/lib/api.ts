@@ -46,10 +46,8 @@ function normalizeOption(record: unknown): ShortlistOption {
 }
 
 export async function listShortlists(): Promise<Shortlist[]> {
-  const userId = pb.authStore.model?.id;
   const records = await pb.collection(SHORTLISTS).getFullList({
     sort: '-updated',
-    filter: userId ? `user = "${userId}"` : '',
   });
   return records.map((record) => castRecord<Shortlist>(record));
 }

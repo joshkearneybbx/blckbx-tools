@@ -289,11 +289,24 @@ export function filterRenderableImages(urls: string[]): string[] {
 }
 
 /**
- * Wraps an external image URL in the n8n image proxy.
- * The proxy fetches server-side (bypassing CORS) and returns the bytes
- * with Access-Control-Allow-Origin: *, allowing @react-pdf/renderer to
- * include the image in the rendered PDF.
+ * Normalises image URLs that have known transformation parameters
+ * which force formats incompatible with @react-pdf/renderer (notably WebP).
+ *
+ * Currently handles:
+ *   - Google CDN (lh3.googleusercontent.com, lh4..., lh5..., lh6.googleusercontent.com)
+ *     Strips transformation suffixes like =w243-h244-n-k-no-nu, =s680-w680-h510-rw, etc.
+ *     Result: bare URL serves the original full-size JPEG.
  */
+function normalizeImageUrl(url: string): string {
+  // Google CDN — strip transformation parameters
+  // Pattern: =wXXX-hYYY-flags or =sXXX-flags appended after the last path segment
+  if (/^https:\/\/lh[3-6]\.googleusercontent\.com\//.test(url)) {
+    return url.replace(/=[\w-]+$/, '');
+  }
+
+  return url;
+}
+
 export function proxyImageUrl(url: string | null | undefined): string {
   if (!url) return '';
   if (url.startsWith(N8N_IMAGE_PROXY)) return url;
@@ -302,7 +315,10 @@ export function proxyImageUrl(url: string | null | undefined): string {
   const pbUrl = import.meta.env.VITE_POCKETBASE_URL || pb.baseUrl;
   if (pbUrl && url.startsWith(pbUrl)) return url;
 
-  return `${N8N_IMAGE_PROXY}?url=${encodeURIComponent(url)}`;
+  // Normalise problematic URL patterns before proxying
+  const normalised = normalizeImageUrl(url);
+
+  return `${N8N_IMAGE_PROXY}?url=${encodeURIComponent(normalised)}`;
 }
 
 export function getOptionImageUrl(
