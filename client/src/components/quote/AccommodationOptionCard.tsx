@@ -10,12 +10,19 @@ import type { AccommodationOption } from "@/components/pdf/OptionsListPDFTemplat
 const INPUT_CLASS = "border-[#D4D0CB] bg-[#FAFAF8] text-sm text-[#0A0A0A] focus:border-[#0A0A0A] focus:ring-0";
 
 function convertToJpeg(file: File): Promise<string> {
+  const MAX_DIMENSION = 1600;
+  const QUALITY = 0.82;
+
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
+      const ratio = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
+      const targetWidth = Math.round(image.width * ratio);
+      const targetHeight = Math.round(image.height * ratio);
+
       const canvas = document.createElement("canvas");
-      canvas.width = image.width;
-      canvas.height = image.height;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const context = canvas.getContext("2d");
 
       if (!context) {
@@ -24,8 +31,8 @@ function convertToJpeg(file: File): Promise<string> {
         return;
       }
 
-      context.drawImage(image, 0, 0);
-      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      context.drawImage(image, 0, 0, targetWidth, targetHeight);
+      const jpegDataUrl = canvas.toDataURL("image/jpeg", QUALITY);
       URL.revokeObjectURL(image.src);
       resolve(jpegDataUrl);
     };
@@ -59,6 +66,7 @@ export function AccommodationOptionCard({
   onPhotoError?: (message: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: option.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const title = option.name || `Accommodation option ${index + 1}`;
@@ -82,6 +90,17 @@ export function AccommodationOptionCard({
       onPhotoError?.(error instanceof Error ? error.message : "Failed to load one or more photos.");
     }
     if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const handleCoverPhoto = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      const encoded = await convertToJpeg(files[0]);
+      update("coverPhoto", encoded);
+    } catch (error) {
+      onPhotoError?.(error instanceof Error ? error.message : "Failed to load cover photo.");
+    }
+    if (coverInputRef.current) coverInputRef.current.value = "";
   };
 
   return (
@@ -142,10 +161,43 @@ export function AccommodationOptionCard({
             <Input className={INPUT_CLASS} placeholder="Board — B&B, Half Board..." value={option.boardBasis || ""} onChange={(event) => update("boardBasis", event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Textarea className={`${INPUT_CLASS} min-h-[90px]`} placeholder="Description" value={option.description || ""} onChange={(event) => update("description", event.target.value)} />
+            <Textarea
+              className={`${INPUT_CLASS} min-h-[90px] !w-full`}
+              placeholder="Description"
+              value={option.description || ""}
+              onChange={(event) => update("description", event.target.value)}
+            />
             <p className="text-xs text-[#6B6B68]">Keep description to 1–3 lines for best PDF layout.</p>
           </div>
 
+          {/* Cover Photo */}
+          <div className="space-y-3 rounded-xl border border-[#ECEAE5] bg-white p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-[#1A1A1A]">Cover Photo</p>
+                <p className="text-xs text-[#6B6B68]">{option.coverPhoto ? "1 cover photo set" : "No cover photo set"}</p>
+              </div>
+              {!option.coverPhoto ? (
+                <>
+                  <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleCoverPhoto(event.target.files)} />
+                  <Button type="button" className="bg-[#1A1A1A] text-white hover:bg-[#111111]" onClick={() => coverInputRef.current?.click()}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Cover Photo
+                  </Button>
+                </>
+              ) : null}
+            </div>
+            {option.coverPhoto ? (
+              <div className="relative overflow-hidden rounded-xl border border-[#ECEAE5] bg-[#FAFAFA]">
+                <img src={option.coverPhoto} alt={`Cover for ${title}`} className="h-40 w-full object-cover" />
+                <Button type="button" variant="ghost" size="icon" className="absolute right-2 top-2 h-7 w-7 rounded-full bg-white/90 text-[#1A1A1A] hover:bg-white" onClick={() => update("coverPhoto", "")}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Gallery Photos */}
           <div className="space-y-3 rounded-xl border border-[#ECEAE5] bg-white p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -188,7 +240,7 @@ export function AccommodationOptionCard({
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input className={INPUT_CLASS} placeholder="From £4,500" value={option.priceFromText} maxLength={50} onChange={(event) => update("priceFromText", event.target.value)} />
-            <Textarea className={`${INPUT_CLASS} min-h-[90px]`} placeholder="Notes" value={option.notes || ""} onChange={(event) => update("notes", event.target.value)} />
+            <Textarea className={`${INPUT_CLASS} min-h-[90px] !w-full`} placeholder="Notes" value={option.notes || ""} onChange={(event) => update("notes", event.target.value)} />
           </div>
         </div>
       ) : null}
@@ -206,6 +258,7 @@ export function createAccommodationOption(order: number): AccommodationOption {
     sleeps: "",
     boardBasis: "",
     description: "",
+    coverPhoto: "",
     photos: [],
     priceFromText: "",
     notes: "",
@@ -222,6 +275,7 @@ export function accommodationOptionHasData(option: AccommodationOption): boolean
       String(option.sleeps || "").trim() ||
       option.boardBasis?.trim() ||
       option.description?.trim() ||
+      Boolean(option.coverPhoto) ||
       option.photos.length > 0 ||
       option.priceFromText.trim() ||
       option.notes?.trim()

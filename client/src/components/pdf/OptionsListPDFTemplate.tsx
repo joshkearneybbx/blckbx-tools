@@ -67,6 +67,7 @@ export interface AccommodationOption {
   sleeps?: number | string;
   boardBasis?: string;
   description?: string;
+  coverPhoto?: string;
   photos: string[];
   priceFromText: string;
   notes?: string;
@@ -170,9 +171,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D4D0CB",
     backgroundColor: "#F5F3F0",
-    marginBottom: 14,
+    marginBottom: 0,
   },
-  primaryPhoto: { width: "100%", height: 150, objectFit: "cover" },
+  coverPhoto: { width: "100%", height: 170, objectFit: "cover" },
   accomBody: { padding: 12, gap: 7 },
   accomHeaderRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
   accomName: { fontSize: 14, fontWeight: 700, flex: 1 },
@@ -180,8 +181,8 @@ const styles = StyleSheet.create({
   accomLocation: { fontSize: 9, color: "#6B6865" },
   accomMeta: { fontSize: 9, color: "#0A0A0A" },
   accomDescription: { fontSize: 9, lineHeight: 1.35, color: "#0A0A0A" },
-  thumbRow: { flexDirection: "row", gap: 5, marginTop: 2 },
-  thumb: { width: 65, height: 50, objectFit: "cover" },
+  galleryWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 14 },
+  galleryCell: { objectFit: "cover" },
 });
 
 const Sidebar = ({ tripTitle }: { tripTitle?: string }) => (
@@ -276,6 +277,18 @@ function FlightOptionCard({ option, index }: { option: FlightOption; index: numb
   );
 }
 
+const GALLERY_WIDTH = 419; // A4 (595pt) - page paddingLeft (148) - paddingRight (28)
+
+function getCellDimensions(photoCount: number): { width: string; height: number } {
+  if (photoCount === 1) {
+    return { width: "100%", height: Math.round(GALLERY_WIDTH * 0.55) };
+  }
+  if (photoCount === 2 || photoCount === 4) {
+    return { width: "49%", height: Math.round(GALLERY_WIDTH * 0.49 * 0.70) };
+  }
+  return { width: "32%", height: Math.round(GALLERY_WIDTH * 0.32 * 0.70) };
+}
+
 function AccommodationOptionCard({ option, index }: { option: AccommodationOption; index: number }) {
   const meta = [
     option.nights ? `${option.nights} nights` : "",
@@ -283,11 +296,11 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
     option.sleeps ? `sleeps ${option.sleeps}` : "",
     option.boardBasis || "",
   ].filter(Boolean);
-  const photos = (option.photos || []).filter(Boolean).slice(0, 6);
+  const coverSrc = option.coverPhoto || (option.photos || [])[0] || "";
 
   return (
     <View style={styles.accomCard} wrap={false}>
-      {photos[0] ? <Image src={photos[0]} style={styles.primaryPhoto} /> : null}
+      {coverSrc ? <Image src={coverSrc} style={styles.coverPhoto} /> : null}
       <View style={styles.accomBody}>
         <View style={styles.accomHeaderRow}>
           <Text style={styles.accomName}>{option.name || "Accommodation option"}</Text>
@@ -296,13 +309,6 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
         {option.location ? <Text style={styles.accomLocation}>{option.location}</Text> : null}
         {meta.length > 0 ? <Text style={styles.accomMeta}>{meta.join(" · ")}</Text> : null}
         {option.description ? <Text style={styles.accomDescription}>{option.description}</Text> : null}
-        {photos.length > 1 ? (
-          <View style={styles.thumbRow}>
-            {photos.slice(1, 6).map((photo, photoIndex) => (
-              <Image key={`thumb-${photoIndex}`} src={photo} style={styles.thumb} />
-            ))}
-          </View>
-        ) : null}
         {option.notes ? (
           <Text style={styles.mutedText}>
             <Text style={styles.notesLabel}>Notes: </Text>
@@ -311,6 +317,23 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
         ) : null}
         <Text style={styles.priceText}>{option.priceFromText}</Text>
       </View>
+    </View>
+  );
+}
+
+function AccommodationOptionGallery({ option }: { option: AccommodationOption }) {
+  const photos = (option.photos || []).filter(Boolean).slice(0, 6);
+  if (photos.length === 0) return null;
+
+  const { width, height } = getCellDimensions(photos.length);
+
+  return (
+    <View style={styles.galleryWrap}>
+      {photos.map((photo, photoIndex) => (
+        <View key={`gallery-${photoIndex}`} style={{ width }}>
+          <Image src={photo} style={{ width: "100%", height, objectFit: "cover" }} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -353,24 +376,37 @@ export function OptionsListPDFTemplate({
         </View>
       </Page>
 
-      <Page size="A4" style={styles.page} wrap>
-        <Sidebar tripTitle={tripTitle} />
-        <Text style={styles.sectionTitle}>
-          {listType === "flight" ? "Flight Options" : "Accommodation Options"}
-        </Text>
-        <View style={styles.divider} />
-        {options.length === 0 ? (
+      {listType === "flight" ? (
+        <Page size="A4" style={styles.page} wrap>
+          <Sidebar tripTitle={tripTitle} />
+          <Text style={styles.sectionTitle}>Flight Options</Text>
+          <View style={styles.divider} />
+          {options.length === 0 ? (
+            <Text style={styles.introText}>Options to be confirmed.</Text>
+          ) : (
+            (options as FlightOption[]).map((option, index) => (
+              <FlightOptionCard key={option.id || `flight-${index}`} option={option} index={index} />
+            ))
+          )}
+        </Page>
+      ) : options.length === 0 ? (
+        <Page size="A4" style={styles.page}>
+          <Sidebar tripTitle={tripTitle} />
+          <Text style={styles.sectionTitle}>Accommodation Options</Text>
+          <View style={styles.divider} />
           <Text style={styles.introText}>Options to be confirmed.</Text>
-        ) : listType === "flight" ? (
-          (options as FlightOption[]).map((option, index) => (
-            <FlightOptionCard key={option.id || `flight-${index}`} option={option} index={index} />
-          ))
-        ) : (
-          (options as AccommodationOption[]).map((option, index) => (
-            <AccommodationOptionCard key={option.id || `accom-${index}`} option={option} index={index} />
-          ))
-        )}
-      </Page>
+        </Page>
+      ) : (
+        (options as AccommodationOption[]).map((option, index) => (
+          <Page key={option.id || `accom-${index}`} size="A4" style={styles.page}>
+            <Sidebar tripTitle={tripTitle} />
+            <Text style={styles.sectionTitle}>Accommodation Options</Text>
+            <View style={styles.divider} />
+            <AccommodationOptionCard option={option} index={index} />
+            <AccommodationOptionGallery option={option} />
+          </Page>
+        ))
+      )}
     </Document>
   );
 }

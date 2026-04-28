@@ -58,6 +58,7 @@ export default function QuotesList({ onSelect, onNew }: QuotesListProps) {
     try {
       const result = await pb.collection("blckbx_quotes").getList(1, 50, {
         sort: "-created",
+        fields: "id,tripName,quoteReference,clientName,destination,dates,status,coverPhoto,created,collectionId,collectionName",
       });
       setQuotes(result.items as unknown as QuoteRecord[]);
     } catch (error) {

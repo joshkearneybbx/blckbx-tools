@@ -59,6 +59,7 @@ function duplicateAccommodationOption(option: AccommodationOption): Accommodatio
   return {
     ...duplicate,
     id: crypto.randomUUID(),
+    coverPhoto: "",
     photos: [],
   };
 }

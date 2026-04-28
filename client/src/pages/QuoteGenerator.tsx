@@ -455,12 +455,19 @@ function buildFilename(data: QuoteData): string {
 }
 
 function convertToJpeg(file: File): Promise<string> {
+  const MAX_DIMENSION = 1600;
+  const QUALITY = 0.82;
+
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
+      const ratio = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
+      const targetWidth = Math.round(image.width * ratio);
+      const targetHeight = Math.round(image.height * ratio);
+
       const canvas = document.createElement("canvas");
-      canvas.width = image.width;
-      canvas.height = image.height;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const context = canvas.getContext("2d");
 
       if (!context) {
@@ -469,8 +476,8 @@ function convertToJpeg(file: File): Promise<string> {
         return;
       }
 
-      context.drawImage(image, 0, 0);
-      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      context.drawImage(image, 0, 0, targetWidth, targetHeight);
+      const jpegDataUrl = canvas.toDataURL("image/jpeg", QUALITY);
       URL.revokeObjectURL(image.src);
       resolve(jpegDataUrl);
     };
@@ -804,17 +811,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       formData.append("mode", mode);
       formData.append("listType", mode === "list" ? listType : "");
       const storedPayload = buildStoredPayload(quoteData);
-      const payloadForStorage = mode === "list" && listType === "accommodation"
-        ? {
-            ...(storedPayload as OptionsListData),
-            options: (storedPayload as OptionsListData).options.map((option) => ({
-              ...(option as AccommodationOption),
-              // Photos live in PocketBase file fields option1Photos...option10Photos, not JSON.
-              photos: [],
-            })),
-          }
-        : storedPayload;
-      formData.append("quoteData", JSON.stringify(payloadForStorage));
+      formData.append("quoteData", JSON.stringify(storedPayload));
 
       if (coverPhoto) {
         formData.append("coverPhoto", base64ToFile(coverPhoto, "cover-photo.jpg"));
