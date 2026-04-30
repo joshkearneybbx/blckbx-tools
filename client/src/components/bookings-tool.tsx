@@ -38,6 +38,8 @@ import type {
   BookingRecord,
   BookingSegment,
   BookingStatus,
+  BookingType,
+  CarHireData,
   FlightLeg,
   FlightSegment,
   TransferSegment
@@ -69,6 +71,10 @@ const buttonToneClasses = {
   danger:
     "border-[hsl(var(--sand-300))] bg-white text-[hsl(var(--base-black))] hover:border-[hsl(var(--error))] hover:text-[hsl(var(--error))]"
 } as const;
+
+const INPUT_CLASS = "w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]";
+const ACTIVE_TOGGLE_CLASS = "border border-[hsl(var(--base-black))] bg-[hsl(var(--base-black))] px-4 py-2 text-sm font-medium text-white transition";
+const INACTIVE_TOGGLE_CLASS = "border border-[hsl(var(--sand-300))] bg-white px-4 py-2 text-sm font-medium text-[hsl(var(--base-black))] transition hover:border-[hsl(var(--base-black))] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-[hsl(var(--sand-300))]";
 
 const SEGMENT_OPTIONS = [
   { label: "Transfer", value: "transfer", icon: Car },
@@ -602,6 +608,17 @@ export function BookingsTool() {
     setMessage("Booking deleted.");
   }
 
+  function switchBookingType(nextType: BookingType) {
+    if (!activeBooking || activeBooking.bookingType === nextType || activeBooking.persisted !== false) {
+      return;
+    }
+
+    const next = createEmptyBooking(nextType);
+    setBookings((current) => current.map((item) => (item.id === activeBooking.id ? next : item)));
+    setActiveBookingId(next.id);
+    setMessage("");
+  }
+
   async function downloadActiveBookingPdf() {
     if (!activeBooking || isDownloadingPdf || activeBooking.persisted === false) {
       return;
@@ -723,8 +740,13 @@ export function BookingsTool() {
               }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-[hsl(var(--base-black))]">{booking.tripName || "Untitled booking"}</div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-semibold text-[hsl(var(--base-black))]">{booking.tripName || "Untitled booking"}</div>
+                    <span className={`inline-block border border-[hsl(var(--sand-300))] px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${booking.bookingType === "car_hire" ? "text-[hsl(var(--base-black))]" : "text-[hsl(var(--sand-900))]"}`}>
+                      {booking.bookingType === "car_hire" ? "Car Hire" : "Trip"}
+                    </span>
+                  </div>
                   <div className="mt-1 text-sm text-[hsl(var(--sand-900))]">
                     {[booking.clientFirstName, booking.clientLastName].filter(Boolean).join(" ") || "Client tbc"}
                   </div>
@@ -786,7 +808,8 @@ export function BookingsTool() {
                   icon={FileInput}
                   tone="secondary"
                   onClick={() => setIsImportModalOpen(true)}
-                  disabled={actionState !== "idle" || isDownloadingPdf}
+                  disabled={activeBooking.bookingType === "car_hire" || actionState !== "idle" || isDownloadingPdf}
+                  title={activeBooking.bookingType === "car_hire" ? "Import from Quote is only available for trip bookings." : undefined}
                 />
                 <BookingsButton
                   label={actionState === "saving" ? "Saving..." : "Save Draft"}
@@ -818,6 +841,29 @@ export function BookingsTool() {
             </div>
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => switchBookingType("trip")}
+              disabled={activeBooking.persisted !== false}
+              title={activeBooking.persisted !== false ? "Booking type can't be changed after saving." : undefined}
+              className={activeBooking.bookingType === "trip" ? ACTIVE_TOGGLE_CLASS : INACTIVE_TOGGLE_CLASS}
+            >
+              Trip Booking
+            </button>
+            <button
+              type="button"
+              onClick={() => switchBookingType("car_hire")}
+              disabled={activeBooking.persisted !== false}
+              title={activeBooking.persisted !== false ? "Booking type can't be changed after saving." : undefined}
+              className={activeBooking.bookingType === "car_hire" ? ACTIVE_TOGGLE_CLASS : INACTIVE_TOGGLE_CLASS}
+            >
+              Car Hire
+            </button>
+          </div>
+
+          {activeBooking.bookingType === "trip" ? (
+            <>
           <SectionCard title="Booking Details">
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Trip Name">
@@ -1279,6 +1325,10 @@ export function BookingsTool() {
               />
             </Field>
           </SectionCard>
+            </>
+          ) : (
+            <CarHireBookingForm booking={activeBooking} onChange={setActiveBooking} />
+          )}
         </div>
       ) : (
         <div className="flex min-h-[420px] items-center justify-center border border-[hsl(var(--sand-300))] bg-[#FAFAF8] p-8 text-center text-[hsl(var(--sand-900))]">
@@ -1292,6 +1342,179 @@ export function BookingsTool() {
         onClose={() => setIsImportModalOpen(false)}
         onImport={importFromQuote}
       />
+    </>
+  );
+}
+
+function createDefaultCarHireData(): CarHireData {
+  return {
+    tripName: "",
+    bookingRef: "",
+    clientFirstName: "",
+    clientLastName: "",
+    clientEmail: "",
+    clientPhone: "",
+    leadDriver: "",
+    supplier: "",
+    supplierReference: "",
+    supplierPhone: "",
+    pickupLocation: "",
+    pickupAddress: "",
+    pickupDate: "",
+    pickupTime: "",
+    dropoffLocation: "",
+    dropoffAddress: "",
+    dropoffDate: "",
+    dropoffTime: "",
+    carType: "",
+    numberOfDays: undefined,
+    inclusions: "",
+    pricing: {
+      currency: "GBP",
+      totalCost: "",
+      paid: "",
+      balanceDue: "",
+      balanceDueDate: ""
+    },
+    notes: ""
+  };
+}
+
+function CarHireBookingForm({
+  booking,
+  onChange
+}: {
+  booking: BookingRecord;
+  onChange: (booking: BookingRecord) => void;
+}) {
+  const data: CarHireData = {
+    ...createDefaultCarHireData(),
+    ...booking.carHireData,
+    pricing: {
+      ...createDefaultCarHireData().pricing,
+      ...booking.carHireData?.pricing
+    }
+  };
+
+  function patchCarHireData(nextData: CarHireData, topLevel: Partial<BookingRecord> = {}) {
+    onChange({
+      ...booking,
+      ...topLevel,
+      carHireData: nextData,
+      bookingData: {
+        ...booking.bookingData,
+        bookingType: "car_hire",
+        carHireData: nextData
+      }
+    });
+  }
+
+  function patchField<K extends keyof CarHireData>(field: K, value: CarHireData[K]) {
+    const nextData = { ...data, [field]: value };
+    const topLevel: Partial<BookingRecord> = {};
+
+    if (field === "tripName") topLevel.tripName = String(value ?? "");
+    if (field === "bookingRef") topLevel.bookingRef = String(value ?? "");
+    if (field === "clientFirstName") topLevel.clientFirstName = String(value ?? "");
+    if (field === "clientLastName") topLevel.clientLastName = String(value ?? "");
+    if (field === "clientEmail") topLevel.clientEmail = String(value ?? "");
+    if (field === "clientPhone") topLevel.clientPhone = String(value ?? "");
+    if (field === "pickupDate") topLevel.departureDate = String(value ?? "");
+
+    patchCarHireData(nextData, topLevel);
+  }
+
+  function patchPricing<K extends keyof NonNullable<CarHireData["pricing"]>>(
+    field: K,
+    value: NonNullable<CarHireData["pricing"]>[K]
+  ) {
+    patchCarHireData({
+      ...data,
+      pricing: {
+        ...data.pricing,
+        [field]: value
+      }
+    });
+  }
+
+  return (
+    <>
+      <SectionCard title="Booking Details">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Trip Name">
+            <input className={INPUT_CLASS} value={data.tripName || booking.tripName} onChange={(event) => patchField("tripName", event.target.value)} />
+          </Field>
+          <Field label="Booking Ref">
+            <input className={INPUT_CLASS} value={data.bookingRef || booking.bookingRef} onChange={(event) => patchField("bookingRef", event.target.value)} />
+          </Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Client">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Client First Name"><input className={INPUT_CLASS} value={data.clientFirstName || booking.clientFirstName} onChange={(event) => patchField("clientFirstName", event.target.value)} /></Field>
+          <Field label="Client Last Name"><input className={INPUT_CLASS} value={data.clientLastName || booking.clientLastName} onChange={(event) => patchField("clientLastName", event.target.value)} /></Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Lead Driver">
+        <Field label="Lead Driver"><input className={INPUT_CLASS} value={data.leadDriver || ""} onChange={(event) => patchField("leadDriver", event.target.value)} /></Field>
+      </SectionCard>
+
+      <SectionCard title="Supplier">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Supplier"><input className={INPUT_CLASS} value={data.supplier || ""} onChange={(event) => patchField("supplier", event.target.value)} /></Field>
+          <Field label="Supplier Reference"><input className={INPUT_CLASS} value={data.supplierReference || ""} onChange={(event) => patchField("supplierReference", event.target.value)} /></Field>
+          <Field label="Supplier Phone"><input className={INPUT_CLASS} value={data.supplierPhone || ""} onChange={(event) => patchField("supplierPhone", event.target.value)} /></Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Pick-up">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Pick-up Location"><input className={INPUT_CLASS} value={data.pickupLocation || ""} onChange={(event) => patchField("pickupLocation", event.target.value)} /></Field>
+          <Field label="Pick-up Date"><input className={INPUT_CLASS} type="date" value={data.pickupDate || ""} onChange={(event) => patchField("pickupDate", event.target.value)} /></Field>
+          <Field label="Pick-up Address" className="md:col-span-2"><textarea className={`${INPUT_CLASS} min-h-[90px]`} value={data.pickupAddress || ""} onChange={(event) => patchField("pickupAddress", event.target.value)} /></Field>
+          <Field label="Pick-up Time"><input className={INPUT_CLASS} type="time" value={data.pickupTime || ""} onChange={(event) => patchField("pickupTime", event.target.value)} /></Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Drop-off">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Drop-off Location"><input className={INPUT_CLASS} value={data.dropoffLocation || ""} onChange={(event) => patchField("dropoffLocation", event.target.value)} /></Field>
+          <Field label="Drop-off Date"><input className={INPUT_CLASS} type="date" value={data.dropoffDate || ""} onChange={(event) => patchField("dropoffDate", event.target.value)} /></Field>
+          <Field label="Drop-off Address" className="md:col-span-2"><textarea className={`${INPUT_CLASS} min-h-[90px]`} value={data.dropoffAddress || ""} onChange={(event) => patchField("dropoffAddress", event.target.value)} /></Field>
+          <Field label="Drop-off Time"><input className={INPUT_CLASS} type="time" value={data.dropoffTime || ""} onChange={(event) => patchField("dropoffTime", event.target.value)} /></Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Hire Details">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Car Type"><input className={INPUT_CLASS} value={data.carType || ""} onChange={(event) => patchField("carType", event.target.value)} /></Field>
+          <Field label="Number of Days"><input className={INPUT_CLASS} type="number" value={data.numberOfDays ?? ""} onChange={(event) => patchField("numberOfDays", event.target.value ? Number(event.target.value) : undefined)} /></Field>
+          <Field label="Inclusions" className="md:col-span-2">
+            <textarea className={`${INPUT_CLASS} min-h-[120px]`} value={data.inclusions || ""} onChange={(event) => patchField("inclusions", event.target.value)} />
+            <span className="text-xs text-[hsl(var(--sand-900))]">One inclusion per line</span>
+          </Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Pricing">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Currency"><select className={INPUT_CLASS} value={data.pricing?.currency || "GBP"} onChange={(event) => patchPricing("currency", event.target.value)}><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="USD">USD</option></select></Field>
+          <Field label="Total"><input className={INPUT_CLASS} value={data.pricing?.totalCost || ""} onChange={(event) => patchPricing("totalCost", event.target.value)} /></Field>
+          <Field label="Paid"><input className={INPUT_CLASS} value={data.pricing?.paid || ""} onChange={(event) => patchPricing("paid", event.target.value)} /></Field>
+          <Field label="Balance Due"><input className={INPUT_CLASS} value={data.pricing?.balanceDue || ""} onChange={(event) => patchPricing("balanceDue", event.target.value)} /></Field>
+          <Field label="Balance Due Date"><input className={INPUT_CLASS} type="date" value={data.pricing?.balanceDueDate || ""} onChange={(event) => patchPricing("balanceDueDate", event.target.value)} /></Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Welcome Message">
+        <Field label="Welcome Message"><textarea className={`${INPUT_CLASS} min-h-[100px]`} value={booking.welcomeMessage} onChange={(event) => onChange({ ...booking, welcomeMessage: event.target.value })} /></Field>
+      </SectionCard>
+
+      <SectionCard title="Notes">
+        <Field label="Notes"><textarea className={`${INPUT_CLASS} min-h-[100px]`} value={data.notes || ""} onChange={(event) => patchField("notes", event.target.value)} /></Field>
+      </SectionCard>
     </>
   );
 }

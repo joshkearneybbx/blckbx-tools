@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import airlines from "@/data/airlines.json";
-import type { FlightLeg, FlightOption } from "@/components/pdf/OptionsListPDFTemplate";
+import type { FlightLeg, FlightOption, FlightReturnType } from "@/components/pdf/OptionsListPDFTemplate";
 
 const INPUT_CLASS = "border-[#D4D0CB] bg-[#FAFAF8] text-sm text-[#0A0A0A] focus:border-[#0A0A0A] focus:ring-0";
 
@@ -148,9 +148,14 @@ export function FlightOptionCard({
   const airlineOptions = airlines as AirlineEntry[];
   const datalistId = useMemo(() => `airline-options-${option.id}`, [option.id]);
   const title = option.airlineName || `Flight option ${index + 1}`;
+  const returnType = option.returnType || "return";
 
   const update = (field: keyof FlightOption, value: string | FlightLeg[]) => {
     onChange({ ...option, [field]: value });
+  };
+
+  const updateReturnType = (value: FlightReturnType) => {
+    onChange({ ...option, returnType: value });
   };
 
   const handleAirlineSearch = (value: string) => {
@@ -168,7 +173,7 @@ export function FlightOptionCard({
       style={style}
       className={`rounded-2xl border border-[#E6E5E0] bg-[#FAFAFA] ${isDragging ? "opacity-70 shadow-lg" : ""}`}
     >
-      <div className="flex items-center gap-3 border-b border-[#ECEAE5] p-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-[#ECEAE5] p-3">
         <button
           type="button"
           className="cursor-grab rounded-lg p-1 text-[#6B6B68] hover:bg-[#ECE8DF] active:cursor-grabbing"
@@ -178,10 +183,22 @@ export function FlightOptionCard({
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <button type="button" className="flex-1 text-left" onClick={onToggle}>
+        <button type="button" className="min-w-[180px] flex-1 text-left" onClick={onToggle}>
           <span className="text-sm font-medium text-[#1A1A1A]">Option {index + 1}: {title}</span>
           <span className="ml-2 text-xs text-[#6B6B68]">{expanded ? "Collapse" : "Edit"}</span>
         </button>
+        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#6B6B68]">
+          Return flight
+          <select
+            className="h-8 rounded-none border border-[#D4D0CB] bg-[#FAFAF8] px-2 text-xs font-normal normal-case tracking-normal text-[#0A0A0A] focus:border-[#0A0A0A] focus:outline-none"
+            value={returnType}
+            onChange={(event) => updateReturnType(event.target.value as FlightReturnType)}
+          >
+            <option value="return">Return</option>
+            <option value="one-way">One-way</option>
+            <option value="tbc">TBC</option>
+          </select>
+        </label>
         <div className="flex items-center gap-2">
           <span title={duplicateDisabled ? "Maximum 10 options reached." : "Duplicate option"}>
             <Button
@@ -232,7 +249,13 @@ export function FlightOptionCard({
           </div>
 
           <LegsSection title="Outbound" legs={option.outboundLegs || []} onChange={(legs) => update("outboundLegs", legs)} />
-          <LegsSection title="Return" legs={option.returnLegs || []} onChange={(legs) => update("returnLegs", legs)} />
+          {returnType === "return" ? (
+            <LegsSection title="Return" legs={option.returnLegs || []} onChange={(legs) => update("returnLegs", legs)} />
+          ) : (
+            <div className="rounded-xl border border-dashed border-[#D8D2C8] bg-[#F8F6F1] px-4 py-3 text-xs text-[#6B6B68]">
+              Return flight fields are hidden for {returnType === "one-way" ? "one-way" : "TBC"} options. Existing return details are preserved if you switch back to Return.
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input className={INPUT_CLASS} placeholder="Baggage — Cabin bags included" value={option.baggage} onChange={(event) => update("baggage", event.target.value)} />
@@ -252,6 +275,7 @@ export function createFlightOption(order: number): FlightOption {
     airlineIata: "",
     outboundLegs: [createLeg()],
     returnLegs: [createLeg()],
+    returnType: "return",
     baggage: "",
     priceFromText: "",
     notes: "",
@@ -266,7 +290,7 @@ export function flightOptionHasData(option: FlightOption): boolean {
       option.baggage.trim() ||
       option.priceFromText.trim() ||
       option.notes?.trim() ||
-      option.outboundLegs.some(hasLegData) ||
-      option.returnLegs.some(hasLegData)
+      (option.outboundLegs || []).some(hasLegData) ||
+      (option.returnLegs || []).some(hasLegData)
   );
 }

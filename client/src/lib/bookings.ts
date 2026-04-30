@@ -4,6 +4,8 @@ import type {
   BookingPassenger,
   BookingRecord,
   BookingSegment,
+  BookingType,
+  CarHireData,
   FlightLeg,
   FlightSegment,
   TransferSegment
@@ -28,6 +30,26 @@ type QuotePassenger = {
   name?: unknown;
   dateOfBirth?: unknown;
   type?: unknown;
+};
+
+type QuoteReturnType = "return" | "one-way" | "tbc";
+
+type QuoteFlightOptionLeg = {
+  flightNumber?: unknown;
+  depAirport?: unknown;
+  depDate?: unknown;
+  depTime?: unknown;
+  arrAirport?: unknown;
+  arrDate?: unknown;
+  arrTime?: unknown;
+};
+
+type QuoteFlightOption = {
+  airlineName?: unknown;
+  airlineIata?: unknown;
+  outboundLegs?: unknown;
+  returnLegs?: unknown;
+  returnType?: unknown;
 };
 
 type QuoteRecordLike = {
@@ -115,6 +137,105 @@ function hasFlightData(segment: Record<string, unknown>) {
     segment.departureDate,
     segment.arrivalDate
   ].some((value) => toStringValue(value) !== "");
+}
+
+function normalizeQuoteReturnType(value: unknown): QuoteReturnType {
+  return value === "one-way" || value === "tbc" ? value : "return";
+}
+
+function hasOptionLegData(leg: QuoteFlightOptionLeg) {
+  return [
+    leg.flightNumber,
+    leg.depAirport,
+    leg.depDate,
+    leg.depTime,
+    leg.arrAirport,
+    leg.arrDate,
+    leg.arrTime
+  ].some((value) => toStringValue(value) !== "");
+}
+
+function normalizeOptionLegs(value: unknown): QuoteFlightOptionLeg[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((leg): leg is Record<string, unknown> => Boolean(leg && typeof leg === "object"))
+    .map((leg) => ({
+      flightNumber: leg.flightNumber,
+      depAirport: leg.depAirport,
+      depDate: leg.depDate,
+      depTime: leg.depTime,
+      arrAirport: leg.arrAirport,
+      arrDate: leg.arrDate,
+      arrTime: leg.arrTime
+    }))
+    .filter(hasOptionLegData);
+}
+
+function buildFlightSegmentFromOptionLegs(
+  option: QuoteFlightOption,
+  legsValue: unknown
+): FlightSegment | null {
+  const legs = normalizeOptionLegs(legsValue);
+  if (legs.length === 0) return null;
+
+  const firstLeg = legs[0];
+  const lastLeg = legs[legs.length - 1];
+  const airline = toStringValue(option.airlineName || option.airlineIata);
+
+  const flightSegment: FlightSegment = {
+    ...emptyFlightSegment(),
+    flightNumber: toStringValue(firstLeg.flightNumber),
+    airline,
+    departureAirport: toStringValue(firstLeg.depAirport).toUpperCase(),
+    departureCode: toStringValue(firstLeg.depAirport).toUpperCase(),
+    departureTerminal: "",
+    arrivalAirport: toStringValue(lastLeg.arrAirport).toUpperCase(),
+    arrivalCode: toStringValue(lastLeg.arrAirport).toUpperCase(),
+    arrivalTerminal: "",
+    departureDate: tryParseDate(toStringValue(firstLeg.depDate)),
+    departureTime: toStringValue(firstLeg.depTime),
+    arrivalDate: tryParseDate(toStringValue(lastLeg.arrDate || lastLeg.depDate)),
+    arrivalTime: toStringValue(lastLeg.arrTime),
+    arrivalNextDay: false,
+    pnr: "",
+    isConnecting: legs.length > 1,
+    legs: []
+  };
+
+  flightSegment.legs = legs.map((leg) => ({
+    ...emptyFlightLeg(),
+    flightNumber: toStringValue(leg.flightNumber),
+    airline,
+    departureAirport: toStringValue(leg.depAirport).toUpperCase(),
+    departureCode: toStringValue(leg.depAirport).toUpperCase(),
+    departureTerminal: "",
+    arrivalAirport: toStringValue(leg.arrAirport).toUpperCase(),
+    arrivalCode: toStringValue(leg.arrAirport).toUpperCase(),
+    arrivalTerminal: "",
+    departureDate: tryParseDate(toStringValue(leg.depDate)),
+    departureTime: toStringValue(leg.depTime),
+    arrivalDate: tryParseDate(toStringValue(leg.arrDate || leg.depDate)),
+    arrivalTime: toStringValue(leg.arrTime),
+    arrivalNextDay: false,
+    layoverDuration: ""
+  }));
+
+  return flightSegment;
+}
+
+function buildFlightSegmentsFromOptions(options: unknown[]): FlightSegment[] {
+  return options.flatMap((optionValue) => {
+    if (!optionValue || typeof optionValue !== "object") return [];
+    const option = optionValue as QuoteFlightOption;
+    const outboundSegment = buildFlightSegmentFromOptionLegs(option, option.outboundLegs);
+    const returnSegment = normalizeQuoteReturnType(option.returnType) === "return"
+      ? buildFlightSegmentFromOptionLegs(option, option.returnLegs)
+      : null;
+
+    return [outboundSegment, returnSegment].filter(
+      (segment): segment is FlightSegment => Boolean(segment)
+    );
+  });
 }
 
 function buildFlightSegment(segment: Record<string, unknown>): FlightSegment | null {
@@ -252,11 +373,16 @@ export function createBookingFromQuote(
     tryParseDate(toStringValue(outboundTravel.departureDate)) ||
     base.departureDate;
 
-  const segments = [
-    buildFlightSegment(outboundTravel),
-    buildAccommodationSegment(accommodation),
-    buildFlightSegment(returnTravel)
-  ].filter((segment): segment is NonNullable<typeof segment> => Boolean(segment));
+  const optionFlightSegments = Array.isArray(quoteData.options)
+    ? buildFlightSegmentsFromOptions(quoteData.options)
+    : [];
+  const segments = optionFlightSegments.length > 0
+    ? optionFlightSegments
+    : [
+        buildFlightSegment(outboundTravel),
+        buildAccommodationSegment(accommodation),
+        buildFlightSegment(returnTravel)
+      ].filter((segment): segment is NonNullable<typeof segment> => Boolean(segment));
 
   return {
     ...base,
@@ -366,6 +492,7 @@ export function emptyAccommodationSegment(): AccommodationSegment {
 
 export function createEmptyBookingData(): BookingData {
   return {
+    bookingType: "trip",
     pricing: {
       totalCost: "",
       depositPaid: "",
@@ -377,12 +504,47 @@ export function createEmptyBookingData(): BookingData {
   };
 }
 
-export function createEmptyBooking(): BookingRecord {
+function createEmptyCarHireData(): CarHireData {
+  return {
+    tripName: "",
+    bookingRef: "",
+    clientFirstName: "",
+    clientLastName: "",
+    clientEmail: "",
+    clientPhone: "",
+    leadDriver: "",
+    supplier: "",
+    supplierReference: "",
+    supplierPhone: "",
+    pickupLocation: "",
+    pickupAddress: "",
+    pickupDate: "",
+    pickupTime: "",
+    dropoffLocation: "",
+    dropoffAddress: "",
+    dropoffDate: "",
+    dropoffTime: "",
+    carType: "",
+    numberOfDays: undefined,
+    inclusions: "",
+    pricing: {
+      currency: "GBP",
+      totalCost: "",
+      paid: "",
+      balanceDue: "",
+      balanceDueDate: ""
+    },
+    notes: ""
+  };
+}
+
+function createEmptyTripBooking(): BookingRecord {
   const today = new Date().toISOString().slice(0, 10);
 
   return {
     id: createId("draft"),
     persisted: false,
+    bookingType: "trip",
     status: "draft",
     tripName: "",
     bookingRef: "",
@@ -390,10 +552,51 @@ export function createEmptyBooking(): BookingRecord {
     departureDate: today,
     clientFirstName: "",
     clientLastName: "",
+    clientEmail: "",
+    clientPhone: "",
     welcomeMessage: DEFAULT_WELCOME_MESSAGE,
     coverImage: "",
     bookingData: createEmptyBookingData()
   };
+}
+
+export function createEmptyCarHireBooking(): BookingRecord {
+  const today = new Date().toISOString().slice(0, 10);
+  const carHireData = createEmptyCarHireData();
+
+  return {
+    id: createId("draft"),
+    persisted: false,
+    bookingType: "car_hire",
+    status: "draft",
+    tripName: "",
+    bookingRef: "",
+    issueDate: today,
+    departureDate: "",
+    clientFirstName: "",
+    clientLastName: "",
+    clientEmail: "",
+    clientPhone: "",
+    welcomeMessage: DEFAULT_WELCOME_MESSAGE,
+    coverImage: "",
+    bookingData: {
+      bookingType: "car_hire",
+      carHireData,
+      pricing: {
+        totalCost: "",
+        depositPaid: "",
+        balanceDueDate: ""
+      },
+      passengers: [],
+      segments: [],
+      additionalInfo: ""
+    },
+    carHireData
+  };
+}
+
+export function createEmptyBooking(bookingType: BookingType = "trip"): BookingRecord {
+  return bookingType === "car_hire" ? createEmptyCarHireBooking() : createEmptyTripBooking();
 }
 
 export function segmentLabel(segment: BookingSegment) {

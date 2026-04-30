@@ -4,7 +4,9 @@ import {
   Image,
   Link,
   Page,
+  Path,
   StyleSheet,
+  Svg,
   Text,
   View,
 } from "@react-pdf/renderer";
@@ -34,6 +36,7 @@ Font.register({
 Font.registerHyphenationCallback((word) => [word]);
 
 export type OptionsListType = "flight" | "accommodation";
+export type FlightReturnType = "return" | "one-way" | "tbc";
 
 export interface FlightLeg {
   id: string;
@@ -52,6 +55,7 @@ export interface FlightOption {
   airlineIata: string;
   outboundLegs: FlightLeg[];
   returnLegs: FlightLeg[];
+  returnType: FlightReturnType;
   baggage: string;
   priceFromText: string;
   notes?: string;
@@ -154,13 +158,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   flightHeaderText: { color: "#FAFAF8", fontSize: 9, fontWeight: 700, flex: 1 },
-  legArrow: { color: "#6B6865" },
   optionLabel: { color: "#FAFAF8", fontSize: 9, letterSpacing: 0.8 },
   flightBody: { padding: 10, gap: 8 },
   directionLabel: { fontSize: 8, fontWeight: 700, color: "#6B6865", textTransform: "uppercase" },
   legLine: { flexDirection: "row", justifyContent: "space-between", gap: 10, alignItems: "center" },
-  legRoute: { fontSize: 10, color: "#0A0A0A", flex: 1 },
-  legAirport: { fontWeight: 700 },
+  legRoute: { flexDirection: "row", alignItems: "center", flex: 1, gap: 3 },
+  legRouteText: { fontSize: 10, color: "#0A0A0A" },
+  legAirport: { fontSize: 10, color: "#0A0A0A", fontWeight: 700 },
+  planeIcon: { marginHorizontal: 4, transform: "rotate(90deg)" },
   legDate: { fontSize: 9, color: "#6B6865", width: 72, textAlign: "right" },
   legSeparator: { height: 1, backgroundColor: "#D4D0CB", marginVertical: 4 },
   mutedText: { fontSize: 9, color: "#6B6865", lineHeight: 1.35 },
@@ -231,27 +236,44 @@ function renderLegs(legs: FlightLeg[]) {
     return <Text style={styles.mutedText}>Details to be confirmed</Text>;
   }
 
-  return visibleLegs.map((leg, index) => (
-    <View key={leg.id || `leg-${index}`}>
-      {index > 0 ? <View style={styles.legSeparator} /> : null}
-      <View style={styles.legLine}>
-        <Text style={styles.legRoute}>
-          {leg.flightNumber ? `${leg.flightNumber}  ` : ""}
-          <Text style={styles.legAirport}>{leg.depAirport || "---"}</Text>
-          {`  ${leg.depTime || "--:--"}  `}
-          <Text style={styles.legArrow}>→</Text>
-          {"  "}
-          <Text style={styles.legAirport}>{leg.arrAirport || "---"}</Text>
-          {`  ${leg.arrTime || "--:--"}`}
-        </Text>
-        <Text style={styles.legDate}>{formatDate(leg.depDate || leg.arrDate)}</Text>
+  return visibleLegs.map((leg, index) => {
+    const flightNumber = leg.flightNumber?.trim() || "";
+    const depAirport = leg.depAirport?.trim() || "";
+    const depTime = leg.depTime?.trim() || "";
+    const depDate = leg.depDate?.trim() || "";
+    const arrAirport = leg.arrAirport?.trim() || "";
+    const arrTime = leg.arrTime?.trim() || "";
+    const arrDate = leg.arrDate?.trim() || "";
+
+    return (
+      <View key={leg.id || `leg-${index}`}>
+        {index > 0 ? <View style={styles.legSeparator} /> : null}
+        <View style={styles.legLine}>
+          <View style={styles.legRoute}>
+            {flightNumber ? <Text style={styles.legRouteText}>{flightNumber}</Text> : null}
+            <Text style={styles.legAirport}>{depAirport || "---"}</Text>
+            <Text style={styles.legRouteText}>{depTime || "--:--"}</Text>
+            <Svg width={10} height={10} viewBox="0 0 24 24" style={styles.planeIcon}>
+              <Path
+                d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+                fill="#6B6865"
+              />
+            </Svg>
+            <Text style={styles.legAirport}>{arrAirport || "---"}</Text>
+            <Text style={styles.legRouteText}>{arrTime || "--:--"}</Text>
+          </View>
+          <Text style={styles.legDate}>{formatDate(depDate || arrDate)}</Text>
+        </View>
       </View>
-    </View>
-  ));
+    );
+  });
 }
 
 function FlightOptionCard({ option, index }: { option: FlightOption; index: number }) {
   const airlineName = option.airlineName || (option.airlineIata ? option.airlineIata : "Flight option");
+  const returnType = option.returnType || "return";
+  const baggage = option.baggage?.trim() || "";
+  const notes = option.notes?.trim() || "";
 
   return (
     <View style={styles.optionCard} wrap={false}>
@@ -262,13 +284,23 @@ function FlightOptionCard({ option, index }: { option: FlightOption; index: numb
       <View style={styles.flightBody}>
         <Text style={styles.directionLabel}>Outbound</Text>
         <View>{renderLegs(option.outboundLegs || [])}</View>
-        <Text style={styles.directionLabel}>Return</Text>
-        <View>{renderLegs(option.returnLegs || [])}</View>
-        {option.baggage ? <Text style={styles.mutedText}>Baggage: {option.baggage}</Text> : null}
-        {option.notes ? (
+        {returnType === "return" ? (
+          <View>
+            <Text style={styles.directionLabel}>Return</Text>
+            <View>{renderLegs(option.returnLegs || [])}</View>
+          </View>
+        ) : null}
+        {returnType === "tbc" ? (
+          <View>
+            <Text style={styles.directionLabel}>Return</Text>
+            <Text style={styles.mutedText}>Details to be confirmed</Text>
+          </View>
+        ) : null}
+        {baggage ? <Text style={styles.mutedText}>Baggage: {baggage}</Text> : null}
+        {notes ? (
           <Text style={styles.mutedText}>
             <Text style={styles.notesLabel}>Notes: </Text>
-            {option.notes}
+            {notes}
           </Text>
         ) : null}
         <Text style={styles.priceText}>{option.priceFromText}</Text>

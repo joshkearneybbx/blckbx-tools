@@ -155,6 +155,39 @@ export type GuideDraft = {
 };
 
 export type BookingStatus = "draft" | "sent";
+export type BookingType = "trip" | "car_hire";
+
+export type CarHireData = {
+  tripName?: string;
+  bookingRef?: string;
+  clientFirstName?: string;
+  clientLastName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  leadDriver?: string;
+  supplier?: string;
+  supplierReference?: string;
+  supplierPhone?: string;
+  pickupLocation?: string;
+  pickupAddress?: string;
+  pickupDate?: string;
+  pickupTime?: string;
+  dropoffLocation?: string;
+  dropoffAddress?: string;
+  dropoffDate?: string;
+  dropoffTime?: string;
+  carType?: string;
+  numberOfDays?: number;
+  inclusions?: string;
+  pricing?: {
+    currency?: string;
+    totalCost?: string;
+    paid?: string;
+    balanceDue?: string;
+    balanceDueDate?: string;
+  };
+  notes?: string;
+};
 
 export type BookingPassenger = {
   id: string;
@@ -236,6 +269,8 @@ export type AccommodationSegment = {
 export type BookingSegment = TransferSegment | FlightSegment | AccommodationSegment;
 
 export type BookingData = {
+  bookingType?: BookingType;
+  carHireData?: CarHireData;
   pricing: {
     totalCost: string;
     depositPaid: string;
@@ -249,6 +284,7 @@ export type BookingData = {
 export type BookingRecord = {
   id: string;
   persisted?: boolean;
+  bookingType: BookingType;
   status: BookingStatus;
   tripName: string;
   bookingRef: string;
@@ -256,9 +292,12 @@ export type BookingRecord = {
   departureDate: string;
   clientFirstName: string;
   clientLastName: string;
+  clientEmail?: string;
+  clientPhone?: string;
   welcomeMessage: string;
   coverImage: string;
   bookingData: BookingData;
+  carHireData?: CarHireData;
   created?: string;
   updated?: string;
 };

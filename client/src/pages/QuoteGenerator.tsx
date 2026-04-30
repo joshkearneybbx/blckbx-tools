@@ -45,6 +45,7 @@ import {
   type AccommodationOption,
   type FlightLeg,
   type FlightOption,
+  type FlightReturnType,
   type OptionsListData,
   type OptionsListOption,
   type OptionsListType,
@@ -311,6 +312,10 @@ function createEmptyLeg(): FlightLeg {
   };
 }
 
+function normalizeReturnType(value: unknown): FlightReturnType {
+  return value === "one-way" || value === "tbc" ? value : "return";
+}
+
 function normalizeFlightLegs(value: unknown): FlightLeg[] {
   if (!Array.isArray(value)) return [createEmptyLeg()];
   const legs = value.reduce<FlightLeg[]>((acc, leg) => {
@@ -374,6 +379,7 @@ function normalizeOptions(value: unknown, listType: OptionsListType): OptionsLis
           airlineIata: sanitizeValue(source.airlineIata).toUpperCase(),
           outboundLegs: normalizeFlightLegs(source.outboundLegs),
           returnLegs: normalizeFlightLegs(source.returnLegs),
+          returnType: normalizeReturnType(source.returnType),
           baggage: sanitizeValue(source.baggage),
           priceFromText: sanitizeValue(source.priceFromText).slice(0, 50),
           notes: sanitizeValue(source.notes),

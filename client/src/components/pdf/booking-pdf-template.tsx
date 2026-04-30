@@ -16,7 +16,7 @@ import {
   formatLongDate,
   formatPassengerType
 } from "@/lib/bookings";
-import { bookingPdfHero, bookingPdfLogo } from "@/lib/booking-pdf-assets";
+import { bookingPdfCarHireHero, bookingPdfCarIconPath, bookingPdfHero, bookingPdfLogo } from "@/lib/booking-pdf-assets";
 import type {
   AccommodationSegment,
   BookingRecord,
@@ -109,6 +109,9 @@ const styles = StyleSheet.create({
     height: 200,
     objectFit: "cover",
     marginBottom: 18
+  },
+  carHireHero: {
+    height: 370
   },
   metadataRow: {
     flexDirection: "row",
@@ -300,6 +303,31 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: "#D4D0CB"
   },
+  carLocationColumn: {
+    width: 150,
+    gap: 3
+  },
+  carLocationDropoffColumn: {
+    width: 150,
+    gap: 3,
+    textAlign: "right"
+  },
+  carLocationTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#0A0A0A"
+  },
+  carLocationAddress: {
+    fontSize: 9,
+    color: "#6B6865",
+    lineHeight: 1.35
+  },
+  carDateTime: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: "#0A0A0A",
+    marginTop: 6
+  },
   arrivalNextDayBadge: {
     fontSize: 8,
     color: "#FAFAF8",
@@ -340,6 +368,12 @@ const styles = StyleSheet.create({
   },
   bulletText: {
     flex: 1
+  },
+  inclusionLine: {
+    fontSize: 9,
+    color: "#0A0A0A",
+    lineHeight: 1.5,
+    marginBottom: 2
   },
   link: {
     color: "#0A0A0A",
@@ -705,6 +739,166 @@ function SegmentCard({ segment }: { segment: BookingSegment }) {
   );
 }
 
+function cleanLines(value?: string): string[] {
+  return (value || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function formatDateRange(start?: string, end?: string): string {
+  const formattedStart = start ? formatLongDate(start) : "";
+  const formattedEnd = end ? formatLongDate(end) : "";
+  if (formattedStart && formattedEnd) return `${formattedStart} – ${formattedEnd}`;
+  return formattedStart || formattedEnd || "Dates tbc";
+}
+
+function DetailRow({ label, value }: { label: string; value?: string | number }) {
+  if (value == null || String(value).trim() === "") return null;
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{String(value)}</Text>
+    </View>
+  );
+}
+
+function CarHireSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View wrap={false}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.divider} />
+      {children}
+    </View>
+  );
+}
+
+function CarHireBookingPDFTemplate({ booking }: { booking: BookingRecord }) {
+  const data = booking.carHireData || booking.bookingData.carHireData || {};
+  const heroImage = bookingPdfCarHireHero;
+  const clientName = [booking.clientFirstName || data.clientFirstName, booking.clientLastName || data.clientLastName]
+    .filter(Boolean)
+    .join(" ");
+  const pickupDateTime = [data.pickupDate ? formatLongDate(data.pickupDate) : "", data.pickupTime || ""]
+    .filter(Boolean)
+    .join(" · ");
+  const dropoffDateTime = [data.dropoffDate ? formatLongDate(data.dropoffDate) : "", data.dropoffTime || ""]
+    .filter(Boolean)
+    .join(" · ");
+  const inclusions = cleanLines(data.inclusions);
+  const notes = cleanLines(data.notes);
+
+  return (
+    <Document title={`${booking.tripName || "Car Hire"} Booking`}>
+      <Page size="A4" style={styles.page}>
+        <Sidebar tripName={booking.tripName} />
+        <Image src={heroImage} style={[styles.hero, styles.carHireHero]} />
+        <View style={styles.metadataRow}>
+          <Text>
+            <Text style={styles.metadataLabel}>BOOKING REF: </Text>
+            <Text style={styles.metadataValue}>{booking.bookingRef || data.bookingRef || "-"}</Text>
+          </Text>
+          <Text>|</Text>
+          <Text>
+            <Text style={styles.metadataLabel}>CLIENT: </Text>
+            <Text style={styles.metadataValue}>{clientName || "-"}</Text>
+          </Text>
+          <Text>|</Text>
+          <Text>
+            <Text style={styles.metadataLabel}>DATES: </Text>
+            <Text style={styles.metadataValue}>{formatDateRange(data.pickupDate, data.dropoffDate)}</Text>
+          </Text>
+        </View>
+        <Text style={styles.greeting}>{booking.tripName || data.tripName || "Car Hire Booking"}</Text>
+        {data.supplier ? <Text style={styles.bodyText}>Supplier: {data.supplier}</Text> : null}
+        {booking.welcomeMessage ? <Text style={styles.bodyText}>{booking.welcomeMessage}</Text> : null}
+      </Page>
+
+      <Page size="A4" style={styles.page}>
+        <Sidebar tripName={booking.tripName} />
+        <CarHireSection title="Pick-up & Drop-off">
+          <View style={styles.segmentCard}>
+            <View style={styles.segmentHeader}>
+              <Text style={styles.segmentHeaderText}>PICK-UP</Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24">
+                <Path d={bookingPdfCarIconPath} fill="#FAFAF8" />
+              </Svg>
+              <Text style={styles.segmentHeaderText}>DROP-OFF</Text>
+            </View>
+            <View style={styles.segmentBody}>
+              <View style={styles.flightRoute}>
+                <View style={styles.carLocationColumn}>
+                  <Text style={styles.carLocationTitle}>{data.pickupLocation || "Pick-up location"}</Text>
+                  {cleanLines(data.pickupAddress).map((line, index) => (
+                    <Text key={`pickup-${index}`} style={styles.carLocationAddress}>{line}</Text>
+                  ))}
+                  {pickupDateTime ? <Text style={styles.carDateTime}>{pickupDateTime}</Text> : null}
+                </View>
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <View style={styles.flightPath}>
+                    <View style={styles.flightPathLine} />
+                    <Svg width={14} height={14} viewBox="0 0 24 24" style={{ marginHorizontal: 4 }}>
+                      <Path d={bookingPdfCarIconPath} fill="#6B6865" />
+                    </Svg>
+                    <View style={styles.flightPathLine} />
+                  </View>
+                </View>
+                <View style={styles.carLocationDropoffColumn}>
+                  <Text style={[styles.carLocationTitle, { textAlign: "right" }]}>{data.dropoffLocation || "Drop-off location"}</Text>
+                  {cleanLines(data.dropoffAddress).map((line, index) => (
+                    <Text key={`dropoff-${index}`} style={[styles.carLocationAddress, { textAlign: "right" }]}>{line}</Text>
+                  ))}
+                  {dropoffDateTime ? <Text style={[styles.carDateTime, { textAlign: "right" }]}>{dropoffDateTime}</Text> : null}
+                </View>
+              </View>
+            </View>
+          </View>
+        </CarHireSection>
+
+        <CarHireSection title="Hire Details">
+          <View style={styles.card}><View style={styles.segmentBody}>
+            <DetailRow label="Car" value={data.carType} />
+            <DetailRow label="Number of Days" value={data.numberOfDays} />
+            <DetailRow label="Lead Driver" value={data.leadDriver} />
+            <DetailRow label="Booking Reference" value={booking.bookingRef || data.bookingRef} />
+            <DetailRow label="Supplier" value={data.supplier} />
+            <DetailRow label="Supplier Reference" value={data.supplierReference} />
+            <DetailRow label="Supplier Phone" value={data.supplierPhone} />
+          </View></View>
+        </CarHireSection>
+
+        {inclusions.length ? (
+          <CarHireSection title="Inclusions">
+            <View style={styles.card}><View style={styles.segmentBody}>
+              {inclusions.map((item, index) => (
+                <Text key={`${item}-${index}`} style={styles.inclusionLine}>{item}</Text>
+              ))}
+            </View></View>
+          </CarHireSection>
+        ) : null}
+
+        <CarHireSection title="Pricing">
+          <View style={styles.card}><View style={styles.segmentBody}>
+            <DetailRow label="Currency" value={data.pricing?.currency} />
+            <DetailRow label="Total" value={data.pricing?.totalCost} />
+            <DetailRow label="Paid" value={data.pricing?.paid} />
+            <DetailRow label="Balance Due" value={data.pricing?.balanceDue} />
+            <DetailRow label="Balance Due Date" value={data.pricing?.balanceDueDate ? formatLongDate(data.pricing.balanceDueDate) : ""} />
+          </View></View>
+        </CarHireSection>
+
+        {notes.length ? (
+          <CarHireSection title="Notes">
+            <View style={styles.card}><View style={styles.segmentBody}>
+              {notes.map((line, index) => <Text key={`${line}-${index}`}>{line}</Text>)}
+            </View></View>
+          </CarHireSection>
+        ) : null}
+      </Page>
+    </Document>
+  );
+}
+
 /**
  * Split a currency string into its prefix (currency code/symbol) and numeric
  * value. Returns null if no number can be parsed.
@@ -758,7 +952,7 @@ function formatRemainingBalance(totalValue: string, depositValue: string): strin
   return `${total.prefix}${formatted}`;
 }
 
-export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
+function TripBookingPDFTemplate({ booking }: { booking: BookingRecord }) {
   const heroImage = booking.coverImage || bookingPdfHero;
   const hasAdditionalInfo = Boolean(booking.bookingData.additionalInfo?.trim());
   const hasItineraryContent = booking.bookingData.segments.length > 0 || hasAdditionalInfo;
@@ -907,4 +1101,12 @@ export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
       </Page>
     </Document>
   );
+}
+
+export function BookingPDFTemplate({ booking }: { booking: BookingRecord }) {
+  if (booking.bookingType === "car_hire") {
+    return <CarHireBookingPDFTemplate booking={booking} />;
+  }
+
+  return <TripBookingPDFTemplate booking={booking} />;
 }

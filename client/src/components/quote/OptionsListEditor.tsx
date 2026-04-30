@@ -49,8 +49,8 @@ function duplicateFlightOption(option: FlightOption): FlightOption {
   return {
     ...duplicate,
     id: crypto.randomUUID(),
-    outboundLegs: duplicate.outboundLegs.map((leg) => ({ ...leg, id: crypto.randomUUID() })),
-    returnLegs: duplicate.returnLegs.map((leg) => ({ ...leg, id: crypto.randomUUID() })),
+    outboundLegs: (duplicate.outboundLegs || []).map((leg) => ({ ...leg, id: crypto.randomUUID() })),
+    returnLegs: (duplicate.returnLegs || []).map((leg) => ({ ...leg, id: crypto.randomUUID() })),
   };
 }
 
