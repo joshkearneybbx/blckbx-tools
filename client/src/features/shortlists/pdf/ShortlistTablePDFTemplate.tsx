@@ -11,7 +11,9 @@ interface ShortlistTablePDFTemplateProps {
 const OPTIONS_PER_PAGE = 4;
 const PAGE_CONTENT_WIDTH = 666;
 const FIELD_WIDTH = 90;
-const OPTION_WIDTH = Math.floor((PAGE_CONTENT_WIDTH - FIELD_WIDTH) / OPTIONS_PER_PAGE);
+const OPTION_AREA_WIDTH = PAGE_CONTENT_WIDTH - FIELD_WIDTH;
+const IMAGE_ASPECT_RATIO = 76 / (OPTION_AREA_WIDTH / OPTIONS_PER_PAGE);
+const IMAGE_HEIGHT_CAP = 220;
 
 const styles = StyleSheet.create({
   page: {
@@ -78,7 +80,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   optionCell: {
-    width: OPTION_WIDTH,
     borderLeftWidth: 1,
     borderLeftStyle: 'solid',
     borderLeftColor: COLORS.sand300,
@@ -88,12 +89,10 @@ const styles = StyleSheet.create({
   },
   imageBox: {
     width: '100%',
-    height: 76,
     backgroundColor: COLORS.sand300,
   },
   image: {
     width: '100%',
-    height: 76,
     objectFit: 'cover',
   },
   name: {
@@ -124,6 +123,11 @@ const styles = StyleSheet.create({
 export function ShortlistTablePDFTemplate({ shortlist, options, baseUrl }: ShortlistTablePDFTemplateProps) {
   const resolvedBaseUrl = getBaseUrl(baseUrl);
   const visibleOptions = getVisibleOptions(options);
+  const columnsPerPage = visibleOptions.length <= OPTIONS_PER_PAGE
+    ? visibleOptions.length
+    : OPTIONS_PER_PAGE;
+  const columnWidth = columnsPerPage > 0 ? OPTION_AREA_WIDTH / columnsPerPage : OPTION_AREA_WIDTH;
+  const imageHeight = Math.min(columnWidth * IMAGE_ASPECT_RATIO, IMAGE_HEIGHT_CAP);
   const pages = chunkOptions(visibleOptions);
   const pageGroups = pages.length > 0 ? pages : [[]];
   const totalPages = pageGroups.length;
@@ -141,7 +145,7 @@ export function ShortlistTablePDFTemplate({ shortlist, options, baseUrl }: Short
           />
           {pageIndex === 0 ? <FullHeader shortlist={shortlist} /> : <SlimHeader shortlist={shortlist} pageNumber={pageIndex + 1} />}
           <View style={styles.divider} />
-          <ComparisonTable options={pageOptions} baseUrl={resolvedBaseUrl} />
+          <ComparisonTable options={pageOptions} baseUrl={resolvedBaseUrl} columnsPerPage={columnsPerPage} imageHeight={imageHeight} />
         </Page>
       ))}
     </Document>
@@ -171,12 +175,13 @@ function SlimHeader({ shortlist, pageNumber }: { shortlist: Shortlist; pageNumbe
   );
 }
 
-function ComparisonTable({ options, baseUrl }: { options: ShortlistOption[]; baseUrl: string }) {
-  const rows = getRows(options, baseUrl);
+function ComparisonTable({ options, baseUrl, columnsPerPage, imageHeight }: { options: ShortlistOption[]; baseUrl: string; columnsPerPage: number; imageHeight: number }) {
+  const rows = getRows(options, baseUrl, imageHeight);
   const paddedOptions: Array<ShortlistOption | null> = [
     ...options,
-    ...Array.from({ length: Math.max(OPTIONS_PER_PAGE - options.length, 0) }).map(() => null),
+    ...Array.from({ length: Math.max(columnsPerPage - options.length, 0) }).map(() => null),
   ];
+  const optionCellStyle = columnsPerPage > 0 ? { width: OPTION_AREA_WIDTH / columnsPerPage } : {};
 
   return (
     <View style={styles.table}>
@@ -185,7 +190,7 @@ function ComparisonTable({ options, baseUrl }: { options: ShortlistOption[]; bas
           <Text style={styles.fieldLabel}>Field</Text>
         </View>
         {paddedOptions.map((option, index) => (
-          <View key={option?.id || `empty-header-${index}`} style={[styles.cell, styles.optionCell]}>
+          <View key={option?.id || `empty-header-${index}`} style={[styles.cell, styles.optionCell, optionCellStyle]}>
             {option && <Text style={styles.fieldLabel}>{option.name || ''}</Text>}
           </View>
         ))}
@@ -196,7 +201,7 @@ function ComparisonTable({ options, baseUrl }: { options: ShortlistOption[]; bas
             <Text style={styles.fieldLabel}>{row.label}</Text>
           </View>
           {paddedOptions.map((option, index) => (
-            <View key={option?.id || `empty-${row.label}-${index}`} style={[styles.cell, styles.optionCell]}>
+            <View key={option?.id || `empty-${row.label}-${index}`} style={[styles.cell, styles.optionCell, optionCellStyle]}>
               {option ? row.render(option) : null}
             </View>
           ))}
@@ -212,14 +217,14 @@ interface TableRow {
   render: (option: ShortlistOption) => React.ReactNode;
 }
 
-function getRows(options: ShortlistOption[], baseUrl: string): TableRow[] {
+function getRows(options: ShortlistOption[], baseUrl: string, imageHeight: number): TableRow[] {
   const rows: TableRow[] = [
     {
       label: 'Image',
       hasValue: () => true,
       render: (option) => {
         const imageUrl = getOptionImageUrl(option, baseUrl);
-        return imageUrl ? <Image src={proxyImageUrl(imageUrl)} style={styles.image} /> : <View style={styles.imageBox} />;
+        return imageUrl ? <Image src={proxyImageUrl(imageUrl)} style={[styles.image, { height: imageHeight }]} /> : <View style={[styles.imageBox, { height: imageHeight }]} />;
       },
     },
     { label: 'Name', hasValue: (option) => !!option.name, render: (option) => <Text style={styles.name}>{option.name || '—'}</Text> },
