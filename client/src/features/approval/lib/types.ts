@@ -80,6 +80,8 @@ export type ProductCandidate = CandidateBase & {
   brand: string | null;
   price_text: string | null;
   price_pence: number | null;
+  price_pence_min?: number | null;
+  price_pence_max?: number | null;
   product_url: string | null;
   primary_image?: string | null;
   hero_image_url?: string | null;
@@ -90,6 +92,7 @@ export type ProductCandidate = CandidateBase & {
   content_focus?: string | null;
   position?: number | null;
   availability: "in_stock" | "out_of_stock";
+  in_stock?: boolean | null;
   currency: string | null;
   category: string | null;
   gender_focus: string | null;

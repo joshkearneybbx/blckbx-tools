@@ -20,7 +20,6 @@ import {
   formatDate,
   formatAvailability,
   formatLocation,
-  formatPrice,
   getPrimaryLink
 } from "../lib/utils";
 
@@ -99,6 +98,30 @@ const fieldClasses =
   "w-full border border-[var(--sand-300)] bg-white px-3 py-3 text-sm text-[var(--text)] outline-none placeholder:text-[var(--sand-500)] focus:border-[var(--black)]";
 const readOnlyFieldClasses =
   "w-full border border-[var(--sand-300)] bg-[var(--sand-100)] px-3 py-3 text-sm text-[var(--sand-700)] outline-none";
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  GBP: "£",
+  EUR: "€",
+  USD: "$"
+};
+
+function formatPrice(
+  pence: number | null,
+  penceMin: number | null | undefined,
+  penceMax: number | null | undefined,
+  currency: string | null
+): string {
+  if (pence == null || currency == null) return "—";
+
+  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  const min = penceMin ?? pence;
+  const max = penceMax ?? pence;
+
+  const minStr = (min / 100).toFixed(2);
+
+  if (min === max) return `${symbol}${minStr}`;
+  return `From ${symbol}${minStr}`;
+}
 
 function uniqueTags(values: string[] | undefined) {
   return Array.from(
@@ -653,7 +676,17 @@ export function CompactList({
 
 function compactMeta(candidate: CatalogueItem) {
   if (candidate.content_tab === "shopping") {
-    return [candidate.brand, formatPrice(candidate)].filter(Boolean).join(" • ");
+    return [
+      candidate.brand,
+      formatPrice(
+        candidate.price_pence,
+        candidate.price_pence_min,
+        candidate.price_pence_max,
+        candidate.currency
+      )
+    ]
+      .filter(Boolean)
+      .join(" • ");
   }
   return [candidate.content_type, formatLocation(candidate), candidate.source_name]
     .filter(Boolean)
@@ -873,14 +906,14 @@ function CatalogueCard({
           <EndorsementBadgeRow endorsements={candidate.endorsements} />
         </div>
 
-        {link ? (
+        {candidate.candidate_url ? (
           <a
-            href={link.href}
+            href={candidate.candidate_url}
             target="_blank"
-            rel="noreferrer"
-            className="approval-card__source-url truncate"
+            rel="noopener noreferrer"
+            className="approval-card__retailer-link"
           >
-            {link.label}
+            View at retailer →
           </a>
         ) : null}
 
@@ -1062,7 +1095,14 @@ function ProductCardBody({ candidate }: { candidate: ProductCandidate }) {
         {candidate.brand ? <p className="approval-card__extracted-title">{candidate.brand}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-lg font-medium text-[var(--cat-text-primary)]">{formatPrice(candidate)}</p>
+        <p className="text-lg font-medium text-[var(--cat-text-primary)]">
+          {formatPrice(
+            candidate.price_pence,
+            candidate.price_pence_min,
+            candidate.price_pence_max,
+            candidate.currency
+          )}
+        </p>
         <span
           className={classNames(
             "approval-card__meta-badge",

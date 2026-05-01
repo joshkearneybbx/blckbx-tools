@@ -26,7 +26,10 @@ type ProductApiCandidate = {
   brand?: string | null;
   description?: string | null;
   price_pence?: number | null;
+  price_pence_min?: number | null;
+  price_pence_max?: number | null;
   price_text?: string | null;
+  currency?: string | null;
   product_url?: string | null;
   resolved_url?: string | null;
   candidate_url?: string | null;
@@ -75,6 +78,7 @@ type ProductApiCandidate = {
   scraped_at?: string | null;
   created_at?: string | null;
   availability?: string | null;
+  in_stock?: boolean | null;
 };
 
 type CandidatesApiResponse = {
@@ -277,7 +281,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
-function mapAvailability(value?: string | null): ProductCandidate["availability"] {
+function mapAvailability(
+  value?: string | null,
+  inStock?: boolean | null
+): ProductCandidate["availability"] {
+  if (typeof inStock === "boolean") {
+    return inStock ? "in_stock" : "out_of_stock";
+  }
   if (!value) {
     return "in_stock";
   }
@@ -311,6 +321,8 @@ function mapCandidate(candidate: ProductApiCandidate): ProductCandidate {
     description: candidate.description ?? null,
     price_text: candidate.price_text ?? null,
     price_pence: candidate.price_pence ?? null,
+    price_pence_min: candidate.price_pence_min ?? null,
+    price_pence_max: candidate.price_pence_max ?? null,
     image_url: candidate.image_url ?? null,
     primary_image: candidate.primary_image ?? null,
     hero_image_url: candidate.hero_image_url ?? null,
@@ -324,12 +336,14 @@ function mapCandidate(candidate: ProductApiCandidate): ProductCandidate {
     content_focus: candidate.content_focus ?? null,
     position: candidate.position ?? null,
     subcategory: candidate.subcategory ?? null,
-    availability: mapAvailability(candidate.availability),
+    availability: mapAvailability(candidate.availability, candidate.in_stock),
+    in_stock: candidate.in_stock ?? null,
     source_name: candidate.source_name,
     source_url: candidate.source_url ?? null,
     scrape_source: candidate.scrape_source ?? candidate.source_type ?? "api",
     currency:
-      candidate.price_text?.includes("€") ? "EUR" : candidate.price_text?.includes("$") ? "USD" : "GBP",
+      candidate.currency ??
+      (candidate.price_text?.includes("€") ? "EUR" : candidate.price_text?.includes("$") ? "USD" : "GBP"),
     tags: candidate.tags ?? [],
     suggested_themes: candidate.themes ?? [],
     category: "shopping",

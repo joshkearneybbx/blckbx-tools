@@ -534,6 +534,20 @@
   margin-bottom: 20px;
 }
 
+.approval-card__retailer-link {
+  display: inline-flex;
+  width: fit-content;
+  font-size: 11px;
+  color: var(--cat-text-secondary);
+  margin-bottom: 20px;
+  text-decoration: none;
+}
+
+.approval-card__retailer-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .approval-card__meta-badge {
   display: inline-flex;
   align-items: center;
