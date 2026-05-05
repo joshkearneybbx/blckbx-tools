@@ -9,6 +9,7 @@ import type { TravelSegment } from './travel-segments';
 import { generateSegmentId } from './travel-segments';
 import type { WizardData } from '@/pages/CreateItinerary';
 import { calculateLayover, resolveFlightLegDates } from './travel-types';
+import type { MainTransportType, TransportDetails } from './travel-types';
 
 const debugLog = (...args: any[]) => {
   if (import.meta.env.DEV) {
@@ -57,6 +58,148 @@ const normalizeRoadTransferType = (value: any): 'taxi' | 'private_car' | 'shuttl
 };
 
 const safeLower = (value: any): string => String(value || '').toLowerCase();
+
+const MAIN_TRANSPORT_TYPES: MainTransportType[] = ['flight', 'train', 'bus', 'ferry', 'other'];
+
+const normalizeMainTransportType = (value: any): MainTransportType =>
+  MAIN_TRANSPORT_TYPES.includes(value) ? value : 'flight';
+
+const parseDetailsObject = (value: any): Record<string, any> | null => {
+  if (!value) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const getDetailsDeparture = (details: Record<string, any>, type: MainTransportType): string => {
+  if (type === 'ferry') return details.departurePort || '';
+  if (type === 'other') return details.from || '';
+  return details.departureStation || '';
+};
+
+const getDetailsArrival = (details: Record<string, any>, type: MainTransportType): string => {
+  if (type === 'ferry') return details.arrivalPort || '';
+  if (type === 'other') return details.to || '';
+  return details.arrivalStation || '';
+};
+
+const getLegDeparture = (leg: Record<string, any>, type: MainTransportType): string => {
+  if (type === 'ferry') return leg.departurePort || '';
+  if (type === 'other') return leg.from || '';
+  return leg.departureStation || '';
+};
+
+const getLegArrival = (leg: Record<string, any>, type: MainTransportType): string => {
+  if (type === 'ferry') return leg.arrivalPort || '';
+  if (type === 'other') return leg.to || '';
+  return leg.arrivalStation || '';
+};
+
+const getDetailsCompany = (details: Record<string, any>, type: MainTransportType): string =>
+  type === 'other' ? (details.label || '') : (details.company || '');
+
+const getLegCompany = (leg: Record<string, any>, type: MainTransportType): string =>
+  type === 'other' ? (leg.label || '') : (leg.company || '');
+
+const transportDetailsToSegments = (transportType: MainTransportType, value: any): TravelSegment[] => {
+  if (transportType === 'flight') return [];
+  const details = parseDetailsObject(value);
+  if (!details) return [];
+  const rawLegs = Array.isArray(details.legs) ? details.legs.filter(Boolean) : [];
+  const useLegs = !!details.isMultiLeg && rawLegs.length > 0;
+  const sourceLegs = useLegs ? rawLegs : [details];
+
+  return sourceLegs.map((leg: Record<string, any>, index: number) => ({
+    id: generateSegmentId(),
+    type: transportType,
+    role: 'main',
+    fromLocation: getLegDeparture(leg, transportType) || getDetailsDeparture(details, transportType),
+    toLocation: getLegArrival(leg, transportType) || getDetailsArrival(details, transportType),
+    date: details.date || '',
+    departureTime: leg.departureTime || details.departureTime || '',
+    arrivalTime: leg.arrivalTime || details.arrivalTime || '',
+    arrivalNextDay: !!(leg.arrivalNextDay ?? details.arrivalNextDay),
+    company: getLegCompany(leg, transportType) || getDetailsCompany(details, transportType),
+    confirmationNumber: index === 0 ? (details.passengersSeats || '') : '',
+    bookingReference: index === 0 ? (details.bookingReference || '') : '',
+    contactDetails: index === 0 ? (details.contact || '') : '',
+    notes: index === 0 ? (details.thingsToRemember || '') : '',
+  }));
+};
+
+const mainSegmentsToTransportDetails = (transportType: Exclude<MainTransportType, 'flight'>, mainSegments: TravelSegment[]): TransportDetails => {
+  const first = mainSegments[0] || ({} as TravelSegment);
+  const last = mainSegments[mainSegments.length - 1] || first;
+  const isMultiLeg = mainSegments.length > 1;
+  const common = {
+    type: transportType,
+    date: first.date || '',
+    departureTime: first.departureTime || '',
+    arrivalTime: last.arrivalTime || '',
+    arrivalNextDay: inferSegmentArrivalNextDay(last),
+    bookingReference: first.bookingReference || '',
+    passengersSeats: first.confirmationNumber || '',
+    contact: first.contactDetails || '',
+    thingsToRemember: stripLayoverFromNotes(first.notes),
+    isMultiLeg,
+  };
+
+  if (transportType === 'ferry') {
+    return {
+      ...common,
+      company: first.company || '',
+      departurePort: first.fromLocation || '',
+      arrivalPort: last.toLocation || '',
+      legs: isMultiLeg ? mainSegments.map((segment) => ({
+        company: segment.company || '',
+        departurePort: segment.fromLocation || '',
+        departureTime: segment.departureTime || '',
+        arrivalPort: segment.toLocation || '',
+        arrivalTime: segment.arrivalTime || '',
+        arrivalNextDay: inferSegmentArrivalNextDay(segment),
+      })) : undefined,
+    };
+  }
+
+  if (transportType === 'other') {
+    return {
+      ...common,
+      label: first.company || '',
+      from: first.fromLocation || '',
+      to: last.toLocation || '',
+      legs: isMultiLeg ? mainSegments.map((segment) => ({
+        label: segment.company || '',
+        from: segment.fromLocation || '',
+        departureTime: segment.departureTime || '',
+        to: segment.toLocation || '',
+        arrivalTime: segment.arrivalTime || '',
+        arrivalNextDay: inferSegmentArrivalNextDay(segment),
+      })) : undefined,
+    };
+  }
+
+  return {
+    ...common,
+    company: first.company || '',
+    departureStation: first.fromLocation || '',
+    arrivalStation: last.toLocation || '',
+    legs: isMultiLeg ? mainSegments.map((segment) => ({
+      company: segment.company || '',
+      departureStation: segment.fromLocation || '',
+      departureTime: segment.departureTime || '',
+      arrivalStation: segment.toLocation || '',
+      arrivalTime: segment.arrivalTime || '',
+      arrivalNextDay: inferSegmentArrivalNextDay(segment),
+    })) : undefined,
+  };
+};
 
 const extractLayoverFromNotes = (notes?: string): string => {
   if (!notes) return '';
@@ -118,6 +261,8 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
   const toAccomTrains = (outbound.transferToAccomTrains && outbound.transferToAccomTrains.length > 0)
     ? outbound.transferToAccomTrains
     : splitToAccom.rail;
+  const transportType = normalizeMainTransportType((outbound as any).transportType);
+  const transportDetails = (outbound as any).transportDetails;
 
   // Transfer to airport (taxi) - single legacy field
   if (outbound.transferToAirportType === 'taxi' && toAirportTaxis.length === 0 && (
@@ -194,10 +339,15 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
     });
   });
 
+  // Main transport - non-flight details are stored in transportDetails JSON.
+  if (transportType !== 'flight') {
+    segments.push(...transportDetailsToSegments(transportType, transportDetails));
+  }
+
   // Flight(s) - handle both single and multi-leg
   const flightDate = outbound.flightDate || '';
   // Check isMultiLeg as truthy (handles both boolean true and number 1)
-  if (outbound.isMultiLeg && outbound.legs && outbound.legs.length > 0) {
+  if (transportType === 'flight' && outbound.isMultiLeg && outbound.legs && outbound.legs.length > 0) {
     // Multi-leg flight
     const resolvedLegDates = resolveFlightLegDates(flightDate, outbound.legs);
     outbound.legs.forEach((leg, index) => {
@@ -234,7 +384,7 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
           : (layoverDuration ? `Layover: ${layoverDuration}` : ''),
       });
     });
-  } else {
+  } else if (transportType === 'flight') {
     // Single flight
     if (outbound.flightNumber || outbound.departureAirport) {
       segments.push({
@@ -337,14 +487,19 @@ export function outboundToSegments(outbound: WizardData['outboundTravel']): Trav
  * private_transfer, car_rental, other) are stored in additionalSegments JSON field
  */
 export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outboundTravel'] {
-  const flights = segments.filter(s => s.type === 'flight' && isMainSegment(s));
+  const mainSegments = segments.filter(isMainSegment);
+  const transportType = normalizeMainTransportType(mainSegments[0]?.type);
+  const flights = transportType === 'flight' ? mainSegments.filter(s => s.type === 'flight') : [];
+  const nonFlightMainSegments = transportType === 'flight'
+    ? []
+    : mainSegments.filter((s): s is TravelSegment => s.type === transportType);
   const transferSegments = segments.filter(isTransferSegment);
   const taxis = transferSegments.filter(s => ['taxi', 'private_car', 'shuttle', 'bus', 'other'].includes(s.type));
   const trains = transferSegments.filter(s => s.type === 'train');
 
   // Segment types not supported by legacy format - store as JSON
   const unsupportedTypes = ['ferry', 'private_transfer', 'car_rental'];
-  const additionalSegments = segments.filter(s => unsupportedTypes.includes(s.type));
+  const additionalSegments = segments.filter(s => unsupportedTypes.includes(s.type) && !isMainSegment(s));
 
   // DEBUG: Log what we're converting
   debugLog('=== segmentsToOutbound DEBUG ===');
@@ -376,13 +531,16 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
   }));
 
   const firstMainIndex = segments.findIndex(isMainSegment);
+  const transportDetails = transportType === 'flight'
+    ? null
+    : mainSegmentsToTransportDetails(transportType, nonFlightMainSegments);
 
   const toAirportTaxis = taxis.filter(t =>
     safeLower(t.toLocation).includes('airport') ||
     (firstMainIndex >= 0 && segments.indexOf(t) < firstMainIndex)
   ).map(t => ({
     id: '',
-    transferType: t.type,
+    transferType: normalizeRoadTransferType(t.type),
     company: t.company || '',
     contact: t.contactDetails || '',
     vehicleRegistration: t.confirmationNumber || '',
@@ -417,7 +575,7 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
     (firstMainIndex >= 0 && segments.indexOf(t) >= firstMainIndex)
   ).map(t => ({
     id: '',
-    transferType: t.type,
+    transferType: normalizeRoadTransferType(t.type),
     company: t.company || '',
     contact: t.contactDetails || '',
     vehicleRegistration: t.confirmationNumber || '',
@@ -448,6 +606,9 @@ export function segmentsToOutbound(segments: TravelSegment[]): WizardData['outbo
 
   // Build legacy structure
   const legacy: WizardData['outboundTravel'] = {
+    transportType,
+    transportDetails,
+
     // Flight fields
     flightNumber: firstFlight?.flightNumber || '',
     flightDate: firstFlight?.date || '',
@@ -537,6 +698,8 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
     : splitHome.rail;
 
   const flightDate = returnTravel.flightDate || '';
+  const transportType = normalizeMainTransportType((returnTravel as any).transportType);
+  const transportDetails = (returnTravel as any).transportDetails;
 
   // Transfer to airport (taxi)
   if (returnTravel.transferToAirportType === 'taxi' && toAirportTaxis.length === 0 && (
@@ -612,9 +775,14 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
     });
   });
 
+  // Main transport - non-flight details are stored in transportDetails JSON.
+  if (transportType !== 'flight') {
+    segments.push(...transportDetailsToSegments(transportType, transportDetails));
+  }
+
   // Flight(s)
   // Check isMultiLeg as truthy (handles both boolean true and number 1)
-  if (returnTravel.isMultiLeg && returnTravel.legs && returnTravel.legs.length > 0) {
+  if (transportType === 'flight' && returnTravel.isMultiLeg && returnTravel.legs && returnTravel.legs.length > 0) {
     // Multi-leg flight
     const resolvedLegDates = resolveFlightLegDates(flightDate, returnTravel.legs);
     returnTravel.legs.forEach((leg, index) => {
@@ -651,7 +819,7 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
           : (layoverDuration ? `Layover: ${layoverDuration}` : ''),
       });
     });
-  } else {
+  } else if (transportType === 'flight') {
     // Single flight
     if (returnTravel.flightNumber || returnTravel.departureAirport) {
       segments.push({
@@ -765,14 +933,19 @@ export function returnToSegments(returnTravel: WizardData['returnTravel']): Trav
  * private_transfer, car_rental, other) are stored in additionalSegments JSON field
  */
 export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnTravel'] {
-  const flights = segments.filter(s => s.type === 'flight' && isMainSegment(s));
+  const mainSegments = segments.filter(isMainSegment);
+  const transportType = normalizeMainTransportType(mainSegments[0]?.type);
+  const flights = transportType === 'flight' ? mainSegments.filter(s => s.type === 'flight') : [];
+  const nonFlightMainSegments = transportType === 'flight'
+    ? []
+    : mainSegments.filter((s): s is TravelSegment => s.type === transportType);
   const transferSegments = segments.filter(isTransferSegment);
   const taxis = transferSegments.filter(s => ['taxi', 'private_car', 'shuttle', 'bus', 'other'].includes(s.type));
   const trains = transferSegments.filter(s => s.type === 'train');
 
   // Segment types not supported by legacy format - store as JSON
   const unsupportedTypes = ['ferry', 'private_transfer', 'car_rental'];
-  const additionalSegments = segments.filter(s => unsupportedTypes.includes(s.type));
+  const additionalSegments = segments.filter(s => unsupportedTypes.includes(s.type) && !isMainSegment(s));
 
   // DEBUG: Log what we're converting
   debugLog('=== segmentsToReturn DEBUG ===');
@@ -802,13 +975,16 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
   }));
 
   const firstMainIndex = segments.findIndex(isMainSegment);
+  const transportDetails = transportType === 'flight'
+    ? null
+    : mainSegmentsToTransportDetails(transportType, nonFlightMainSegments);
 
   const toAirportTaxis = taxis.filter(t =>
     safeLower(t.toLocation).includes('airport') ||
     (firstMainIndex >= 0 && segments.indexOf(t) < firstMainIndex)
   ).map(t => ({
     id: '',
-    transferType: t.type,
+    transferType: normalizeRoadTransferType(t.type),
     company: t.company || '',
     contact: t.contactDetails || '',
     vehicleRegistration: t.confirmationNumber || '',
@@ -843,7 +1019,7 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
     (firstMainIndex === -1 || segments.indexOf(t) > firstMainIndex)
   ).map(t => ({
     id: '',
-    transferType: t.type,
+    transferType: normalizeRoadTransferType(t.type),
     company: t.company || '',
     contact: t.contactDetails || '',
     vehicleRegistration: t.confirmationNumber || '',
@@ -874,6 +1050,9 @@ export function segmentsToReturn(segments: TravelSegment[]): WizardData['returnT
   }));
 
   const legacy: WizardData['returnTravel'] = {
+    transportType,
+    transportDetails,
+
     flightNumber: firstFlight?.flightNumber || '',
     flightDate: firstFlight?.date || '',
     departureAirport: firstFlight?.fromLocation || '',

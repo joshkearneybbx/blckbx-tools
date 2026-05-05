@@ -9,7 +9,8 @@ export type InsertItinerary = Project;
 // Travel segment type
 export interface TravelSegment {
   id: string;
-  type: 'flight' | 'train' | 'bus' | 'ferry' | 'taxi' | 'private_transfer' | 'shuttle' | 'car_rental' | 'other';
+  role?: 'main' | 'transfer' | 'additional';
+  type: 'flight' | 'train' | 'bus' | 'ferry' | 'taxi' | 'private_car' | 'private_transfer' | 'shuttle' | 'car_rental' | 'other';
   fromLocation: string;
   toLocation: string;
   date: string;

@@ -48,6 +48,112 @@ export interface TransportLeg {
 // Main transport types
 export type MainTransportType = 'flight' | 'train' | 'bus' | 'ferry' | 'other';
 
+export interface TrainLegDetails {
+  company?: string;
+  departureStation?: string;
+  departureTime?: string;
+  arrivalStation?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+}
+
+export interface TrainDetails {
+  type: 'train';
+  date?: string;
+  company?: string;
+  departureStation?: string;
+  departureTime?: string;
+  arrivalStation?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+  bookingReference?: string;
+  passengersSeats?: string;
+  contact?: string;
+  thingsToRemember?: string;
+  isMultiLeg?: boolean;
+  legs?: TrainLegDetails[];
+}
+
+export interface BusLegDetails {
+  company?: string;
+  departureStation?: string;
+  departureTime?: string;
+  arrivalStation?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+}
+
+export interface BusDetails {
+  type: 'bus';
+  date?: string;
+  company?: string;
+  departureStation?: string;
+  departureTime?: string;
+  arrivalStation?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+  bookingReference?: string;
+  passengersSeats?: string;
+  contact?: string;
+  thingsToRemember?: string;
+  isMultiLeg?: boolean;
+  legs?: BusLegDetails[];
+}
+
+export interface FerryLegDetails {
+  company?: string;
+  departurePort?: string;
+  departureTime?: string;
+  arrivalPort?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+}
+
+export interface FerryDetails {
+  type: 'ferry';
+  date?: string;
+  company?: string;
+  departurePort?: string;
+  departureTime?: string;
+  arrivalPort?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+  bookingReference?: string;
+  passengersSeats?: string;
+  contact?: string;
+  thingsToRemember?: string;
+  isMultiLeg?: boolean;
+  legs?: FerryLegDetails[];
+}
+
+export interface OtherLegDetails {
+  label?: string;
+  from?: string;
+  departureTime?: string;
+  to?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+}
+
+export interface OtherDetails {
+  type: 'other';
+  date?: string;
+  label?: string;
+  from?: string;
+  to?: string;
+  departureTime?: string;
+  arrivalTime?: string;
+  arrivalNextDay?: boolean;
+  bookingReference?: string;
+  passengersSeats?: string;
+  contact?: string;
+  thingsToRemember?: string;
+  isMultiLeg?: boolean;
+  legs?: OtherLegDetails[];
+}
+
+export type TransportDetails = TrainDetails | BusDetails | FerryDetails | OtherDetails;
+
 export interface MainTransport {
   id: string;
   type: MainTransportType;

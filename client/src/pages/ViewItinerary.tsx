@@ -505,7 +505,7 @@ function DestinationSection({
             </h3>
             <div className="space-y-4">
               {travelSegments.map((segment, idx) => (
-                <TravelSegmentCard key={idx} segment={segment} travellers={travellers} />
+                <TransportCard key={idx} segment={segment} travellers={travellers} />
               ))}
             </div>
           </div>
@@ -579,25 +579,32 @@ function DestinationSection({
 }
 
 // =============================================================================
-// TRAVEL SEGMENT CARD (WEB VIEW)
+// TRANSPORT CARD (WEB VIEW)
 // =============================================================================
 
-function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; travellers?: any[] }) {
-  const getSegmentIcon = () => {
+function TransportCard({ segment, travellers }: { segment: TravelSegment; travellers?: any[] }) {
+  const passengerNames = travellers?.map((t) => t.name).filter(Boolean).join(', ') || '';
+  const departureDate = segment.departureDate || segment.date;
+  const arrivalDate = segment.arrivalDate || departureDate;
+
+  const getTransportIcon = () => {
     const iconClass = "w-5 h-5 text-[#0A0A0A]";
     switch (segment.type) {
       case 'flight': return <Plane className={iconClass} />;
       case 'train': return <Train className={iconClass} />;
       case 'bus': return <Bus className={iconClass} />;
       case 'ferry': return <Sailboat className={iconClass} />;
-      case 'taxi': return <Car className={iconClass} />;
-      case 'private_car': return <Car className={iconClass} />;
-      case 'car_rental': return <Car className={iconClass} />;
+      case 'taxi':
+      case 'private_car':
+      case 'private_transfer':
+      case 'shuttle':
+      case 'car_rental':
+        return <Car className={iconClass} />;
       default: return <Car className={iconClass} />;
     }
   };
 
-  const getSegmentLabel = () => {
+  const getTransportLabel = () => {
     switch (segment.type) {
       case 'flight': return 'Flight';
       case 'train': return 'Train';
@@ -608,6 +615,7 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
       case 'private_transfer': return 'Private Transfer';
       case 'shuttle': return 'Shuttle';
       case 'car_rental': return 'Car Rental';
+      case 'other': return 'Other';
       default: return 'Transport';
     }
   };
@@ -624,7 +632,7 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
         arrivalAirport={segment.toLocation || ''}
         arrivalTime={segment.arrivalTime || ''}
         arrivalNextDay={!!segment.arrivalNextDay}
-        passengers={travellers?.map(t => t.name).join(', ') || undefined}
+        passengers={passengerNames || undefined}
         notes={segment.notes || undefined}
         airline={segment.airline || ''}
         bookingReference={segment.bookingReference || ''}
@@ -635,54 +643,61 @@ function TravelSegmentCard({ segment, travellers }: { segment: TravelSegment; tr
   }
 
   return (
-    <div className="p-4 bg-[#F5F3F0] border border-[#D4D0CB]">
-      <div className="flex items-center gap-3 mb-3">
-        {getSegmentIcon()}
-        <h4 className="font-semibold">{getSegmentLabel()}</h4>
-        {segment.date && (
-          <span className="text-sm text-muted-foreground ml-auto">{formatDate(segment.date)}</span>
+    <div className="bg-[#F5F3F0] border border-[#D4D0CB] text-[#0A0A0A] overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#D4D0CB]">
+        {getTransportIcon()}
+        <h4 className="font-semibold text-[#0A0A0A]">{getTransportLabel()}</h4>
+        {departureDate && (
+          <span className="text-sm text-[#6B6865] ml-auto">{formatDate(departureDate)}</span>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        {segment.fromLocation && (
-          <div>
-            <span className="text-muted-foreground">From:</span> {segment.fromLocation}
+
+      <div className="p-4 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-4 sm:gap-6 items-center">
+          <div className="text-center sm:text-left space-y-1">
+            {departureDate && <p className="text-xs text-[#6B6865]">{formatDate(departureDate)}</p>}
+            <p className="font-semibold text-[#0A0A0A] break-words">{segment.fromLocation || 'Origin'}</p>
+            <p className="text-lg font-semibold text-[#0A0A0A]">{segment.departureTime || '--:--'}</p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-[#6B6865]">
+            <div className="hidden sm:block h-px w-10 bg-[#D4D0CB]" />
+            <span className="text-sm font-medium">&gt;</span>
+            <div className="hidden sm:block h-px w-10 bg-[#D4D0CB]" />
+          </div>
+
+          <div className="text-center sm:text-right space-y-1">
+            {arrivalDate && (
+              <p className="text-xs text-[#6B6865]">
+                {formatDate(arrivalDate)}{segment.arrivalNextDay ? ' (+1 day)' : ''}
+              </p>
+            )}
+            <p className="font-semibold text-[#0A0A0A] break-words">{segment.toLocation || 'Destination'}</p>
+            <p className="text-lg font-semibold text-[#0A0A0A]">{segment.arrivalTime || '--:--'}</p>
+          </div>
+        </div>
+
+        {(segment.company || segment.bookingReference || segment.contactDetails || segment.confirmationNumber || passengerNames) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm border-t border-[#D4D0CB] pt-4">
+            {segment.company && (
+              <p><span className="text-[#6B6865]">Operator:</span> {segment.company}</p>
+            )}
+            {segment.bookingReference && (
+              <p><span className="text-[#6B6865]">Booking Ref:</span> {segment.bookingReference}</p>
+            )}
+            {segment.contactDetails && (
+              <p><span className="text-[#6B6865]">Contact:</span> {segment.contactDetails}</p>
+            )}
+            {(segment.confirmationNumber || passengerNames) && (
+              <p><span className="text-[#6B6865]">Passengers/Seats:</span> {segment.confirmationNumber || passengerNames}</p>
+            )}
           </div>
         )}
-        {segment.toLocation && (
-          <div>
-            <span className="text-muted-foreground">To:</span> {segment.toLocation}
-          </div>
-        )}
-        {segment.departureTime && (
-          <div>
-            <span className="text-muted-foreground">Departure:</span> {segment.departureTime}
-          </div>
-        )}
-        {segment.arrivalTime && (
-          <div>
-            <span className="text-muted-foreground">Arrival:</span> {segment.arrivalTime}
-          </div>
-        )}
-        {segment.company && (
-          <div>
-            <span className="text-muted-foreground">Company:</span> {segment.company}
-          </div>
-        )}
-        {segment.bookingReference && (
-          <div>
-            <span className="text-muted-foreground">Booking Ref:</span> {segment.bookingReference}
-          </div>
-        )}
-        {segment.contactDetails && (
-          <div>
-            <span className="text-muted-foreground">Contact:</span> {segment.contactDetails}
-          </div>
+
+        {segment.notes && (
+          <p className="text-sm text-[#6B6865] whitespace-pre-wrap border-t border-[#D4D0CB] pt-4">{segment.notes}</p>
         )}
       </div>
-      {segment.notes && (
-        <p className="text-sm text-muted-foreground mt-3">{segment.notes}</p>
-      )}
     </div>
   );
 }
@@ -1810,9 +1825,9 @@ export default function ViewItinerary() {
                   {returnSegmentsToRender.length > 0 && (
                     <div className="space-y-4">
                       {returnSegmentsToRender.map((segment, idx) => (
-                        <TravelSegmentCard 
-                          key={idx} 
-                          segment={segment} 
+                        <TransportCard
+                          key={idx}
+                          segment={segment}
                           travellers={travellers}
                         />
                       ))}

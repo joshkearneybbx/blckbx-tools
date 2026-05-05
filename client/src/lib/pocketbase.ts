@@ -1,4 +1,5 @@
 import PocketBase from 'pocketbase';
+import type { MainTransportType, TransportDetails } from './travel-types';
 
 const pocketBaseUrl =
   import.meta.env.VITE_POCKETBASE_URL ||
@@ -161,6 +162,8 @@ export interface OutboundTravel {
   transferToAirportPaymentStatus?: string;
   transferToAirportTaxis?: any[];
   transferToAirportTrains?: any[];
+  transportType?: MainTransportType;
+  transportDetails?: TransportDetails | null;
   flightNumber?: string;
   flightDate?: string;
   departureAirport?: string;
@@ -192,6 +195,8 @@ export interface ReturnTravel {
   transferToAirportPaymentStatus?: string;
   transferToAirportTaxis?: any[];
   transferToAirportTrains?: any[];
+  transportType?: MainTransportType;
+  transportDetails?: TransportDetails | null;
   flightNumber?: string;
   flightDate?: string;
   departureAirport?: string;

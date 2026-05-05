@@ -35,6 +35,7 @@ export type SegmentType =
   | 'bus'
   | 'ferry'
   | 'taxi'
+  | 'private_car'
   | 'private_transfer'
   | 'shuttle'
   | 'car_rental'
@@ -53,6 +54,7 @@ export function getSegmentIcon(type: SegmentType): string {
     bus: 'bus',
     ferry: 'ship',
     taxi: 'car',
+    private_car: 'car',
     private_transfer: 'car',
     shuttle: 'car', // Use car for shuttle (van icon not available)
     car_rental: 'key',

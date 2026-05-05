@@ -25,6 +25,7 @@ import { ItineraryPDFTemplate } from "@/components/pdf/ItineraryPDFTemplate";
 import { useImagePreprocessor } from "@/hooks/useImagePreprocessor";
 import { pb } from "@/lib/pocketbase";
 import type { TravelSegment } from "@/lib/travel-segments";
+import type { MainTransportType, TransportDetails } from "@/lib/travel-types";
 import { isReservedSlug } from "@/lib/reserved-slugs";
 
 // Wizard pages
@@ -136,6 +137,9 @@ export type WizardData = {
     // Multiple taxi/train support for Transfer to Airport
     transferToAirportTaxis: TaxiTransfer[];
     transferToAirportTrains: TrainTransfer[];
+    // Main transport
+    transportType: MainTransportType;
+    transportDetails: TransportDetails | null;
     // Flight
     flightNumber: string;
     flightDate: string;
@@ -293,6 +297,9 @@ export type WizardData = {
     // Multiple taxi/train support for Transfer to Airport
     transferToAirportTaxis: TaxiTransfer[];
     transferToAirportTrains: TrainTransfer[];
+    // Main transport
+    transportType: MainTransportType;
+    transportDetails: TransportDetails | null;
     // Flight
     flightNumber: string;
     flightDate: string;
@@ -379,6 +386,33 @@ const isValidEmail = (email: string | undefined | null): boolean => {
 // Helper function to get valid email or empty string
 const getValidEmail = (email: string | undefined | null): string => {
   return isValidEmail(email) ? email?.trim() || '' : '';
+};
+
+const TRANSPORT_TYPES: MainTransportType[] = ['flight', 'train', 'bus', 'ferry', 'other'];
+
+const normalizeTransportType = (value: any): MainTransportType => {
+  return TRANSPORT_TYPES.includes(value) ? value : 'flight';
+};
+
+const parseJsonObject = (value: any): Record<string, any> | null => {
+  if (!value) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const normalizeTransportDetails = (value: any, transportType: MainTransportType): TransportDetails | null => {
+  if (transportType === 'flight') return null;
+  const details = parseJsonObject(value);
+  if (!details) return { type: transportType } as TransportDetails;
+  return { ...details, type: transportType } as TransportDetails;
 };
 
 const parseJsonArray = (value: any): any[] => {
@@ -522,6 +556,8 @@ const initialData: WizardData = {
     transferToAirportTrainNotes: "",
     transferToAirportTaxis: [],
     transferToAirportTrains: [],
+    transportType: "flight",
+    transportDetails: null,
     flightNumber: "",
     flightDate: "",
     departureAirport: "",
@@ -576,6 +612,8 @@ const initialData: WizardData = {
     transferToAirportTrainNotes: "",
     transferToAirportTaxis: [],
     transferToAirportTrains: [],
+    transportType: "flight",
+    transportDetails: null,
     flightNumber: "",
     flightDate: "",
     departureAirport: "",
@@ -724,6 +762,8 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
     transferToAccomTrainsRaw,
     splitToAccom.rail
   );
+  const transportType = normalizeTransportType(data.transportType);
+  const transportDetails = normalizeTransportDetails(data.transportDetails, transportType);
   
   return {
     transferToAirportType,
@@ -742,19 +782,21 @@ function mapOutboundFromDb(data: any): WizardData['outboundTravel'] {
     transferToAirportTrainNotes: data.transferToAirportTrainNotes || "",
     transferToAirportTaxis: normalizeTaxiTransfers(transferToAirportTaxis, "outbound-to-airport"),
     transferToAirportTrains: normalizeTrainTransfers(transferToAirportTrains, "outbound-to-airport"),
-    flightNumber: data.flightNumber || "",
-    flightDate: data.flightDate || "",
-    departureAirport: data.departureAirport || "",
-    arrivalAirport: data.arrivalAirport || "",
-    departureTime: data.departureTime || "",
-    arrivalTime: data.arrivalTime || "",
-    airline: data.airline || "",
-    bookingReference: data.bookingReference || "",
-    contact: data.contact || "",
-    passengersSeats: data.passengersSeats || "",
-    thingsToRemember: data.thingsToRemember || "",
-    isMultiLeg: data.isMultiLeg ?? 0,
-    legs,
+    transportType,
+    transportDetails,
+    flightNumber: transportType === 'flight' ? (data.flightNumber || "") : "",
+    flightDate: transportType === 'flight' ? (data.flightDate || "") : "",
+    departureAirport: transportType === 'flight' ? (data.departureAirport || "") : "",
+    arrivalAirport: transportType === 'flight' ? (data.arrivalAirport || "") : "",
+    departureTime: transportType === 'flight' ? (data.departureTime || "") : "",
+    arrivalTime: transportType === 'flight' ? (data.arrivalTime || "") : "",
+    airline: transportType === 'flight' ? (data.airline || "") : "",
+    bookingReference: transportType === 'flight' ? (data.bookingReference || "") : "",
+    contact: transportType === 'flight' ? (data.contact || "") : "",
+    passengersSeats: transportType === 'flight' ? (data.passengersSeats || "") : "",
+    thingsToRemember: transportType === 'flight' ? (data.thingsToRemember || "") : "",
+    isMultiLeg: transportType === 'flight' ? (data.isMultiLeg ?? 0) : 0,
+    legs: transportType === 'flight' ? legs : [],
     transferToAccomType,
     transferToAccomTaxiBooked: data.transferToAccomTaxiBooked ?? 0,
     transferToAccomCompany: data.transferToAccomCompany || "",
@@ -827,6 +869,8 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
     transferHomeTrainsRaw,
     splitHome.rail
   );
+  const transportType = normalizeTransportType(data.transportType);
+  const transportDetails = normalizeTransportDetails(data.transportDetails, transportType);
   
   return {
     transferToAirportType,
@@ -845,19 +889,21 @@ function mapReturnFromDb(data: any): WizardData['returnTravel'] {
     transferToAirportTrainNotes: data.transferToAirportTrainNotes || "",
     transferToAirportTaxis: normalizeTaxiTransfers(transferToAirportTaxis, "return-to-airport"),
     transferToAirportTrains: normalizeTrainTransfers(transferToAirportTrains, "return-to-airport"),
-    flightNumber: data.flightNumber || "",
-    flightDate: data.flightDate || "",
-    departureAirport: data.departureAirport || "",
-    arrivalAirport: data.arrivalAirport || "",
-    departureTime: data.departureTime || "",
-    arrivalTime: data.arrivalTime || "",
-    airline: data.airline || "",
-    bookingReference: data.bookingReference || "",
-    contact: data.contact || "",
-    passengersSeats: data.passengersSeats || "",
-    thingsToRemember: data.thingsToRemember || "",
-    isMultiLeg: data.isMultiLeg ?? 0,
-    legs,
+    transportType,
+    transportDetails,
+    flightNumber: transportType === 'flight' ? (data.flightNumber || "") : "",
+    flightDate: transportType === 'flight' ? (data.flightDate || "") : "",
+    departureAirport: transportType === 'flight' ? (data.departureAirport || "") : "",
+    arrivalAirport: transportType === 'flight' ? (data.arrivalAirport || "") : "",
+    departureTime: transportType === 'flight' ? (data.departureTime || "") : "",
+    arrivalTime: transportType === 'flight' ? (data.arrivalTime || "") : "",
+    airline: transportType === 'flight' ? (data.airline || "") : "",
+    bookingReference: transportType === 'flight' ? (data.bookingReference || "") : "",
+    contact: transportType === 'flight' ? (data.contact || "") : "",
+    passengersSeats: transportType === 'flight' ? (data.passengersSeats || "") : "",
+    thingsToRemember: transportType === 'flight' ? (data.thingsToRemember || "") : "",
+    isMultiLeg: transportType === 'flight' ? (data.isMultiLeg ?? 0) : 0,
+    legs: transportType === 'flight' ? legs : [],
     transferHomeType,
     transferHomeTaxiBooked: data.transferHomeTaxiBooked ?? 0,
     transferHomeCompany: data.transferHomeCompany || "",
@@ -1941,9 +1987,27 @@ export default function CreateItinerary() {
           ...(wizardData.outboundTravel.transferToAccomTrains || []),
         ];
 
+        const outboundTransportType = normalizeTransportType(wizardData.outboundTravel.transportType);
         const outboundPayload = {
           project: projectId,
           ...wizardData.outboundTravel,
+          transportType: outboundTransportType,
+          transportDetails: outboundTransportType === 'flight'
+            ? null
+            : normalizeTransportDetails(wizardData.outboundTravel.transportDetails, outboundTransportType),
+          flightNumber: outboundTransportType === 'flight' ? wizardData.outboundTravel.flightNumber : '',
+          flightDate: outboundTransportType === 'flight' ? wizardData.outboundTravel.flightDate : '',
+          departureAirport: outboundTransportType === 'flight' ? wizardData.outboundTravel.departureAirport : '',
+          arrivalAirport: outboundTransportType === 'flight' ? wizardData.outboundTravel.arrivalAirport : '',
+          departureTime: outboundTransportType === 'flight' ? wizardData.outboundTravel.departureTime : '',
+          arrivalTime: outboundTransportType === 'flight' ? wizardData.outboundTravel.arrivalTime : '',
+          airline: outboundTransportType === 'flight' ? wizardData.outboundTravel.airline : '',
+          bookingReference: outboundTransportType === 'flight' ? wizardData.outboundTravel.bookingReference : '',
+          contact: outboundTransportType === 'flight' ? wizardData.outboundTravel.contact : '',
+          passengersSeats: outboundTransportType === 'flight' ? wizardData.outboundTravel.passengersSeats : '',
+          thingsToRemember: outboundTransportType === 'flight' ? wizardData.outboundTravel.thingsToRemember : '',
+          isMultiLeg: outboundTransportType === 'flight' ? wizardData.outboundTravel.isMultiLeg : 0,
+          legs: outboundTransportType === 'flight' ? wizardData.outboundTravel.legs : [],
           transferToAirportType: toAirportType,
           transferToAccomType: toAccomType,
           transferToAirportDetails: transferToAirportDetails.length > 0 ? transferToAirportDetails : null,
@@ -2136,9 +2200,27 @@ export default function CreateItinerary() {
           ...(wizardData.returnTravel.transferHomeTrains || []),
         ];
 
+        const returnTransportType = normalizeTransportType(wizardData.returnTravel.transportType);
         const returnPayload = {
           project: projectId,
           ...wizardData.returnTravel,
+          transportType: returnTransportType,
+          transportDetails: returnTransportType === 'flight'
+            ? null
+            : normalizeTransportDetails(wizardData.returnTravel.transportDetails, returnTransportType),
+          flightNumber: returnTransportType === 'flight' ? wizardData.returnTravel.flightNumber : '',
+          flightDate: returnTransportType === 'flight' ? wizardData.returnTravel.flightDate : '',
+          departureAirport: returnTransportType === 'flight' ? wizardData.returnTravel.departureAirport : '',
+          arrivalAirport: returnTransportType === 'flight' ? wizardData.returnTravel.arrivalAirport : '',
+          departureTime: returnTransportType === 'flight' ? wizardData.returnTravel.departureTime : '',
+          arrivalTime: returnTransportType === 'flight' ? wizardData.returnTravel.arrivalTime : '',
+          airline: returnTransportType === 'flight' ? wizardData.returnTravel.airline : '',
+          bookingReference: returnTransportType === 'flight' ? wizardData.returnTravel.bookingReference : '',
+          contact: returnTransportType === 'flight' ? wizardData.returnTravel.contact : '',
+          passengersSeats: returnTransportType === 'flight' ? wizardData.returnTravel.passengersSeats : '',
+          thingsToRemember: returnTransportType === 'flight' ? wizardData.returnTravel.thingsToRemember : '',
+          isMultiLeg: returnTransportType === 'flight' ? wizardData.returnTravel.isMultiLeg : 0,
+          legs: returnTransportType === 'flight' ? wizardData.returnTravel.legs : [],
           transferToAirportType: toAirportType,
           transferHomeType: homeType,
           transferToAirportDetails: transferToAirportDetails.length > 0 ? transferToAirportDetails : null,

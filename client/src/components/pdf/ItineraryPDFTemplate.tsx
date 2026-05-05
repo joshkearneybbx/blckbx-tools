@@ -652,6 +652,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  transportRouteDetailed: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+
+  transportColumn: {
+    alignItems: "center",
+    width: 140,
+  },
+
   transportLocation: {
     fontSize: 14,
     color: "#0A0A0A",
@@ -659,10 +671,45 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  transportArrow: {
-    fontSize: 16,
+  transportLocationName: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#0A0A0A",
+    textAlign: "center",
+    lineHeight: 1.25,
+  },
+
+  transportDateText: {
+    fontSize: 9,
     color: "#6B6865",
-    marginHorizontal: 16,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+
+  transportTime: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#0A0A0A",
+    marginTop: 4,
+  },
+
+  transportPathContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  transportPathLine: {
+    height: 2,
+    backgroundColor: "#D4D0CB",
+    flex: 1,
+  },
+
+  transportArrow: {
+    fontSize: 12,
+    color: "#6B6865",
+    marginHorizontal: 8,
   },
 
   transportMeta: {
@@ -927,22 +974,144 @@ const Sidebar = ({
 );
 
 // =============================================================================
-// TRAVEL SEGMENT CARD COMPONENT
+// TRANSPORT CARD COMPONENT
 // =============================================================================
 
-const TravelSegmentCard = ({
+type MainPdfTransportType = 'flight' | 'train' | 'bus' | 'ferry' | 'other';
+
+const PDF_MAIN_TRANSPORT_TYPES: MainPdfTransportType[] = ['flight', 'train', 'bus', 'ferry', 'other'];
+
+const normalizePdfTransportType = (value: any): MainPdfTransportType =>
+  PDF_MAIN_TRANSPORT_TYPES.includes(value) ? value : 'flight';
+
+const parsePdfJsonObject = (value: any): Record<string, any> | null => {
+  if (!value) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const getPdfTransportDeparture = (item: Record<string, any>, type: MainPdfTransportType): string => {
+  if (type === 'flight') return item.departureAirport || item.fromLocation || '';
+  if (type === 'ferry') return item.departurePort || item.fromLocation || '';
+  if (type === 'other') return item.from || item.fromLocation || '';
+  return item.departureStation || item.fromLocation || '';
+};
+
+const getPdfTransportArrival = (item: Record<string, any>, type: MainPdfTransportType): string => {
+  if (type === 'flight') return item.arrivalAirport || item.toLocation || '';
+  if (type === 'ferry') return item.arrivalPort || item.toLocation || '';
+  if (type === 'other') return item.to || item.toLocation || '';
+  return item.arrivalStation || item.toLocation || '';
+};
+
+const getPdfTransportCompany = (item: Record<string, any>, type: MainPdfTransportType): string =>
+  type === 'other' ? (item.label || item.company || '') : (item.company || item.airline || '');
+
+const hasPdfSegmentContent = (segment: TravelSegment): boolean => {
+  return !!(
+    segment.fromLocation ||
+    segment.toLocation ||
+    segment.date ||
+    segment.departureTime ||
+    segment.arrivalTime ||
+    segment.flightNumber ||
+    segment.bookingReference ||
+    segment.company ||
+    segment.notes
+  );
+};
+
+const travelRecordToMainTransportSegments = (travelRecord: any, fallbackId: string): TravelSegment[] => {
+  if (!travelRecord) return [];
+  const transportType = normalizePdfTransportType(travelRecord.transportType);
+
+  if (transportType === 'flight') {
+    const flightDate = travelRecord.flightDate || '';
+    if (travelRecord.isMultiLeg && Array.isArray(travelRecord.legs) && travelRecord.legs.length > 0) {
+      return buildFlightLegSegments(travelRecord.legs, flightDate, (leg, idx, meta) => ({
+        id: `${travelRecord.id || fallbackId}-flight-leg-${idx}`,
+        role: 'main' as const,
+        type: 'flight' as const,
+        fromLocation: leg.departureAirport || travelRecord.departureAirport || '',
+        toLocation: leg.arrivalAirport || travelRecord.arrivalAirport || '',
+        date: meta.departureDate || leg.date || flightDate,
+        departureDate: meta.departureDate || leg.date || flightDate,
+        arrivalDate: meta.arrivalDate || meta.departureDate || leg.date || flightDate,
+        departureTime: leg.departureTime || '',
+        arrivalTime: leg.arrivalTime || '',
+        arrivalNextDay: meta.arrivalNextDay,
+        flightNumber: leg.flightNumber || travelRecord.flightNumber || '',
+        airline: leg.airline || travelRecord.airline || '',
+        confirmationNumber: idx === 0 ? (travelRecord.passengersSeats || '') : '',
+        bookingReference: idx === 0 ? (travelRecord.bookingReference || '') : '',
+        contactDetails: idx === 0 ? (travelRecord.contact || '') : '',
+        notes: idx === 0 ? (travelRecord.thingsToRemember || '') : (meta.layoverDuration ? `Layover: ${meta.layoverDuration}` : ''),
+      }));
+    }
+
+    const singleFlightSegment: TravelSegment = {
+      id: travelRecord.id || fallbackId,
+      role: 'main',
+      type: 'flight',
+      fromLocation: travelRecord.departureAirport || '',
+      toLocation: travelRecord.arrivalAirport || '',
+      date: flightDate,
+      departureTime: travelRecord.departureTime || '',
+      arrivalTime: travelRecord.arrivalTime || '',
+      flightNumber: travelRecord.flightNumber || '',
+      airline: travelRecord.airline || '',
+      confirmationNumber: travelRecord.passengersSeats || '',
+      bookingReference: travelRecord.bookingReference || '',
+      contactDetails: travelRecord.contact || '',
+      notes: travelRecord.thingsToRemember || '',
+    };
+    return [singleFlightSegment].filter(hasPdfSegmentContent);
+  }
+
+  const details = parsePdfJsonObject(travelRecord.transportDetails);
+  if (!details) return [];
+  const rawLegs = Array.isArray(details.legs) ? details.legs.filter(Boolean) : [];
+  const sourceLegs = details.isMultiLeg && rawLegs.length > 0 ? rawLegs : [details];
+  return sourceLegs.map((leg: Record<string, any>, idx: number): TravelSegment => ({
+    id: `${travelRecord.id || fallbackId}-${transportType}-leg-${idx}`,
+    role: 'main',
+    type: transportType,
+    fromLocation: getPdfTransportDeparture(leg, transportType) || getPdfTransportDeparture(details, transportType),
+    toLocation: getPdfTransportArrival(leg, transportType) || getPdfTransportArrival(details, transportType),
+    date: leg.date || details.date || '',
+    departureTime: leg.departureTime || details.departureTime || '',
+    arrivalTime: leg.arrivalTime || details.arrivalTime || '',
+    arrivalNextDay: !!(leg.arrivalNextDay ?? details.arrivalNextDay),
+    company: getPdfTransportCompany(leg, transportType) || getPdfTransportCompany(details, transportType),
+    confirmationNumber: idx === 0 ? (details.passengersSeats || '') : '',
+    bookingReference: idx === 0 ? (details.bookingReference || '') : '',
+    contactDetails: idx === 0 ? (details.contact || '') : '',
+    notes: idx === 0 ? (details.thingsToRemember || '') : '',
+  })).filter(hasPdfSegmentContent);
+};
+
+const TransportCard = ({
   segment,
   travellers,
 }: {
   segment: TravelSegment;
   travellers?: any[];
 }) => {
+  const transportType = segment.type;
   const passengerNames = getPassengerNames(travellers);
   const passengerLines = getPassengerLines(travellers, 2);
   const departureDate = segment.departureDate || segment.date;
   const arrivalDate = segment.arrivalDate || departureDate;
 
-  if (segment.type === 'flight') {
+  if (transportType === 'flight') {
     return (
       <View style={styles.flightCard} wrap={false}>
         {/* Dark header bar */}
@@ -1046,7 +1215,7 @@ const TravelSegmentCard = ({
   // For other transport types
   const getTransportIcon = () => {
     const iconProps = { size: 14, color: "#FFFFFF" };
-    switch (segment.type) {
+    switch (transportType) {
       case 'train': return <TrainIcon {...iconProps} />;
       case 'bus': return <BusIcon {...iconProps} />;
       case 'ferry': return <FerryIcon {...iconProps} />;
@@ -1061,7 +1230,7 @@ const TravelSegmentCard = ({
   };
 
   const getTransportLabel = () => {
-    switch (segment.type) {
+    switch (transportType) {
       case 'train': return 'Train';
       case 'bus': return 'Bus';
       case 'ferry': return 'Ferry';
@@ -1082,39 +1251,61 @@ const TravelSegmentCard = ({
       </View>
 
       <View style={styles.transportCardBody}>
-        <View style={styles.transportRoute}>
-          <Text style={styles.transportLocation}>{segment.fromLocation || 'Origin'}</Text>
-          <Text style={styles.transportArrow}>{'->'}</Text>
-          <Text style={styles.transportLocation}>{segment.toLocation || 'Destination'}</Text>
+        <View style={styles.transportRouteDetailed}>
+          <View style={styles.transportColumn}>
+            {departureDate && (
+              <Text style={styles.transportDateText}>{formatDate(departureDate)}</Text>
+            )}
+            <Text style={styles.transportLocationName}>{segment.fromLocation || 'Origin'}</Text>
+            <Text style={styles.transportTime}>{segment.departureTime || '--:--'}</Text>
+          </View>
+
+          <View style={styles.transportPathContainer}>
+            <View style={styles.transportPathLine} />
+            <Text style={styles.transportArrow}>{'>'}</Text>
+            <View style={styles.transportPathLine} />
+          </View>
+
+          <View style={styles.transportColumn}>
+            {arrivalDate && (
+              <Text style={styles.transportDateText}>
+                {formatDate(arrivalDate)}{segment.arrivalNextDay ? ' (+1 day)' : ''}
+              </Text>
+            )}
+            <Text style={styles.transportLocationName}>{segment.toLocation || 'Destination'}</Text>
+            <Text style={styles.transportTime}>{segment.arrivalTime || '--:--'}</Text>
+          </View>
         </View>
 
-        <View style={styles.transportMeta}>
-          {segment.date && (
+        <View style={styles.flightMetaRow}>
+          {departureDate && (
             <View style={styles.metaItem}>
               <CalendarIcon size={11} color="#6B6865" />
-              <Text style={styles.metaText}>{formatDate(segment.date)}</Text>
+              <Text style={styles.metaText}>{formatDate(departureDate)}</Text>
             </View>
           )}
-          {segment.departureTime && (
-            <View style={styles.metaItem}>
-              <Text style={styles.metaText}>{segment.departureTime || '--:--'}</Text>
+          {passengerNames && passengerLines.length > 0 && (
+            <View style={styles.passengersBlock}>
+              <UsersIcon size={11} color="#6B6865" />
+              <View style={styles.passengersTextColumn}>
+                {passengerLines.map((line, idx) => (
+                  <Text key={idx} style={styles.metaText}>{line}</Text>
+                ))}
+              </View>
             </View>
           )}
         </View>
 
-        {(segment.company || segment.bookingReference || segment.contactDetails) && (
-          <View style={styles.bookingDetailsBox}>
-            <Text style={styles.bookingDetailsTitle}>Details</Text>
-            {segment.company && (
-              <Text style={styles.bookingDetailRow}>Company: {segment.company}</Text>
-            )}
-            {segment.bookingReference && (
-              <Text style={styles.bookingDetailRow}>Booking Ref: {segment.bookingReference}</Text>
-            )}
-            {segment.contactDetails && (
-              <Text style={styles.bookingDetailRow}>Contact: {segment.contactDetails}</Text>
-            )}
-          </View>
+        {(segment.company || segment.bookingReference || segment.contactDetails || segment.confirmationNumber) && (
+          <Text style={styles.bookingDetailsInline}>
+            {segment.company ? `Operator: ${segment.company}` : ''}
+            {segment.company && segment.bookingReference ? ' • ' : ''}
+            {segment.bookingReference ? `Booking Ref: ${segment.bookingReference}` : ''}
+            {(segment.company || segment.bookingReference) && segment.contactDetails ? ' • ' : ''}
+            {segment.contactDetails ? `Contact: ${segment.contactDetails}` : ''}
+            {(segment.company || segment.bookingReference || segment.contactDetails) && segment.confirmationNumber ? ' • ' : ''}
+            {segment.confirmationNumber ? `Passengers/Seats: ${segment.confirmationNumber}` : ''}
+          </Text>
         )}
 
         {segment.notes && (
@@ -1357,7 +1548,7 @@ const DestinationPage = ({
           title={destIndex === 0 ? 'Outbound Travel' : `Travel to ${destination.name}`}
           items={travelSegments}
           renderItem={(segment, segIndex) => (
-            <TravelSegmentCard
+            <TransportCard
               key={`segment-${segIndex}`}
               segment={segment}
               travellers={travellers}
@@ -1437,6 +1628,8 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
     additionalTravel = [],
     outboundJourney = [],
     returnJourney = [],
+    outboundTravel,
+    returnTravel,
     helpfulInformation,
   } = data;
 
@@ -1452,6 +1645,13 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
   const activities = allActivities?.filter(item => item.visible !== 0) || [];
   const dining = allDining?.filter(item => item.visible !== 0) || [];
   const bars = allBars?.filter(item => item.visible !== 0) || [];
+  const effectiveOutboundJourney = outboundJourney && outboundJourney.length > 0
+    ? outboundJourney
+    : travelRecordToMainTransportSegments(outboundTravel, 'outbound-travel');
+  const effectiveReturnJourney = returnJourney && returnJourney.length > 0
+    ? returnJourney
+    : travelRecordToMainTransportSegments(returnTravel, 'return-travel');
+
   const isListProject = itinerary?.projectType === 'list';
 
   const listSummaryCategories = [
@@ -1685,7 +1885,7 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
 
     if (destIndex === 0) {
       // First destination: show outbound journey and any unassigned additional travel.
-      return [...(outboundJourney || []), ...additionalDestinationSegments, ...fallbackAdditionalSegments];
+      return [...(effectiveOutboundJourney || []), ...additionalDestinationSegments, ...fallbackAdditionalSegments];
     }
 
     // Subsequent destinations: include all inter-destination records that arrive at this destination.
@@ -1884,7 +2084,7 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
       )}
 
       {/* RETURN TRAVEL PAGE */}
-      {returnJourney && returnJourney.length > 0 && (
+      {effectiveReturnJourney && effectiveReturnJourney.length > 0 && (
         <Page size="A4" style={styles.page}>
           <Sidebar
             tripTitle={itinerary?.title}
@@ -1897,14 +2097,14 @@ export function ItineraryPDFTemplate({ data }: ItineraryPDFTemplateProps) {
               <View wrap={false}>
                 <SectionHeader title="Return Travel" />
                 <View style={styles.divider} />
-                <TravelSegmentCard
+                <TransportCard
                   key="return-0"
-                  segment={returnJourney[0]}
+                  segment={effectiveReturnJourney[0]}
                   travellers={travellers}
                 />
               </View>
-              {returnJourney.slice(1).map((segment, index) => (
-                <TravelSegmentCard
+              {effectiveReturnJourney.slice(1).map((segment, index) => (
+                <TransportCard
                   key={`return-${index + 1}`}
                   segment={segment}
                   travellers={travellers}
