@@ -2,6 +2,7 @@ import { Font, Image, Link, Path, StyleSheet, Svg, Text, View } from '@react-pdf
 import { bookingPdfLogo } from '@/lib/booking-pdf-assets';
 import { pb } from '@/lib/pocketbase';
 import type { Shortlist, ShortlistOption } from '../lib/types';
+import { parseRating } from '../lib/format';
 import { ICON_PATHS, resolvePlatform, type SocialPlatform } from '../components/SocialIcons';
 
 Font.register({
@@ -31,6 +32,7 @@ Font.registerHyphenationCallback((word) => [word]);
 const N8N_IMAGE_PROXY = 'https://n8n.blckbx.co.uk/webhook/image-proxy';
 
 const PDF_ICON_PATHS = ICON_PATHS;
+const RATING_STAR_PATH = 'M12 2l2.9 6.6 7.1.6-5.3 4.7 1.6 7L12 17.7 5.7 21.4l1.6-7L2 9.2l7.1-.6L12 2z';
 
 export const COLORS = {
   black: '#0A0A0A',
@@ -393,6 +395,33 @@ export function PdfSocialIcon({ platform, size = 24 }: PdfSocialIconProps) {
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path d={PDF_ICON_PATHS[platform]} fill={COLORS.black} />
     </Svg>
+  );
+}
+
+interface RatingDisplayPdfProps {
+  rating: string | null | undefined;
+  /** Star size in pt. Defaults to 9 to match body text. */
+  starSize?: number;
+  /** Style overrides for the wrapping View. */
+  style?: any;
+  /** Style overrides for the text portions. */
+  textStyle?: any;
+}
+
+export function RatingDisplayPdf({ rating, starSize = 9, style, textStyle }: RatingDisplayPdfProps) {
+  const parsed = parseRating(rating);
+  if (parsed.isEmpty) return null;
+
+  return (
+    <View style={style ? [{ flexDirection: 'row', alignItems: 'center', gap: 3 }, style] : { flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+      <Text style={textStyle}>{parsed.number}</Text>
+      {parsed.showStar && (
+        <Svg width={starSize} height={starSize} viewBox="0 0 24 24">
+          <Path d={RATING_STAR_PATH} fill={COLORS.black} />
+        </Svg>
+      )}
+      {parsed.reviews && <Text style={textStyle}> {parsed.reviews}</Text>}
+    </View>
   );
 }
 

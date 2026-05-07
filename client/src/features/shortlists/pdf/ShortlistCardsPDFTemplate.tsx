@@ -3,6 +3,7 @@ import type { Shortlist, ShortlistOption } from '../lib/types';
 import {
   COLORS,
   PdfSocialLinksRow,
+  RatingDisplayPdf,
   RenderHtmlBlocks,
   Sidebar,
   formatHostname,
@@ -57,6 +58,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginTop: 8,
+  },
+  ratingPillText: {
     fontSize: 9,
     color: COLORS.textMuted,
   },
@@ -130,7 +133,7 @@ export function ShortlistCardsPDFTemplate({ shortlist, options, baseUrl }: Short
           <View wrap={false} style={styles.optionHeader}>
             <Text style={sharedStyles.eyebrow}>Option {index + 1} of {visibleOptions.length}</Text>
             <Text style={sharedStyles.h2}>{option.name}</Text>
-            {option.rating && <Text style={styles.ratingPill}>{option.rating}</Text>}
+            {option.rating && <RatingDisplayPdf rating={option.rating} starSize={8} style={styles.ratingPill} textStyle={styles.ratingPillText} />}
           </View>
           <OptionContent option={option} baseUrl={resolvedBaseUrl} />
         </Page>

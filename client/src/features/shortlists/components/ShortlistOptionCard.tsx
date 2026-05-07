@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { Eye, EyeOff, GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { CARD_CLASS, SECONDARY_BUTTON } from '../lib/styles';
 import { getFileUrl } from '../lib/api';
+import { RatingDisplay } from './RatingDisplay';
 import type { ShortlistOption } from '../lib/types';
 
 interface ShortlistOptionCardProps {
@@ -36,7 +37,7 @@ export default function ShortlistOptionCard({ option, onEdit, onDelete, onToggle
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-[#0A0A0A]">{option.name || 'Untitled option'}</h3>
-            {option.rating && <span className="border border-[#D4D0CB] bg-white px-2 py-0.5 text-xs text-[#6B6865]">{option.rating}</span>}
+            {option.rating && <span className="border border-[#D4D0CB] bg-white px-2 py-0.5 text-xs text-[#6B6865]"><RatingDisplay rating={option.rating} starSize={12} /></span>}
           </div>
           {option.sourceType === 'autofill' && <p className="mt-1 text-xs text-[#6B6865]">Autofilled</p>}
         </div>

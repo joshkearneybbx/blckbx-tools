@@ -1,6 +1,6 @@
 import { Document, Image, Link, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import type { Shortlist, ShortlistOption } from '../lib/types';
-import { COLORS, PdfSocialLinksRow, Sidebar, formatHostname, getBaseUrl, getOptionImageUrl, getVisibleOptions, proxyImageUrl, sharedStyles } from './shared';
+import { COLORS, PdfSocialLinksRow, RatingDisplayPdf, Sidebar, formatHostname, getBaseUrl, getOptionImageUrl, getVisibleOptions, parseHtmlToBlocks, proxyImageUrl, sharedStyles } from './shared';
 
 interface ShortlistTablePDFTemplateProps {
   shortlist: Shortlist;
@@ -12,7 +12,8 @@ const OPTIONS_PER_PAGE = 4;
 const PAGE_CONTENT_WIDTH = 666;
 const FIELD_WIDTH = 90;
 const OPTION_AREA_WIDTH = PAGE_CONTENT_WIDTH - FIELD_WIDTH;
-const IMAGE_ASPECT_RATIO = 76 / (OPTION_AREA_WIDTH / OPTIONS_PER_PAGE);
+const OPTION_COLUMN_WIDTH = OPTION_AREA_WIDTH / OPTIONS_PER_PAGE;
+const IMAGE_ASPECT_RATIO = 76 / OPTION_COLUMN_WIDTH;
 const IMAGE_HEIGHT_CAP = 220;
 
 const styles = StyleSheet.create({
@@ -111,6 +112,21 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     lineHeight: 1.3,
   },
+
+  tableBlock: {
+    marginBottom: 4,
+  },
+  tableListItem: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 2,
+  },
+  tableListItemText: {
+    fontSize: 9,
+    color: COLORS.black,
+    lineHeight: 1.35,
+    width: '92%',
+  },
   link: {
     color: COLORS.black,
     textDecoration: 'none',
@@ -123,11 +139,7 @@ const styles = StyleSheet.create({
 export function ShortlistTablePDFTemplate({ shortlist, options, baseUrl }: ShortlistTablePDFTemplateProps) {
   const resolvedBaseUrl = getBaseUrl(baseUrl);
   const visibleOptions = getVisibleOptions(options);
-  const columnsPerPage = visibleOptions.length <= OPTIONS_PER_PAGE
-    ? visibleOptions.length
-    : OPTIONS_PER_PAGE;
-  const columnWidth = columnsPerPage > 0 ? OPTION_AREA_WIDTH / columnsPerPage : OPTION_AREA_WIDTH;
-  const imageHeight = Math.min(columnWidth * IMAGE_ASPECT_RATIO, IMAGE_HEIGHT_CAP);
+  const imageHeight = Math.min(OPTION_COLUMN_WIDTH * IMAGE_ASPECT_RATIO, IMAGE_HEIGHT_CAP);
   const pages = chunkOptions(visibleOptions);
   const pageGroups = pages.length > 0 ? pages : [[]];
   const totalPages = pageGroups.length;
@@ -145,7 +157,7 @@ export function ShortlistTablePDFTemplate({ shortlist, options, baseUrl }: Short
           />
           {pageIndex === 0 ? <FullHeader shortlist={shortlist} /> : <SlimHeader shortlist={shortlist} pageNumber={pageIndex + 1} />}
           <View style={styles.divider} />
-          <ComparisonTable options={pageOptions} baseUrl={resolvedBaseUrl} columnsPerPage={columnsPerPage} imageHeight={imageHeight} />
+          <ComparisonTable options={pageOptions} baseUrl={resolvedBaseUrl} imageHeight={imageHeight} />
         </Page>
       ))}
     </Document>
@@ -175,23 +187,20 @@ function SlimHeader({ shortlist, pageNumber }: { shortlist: Shortlist; pageNumbe
   );
 }
 
-function ComparisonTable({ options, baseUrl, columnsPerPage, imageHeight }: { options: ShortlistOption[]; baseUrl: string; columnsPerPage: number; imageHeight: number }) {
+function ComparisonTable({ options, baseUrl, imageHeight }: { options: ShortlistOption[]; baseUrl: string; imageHeight: number }) {
   const rows = getRows(options, baseUrl, imageHeight);
-  const paddedOptions: Array<ShortlistOption | null> = [
-    ...options,
-    ...Array.from({ length: Math.max(columnsPerPage - options.length, 0) }).map(() => null),
-  ];
-  const optionCellStyle = columnsPerPage > 0 ? { width: OPTION_AREA_WIDTH / columnsPerPage } : {};
+  const optionCellStyle = { width: OPTION_COLUMN_WIDTH };
+  const tableWidth = FIELD_WIDTH + (OPTION_COLUMN_WIDTH * options.length);
 
   return (
-    <View style={styles.table}>
+    <View style={[styles.table, { width: tableWidth }]}>
       <View style={styles.row}>
         <View style={[styles.cell, styles.fieldCell]}>
           <Text style={styles.fieldLabel}>Field</Text>
         </View>
-        {paddedOptions.map((option, index) => (
-          <View key={option?.id || `empty-header-${index}`} style={[styles.cell, styles.optionCell, optionCellStyle]}>
-            {option && <Text style={styles.fieldLabel}>{option.name || ''}</Text>}
+        {options.map((option) => (
+          <View key={option.id} style={[styles.cell, styles.optionCell, optionCellStyle]}>
+            <Text style={styles.fieldLabel}>{option.name || ''}</Text>
           </View>
         ))}
       </View>
@@ -200,9 +209,9 @@ function ComparisonTable({ options, baseUrl, columnsPerPage, imageHeight }: { op
           <View style={[styles.cell, styles.fieldCell]}>
             <Text style={styles.fieldLabel}>{row.label}</Text>
           </View>
-          {paddedOptions.map((option, index) => (
-            <View key={option?.id || `empty-${row.label}-${index}`} style={[styles.cell, styles.optionCell, optionCellStyle]}>
-              {option ? row.render(option) : null}
+          {options.map((option) => (
+            <View key={option.id} style={[styles.cell, styles.optionCell, optionCellStyle]}>
+              {row.render(option)}
             </View>
           ))}
         </View>
@@ -228,10 +237,20 @@ function getRows(options: ShortlistOption[], baseUrl: string, imageHeight: numbe
       },
     },
     { label: 'Name', hasValue: (option) => !!option.name, render: (option) => <Text style={styles.name}>{option.name || '—'}</Text> },
+    { label: 'Rating', hasValue: (option) => !!option.rating?.trim(), render: (option) => option.rating?.trim() ? <RatingDisplayPdf rating={option.rating} starSize={8} textStyle={styles.text} /> : <Text style={[styles.text, styles.empty]}>—</Text> },
     { label: 'Quote', hasValue: (option) => !!option.quote, render: (option) => <Text style={styles.text}>{option.quote || '—'}</Text> },
-    { label: 'Address', hasValue: (option) => !!option.address, render: (option) => <Text style={styles.text}>{option.address || '—'}</Text> },
     { label: 'Phone', hasValue: (option) => !!option.phone, render: (option) => option.phone ? <Link src={`tel:${option.phone}`} style={[styles.text, styles.link]}>{option.phone}</Link> : <Text style={[styles.text, styles.empty]}>—</Text> },
-    { label: 'Website', hasValue: (option) => !!option.website, render: (option) => option.website ? <Link src={option.website} style={[styles.text, styles.link]}>{formatHostname(option.website)}</Link> : <Text style={[styles.text, styles.empty]}>—</Text> },
+    { label: 'Email', hasValue: (option) => !!option.email, render: (option) => option.email ? <Link src={`mailto:${option.email}`} style={[styles.text, styles.link]}>{wrapPdfText(option.email)}</Link> : <Text style={[styles.text, styles.empty]}>—</Text> },
+    { label: 'Website', hasValue: (option) => !!option.website, render: (option) => option.website ? <Link src={option.website} style={[styles.text, styles.link]}>{wrapPdfText(formatHostname(option.website))}</Link> : <Text style={[styles.text, styles.empty]}>—</Text> },
+    {
+      label: "What's Included",
+      hasValue: (option) => parseHtmlToBlocks(option.included).length > 0,
+      render: (option) => {
+        const blocks = parseHtmlToBlocks(option.included);
+        return blocks.length > 0 ? <RenderTableHtmlBlocks blocks={blocks} /> : <Text style={[styles.smallText, styles.empty]}>—</Text>;
+      },
+    },
+    { label: 'Address', hasValue: (option) => !!option.address, render: (option) => <Text style={styles.text}>{option.address || '—'}</Text> },
     {
       label: 'Opening hours',
       hasValue: (option) => (option.openingHours || []).length > 0,
@@ -251,6 +270,49 @@ function getRows(options: ShortlistOption[], baseUrl: string, imageHeight: numbe
   ];
 
   return rows.filter((row) => options.some(row.hasValue));
+}
+
+function RenderTableHtmlBlocks({ blocks }: { blocks: ReturnType<typeof parseHtmlToBlocks> }) {
+  if (blocks.length === 0) return null;
+
+  return (
+    <View>
+      {blocks.map((block, blockIndex) => (
+        <View key={`block-${blockIndex}`} style={styles.tableBlock}>
+          {block.type === 'paragraph' ? (
+            <Text style={styles.text}>{block.items[0]}</Text>
+          ) : (
+            <View>
+              {block.items.map((item, itemIndex) => (
+                <View key={`item-${itemIndex}`} style={styles.tableListItem}>
+                  <Text style={styles.text}>•</Text>
+                  <Text style={styles.tableListItemText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function wrapPdfText(value: string, maxLineLength = 26): string {
+  const lines: string[] = [];
+  let current = '';
+
+  for (const part of value.split(/([@./_-])/)) {
+    if (!part) continue;
+    if (current && current.length + part.length > maxLineLength) {
+      lines.push(current);
+      current = part;
+      continue;
+    }
+    current += part;
+  }
+
+  if (current) lines.push(current);
+  return lines.join('\n');
 }
 
 function chunkOptions(options: ShortlistOption[]): ShortlistOption[][] {

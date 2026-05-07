@@ -1,5 +1,6 @@
 import { ArrowLeftRight } from 'lucide-react';
 import { getFileUrl } from '../lib/api';
+import { RatingDisplay } from './RatingDisplay';
 import { stripAutofillImageRefs } from '../pdf/shared';
 import type { CustomField, ShortlistOption } from '../lib/types';
 import { SocialLinksRow } from './SocialIcons';
@@ -33,12 +34,13 @@ export default function PublicOptionTable({ options }: { options: ShortlistOptio
       },
     },
     { label: 'Name', hasValue: (option: ShortlistOption) => textValue(option.name), render: (option: ShortlistOption) => option.name || '—' },
-    { label: 'Rating', hasValue: (option: ShortlistOption) => textValue(option.rating), render: (option: ShortlistOption) => option.rating || '—' },
+    { label: 'Rating', hasValue: (option: ShortlistOption) => textValue(option.rating), render: (option: ShortlistOption) => textValue(option.rating) ? <RatingDisplay rating={option.rating} /> : '—' },
     { label: 'Quote', hasValue: (option: ShortlistOption) => textValue(option.quote), render: (option: ShortlistOption) => option.quote || '—' },
-    { label: 'Address', hasValue: (option: ShortlistOption) => textValue(option.address), render: (option: ShortlistOption) => option.address || '—' },
     { label: 'Phone', hasValue: (option: ShortlistOption) => textValue(option.phone), render: (option: ShortlistOption) => option.phone ? <a href={`tel:${option.phone}`}>{option.phone}</a> : '—' },
     { label: 'Email', hasValue: (option: ShortlistOption) => textValue(option.email), render: (option: ShortlistOption) => option.email ? <a href={`mailto:${option.email}`}>{option.email}</a> : '—' },
-    { label: 'Website', hasValue: (option: ShortlistOption) => textValue(option.website), render: (option: ShortlistOption) => option.website ? <a href={option.website} target="_blank" rel="noreferrer">Website</a> : '—' },
+    { label: 'Website', hasValue: (option: ShortlistOption) => textValue(option.website), render: (option: ShortlistOption) => option.website ? <a href={option.website} target="_blank" rel="noreferrer">{formatWebsiteLabel(option.website)}</a> : '—' },
+    { label: "What's Included", hasValue: (option: ShortlistOption) => textValue(option.included), render: (option: ShortlistOption) => option.included ? <div className="prose prose-sm max-w-none text-sm leading-5 text-[#0A0A0A] prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 [&_*]:!text-sm [&_*]:!leading-5" dangerouslySetInnerHTML={{ __html: option.included }} /> : '—' },
+    { label: 'Address', hasValue: (option: ShortlistOption) => textValue(option.address), render: (option: ShortlistOption) => option.address || '—' },
     {
       label: 'Opening hours',
       hasValue: (option: ShortlistOption) => (option.openingHours || []).length > 0,
@@ -53,7 +55,6 @@ export default function PublicOptionTable({ options }: { options: ShortlistOptio
       hasValue: (option: ShortlistOption) => Object.values(option.socialLinks || {}).some(Boolean),
       render: (option: ShortlistOption) => Object.values(option.socialLinks || {}).some(Boolean) ? <SocialLinksRow socialLinks={option.socialLinks} iconSize={18} gap={10} /> : <span className="text-[#6B6865]">—</span>,
     },
-    { label: "What's included", hasValue: (option: ShortlistOption) => textValue(option.included), render: (option: ShortlistOption) => option.included ? <div dangerouslySetInnerHTML={{ __html: option.included }} /> : '—' },
     {
       label: 'Notes',
       hasValue: (option: ShortlistOption) => textValue(stripAutofillImageRefs(option.notes)),
@@ -81,7 +82,7 @@ export default function PublicOptionTable({ options }: { options: ShortlistOptio
       )}
       <div className="overflow-x-auto border border-[#D4D0CB] bg-white">
         <table
-          className="w-full border-collapse text-left text-sm text-[#0A0A0A]"
+          className="w-full table-fixed border-collapse text-left text-sm text-[#0A0A0A]"
           style={{ tableLayout: 'fixed', minWidth: `calc(160px + ${options.length} * 220px)` }}
         >
           <colgroup>
@@ -94,7 +95,7 @@ export default function PublicOptionTable({ options }: { options: ShortlistOptio
             <tr>
               <th className="sticky left-0 z-10 border-b border-r border-[#D4D0CB] bg-[#F5F3F0] p-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6865]">Field</th>
               {options.map((option) => (
-                <th key={option.id} className="border-b border-r border-[#D4D0CB] bg-[#F5F3F0] p-4 font-semibold">{option.name}</th>
+                <th key={option.id} className="overflow-hidden break-words border-b border-r border-[#D4D0CB] bg-[#F5F3F0] p-4 font-semibold">{option.name}</th>
               ))}
             </tr>
           </thead>
@@ -103,7 +104,7 @@ export default function PublicOptionTable({ options }: { options: ShortlistOptio
               <tr key={row.label || 'image'}>
                 <th className="sticky left-0 z-10 border-b border-r border-[#D4D0CB] bg-[#F5F3F0] p-4 align-top text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6865]">{row.label}</th>
                 {options.map((option) => (
-                  <td key={option.id} className="border-b border-r border-[#D4D0CB] bg-white p-4 align-top">{row.render(option)}</td>
+                  <td key={option.id} className="overflow-hidden break-words border-b border-r border-[#D4D0CB] bg-white p-4 align-top">{row.render(option)}</td>
                 ))}
               </tr>
             ))}
@@ -116,4 +117,13 @@ export default function PublicOptionTable({ options }: { options: ShortlistOptio
 
 function findCustomField(fields: CustomField[] | undefined, label: string) {
   return (fields || []).find((field) => field.label === label);
+}
+
+function formatWebsiteLabel(website: string) {
+  try {
+    const url = website.startsWith('http://') || website.startsWith('https://') ? website : `https://${website}`;
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return website;
+  }
 }

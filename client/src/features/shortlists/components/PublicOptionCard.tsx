@@ -3,6 +3,7 @@ import { getFileUrl } from '../lib/api';
 import { stripAutofillImageRefs } from '../pdf/shared';
 import { CARD_CLASS } from '../lib/styles';
 import { SocialLinksRow } from './SocialIcons';
+import { RatingDisplay } from './RatingDisplay';
 import type { ShortlistOption } from '../lib/types';
 
 export function OpeningHoursBlock({ option }: { option: ShortlistOption }) {
@@ -36,7 +37,7 @@ export default function PublicOptionCard({ option }: { option: ShortlistOption }
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-[#0A0A0A]">{option.name}</h2>
-            {option.rating && <div className="mt-2 inline-block border border-[#D4D0CB] bg-white px-2 py-0.5 text-xs text-[#6B6865]">{option.rating}</div>}
+            {option.rating && <div className="mt-2 inline-block border border-[#D4D0CB] bg-white px-2 py-0.5 text-xs text-[#6B6865]"><RatingDisplay rating={option.rating} starSize={12} /></div>}
           </div>
           {option.quote && <div className="text-right text-sm font-semibold tabular-nums text-[#0A0A0A]">{option.quote}</div>}
         </div>
