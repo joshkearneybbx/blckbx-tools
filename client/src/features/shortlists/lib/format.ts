@@ -45,3 +45,11 @@ export function formatRating(rating: string | null | undefined): string {
   const reviews = parsed.reviews ? ` ${parsed.reviews}` : '';
   return `${parsed.number}${star}${reviews}`.trim();
 }
+
+export function splitParagraphs(text: string | null | undefined): string[] {
+  if (!text) return [];
+  return text
+    .split(/\n\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0);
+}

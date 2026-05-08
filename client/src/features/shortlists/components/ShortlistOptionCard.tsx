@@ -23,7 +23,7 @@ export default function ShortlistOptionCard({ option, onEdit, onDelete, onToggle
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`${CARD_CLASS} ${isDragging ? 'opacity-70' : ''} ${!option.visible ? 'opacity-55' : ''} p-4`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <button type="button" className="cursor-grab border border-[#D4D0CB] bg-white p-2 text-[#6B6865]" {...attributes} {...listeners} aria-label="Drag option">
           <GripVertical className="h-4 w-4" />
         </button>
@@ -35,13 +35,12 @@ export default function ShortlistOptionCard({ option, onEdit, onDelete, onToggle
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-[#0A0A0A]">{option.name || 'Untitled option'}</h3>
-            {option.rating && <span className="border border-[#D4D0CB] bg-white px-2 py-0.5 text-xs text-[#6B6865]"><RatingDisplay rating={option.rating} starSize={12} /></span>}
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="min-w-0 truncate text-sm font-semibold text-[#0A0A0A]">{option.name || 'Untitled option'}</h3>
+            {option.rating && <span className="max-w-[180px] shrink-0 whitespace-nowrap border border-[#D4D0CB] bg-white px-2 py-0.5 text-xs text-[#6B6865]"><RatingDisplay rating={option.rating} starSize={12} /></span>}
           </div>
           {option.sourceType === 'autofill' && <p className="mt-1 text-xs text-[#6B6865]">Autofilled</p>}
         </div>
-        {option.quote && <div className="text-right text-sm font-semibold tabular-nums text-[#0A0A0A]">{option.quote}</div>}
         <button type="button" onClick={() => onToggleVisible(option)} className={SECONDARY_BUTTON} aria-label="Toggle visibility">
           {option.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
         </button>

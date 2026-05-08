@@ -1,10 +1,11 @@
 import { Clock, ExternalLink, Mail, MapPin, Phone, type LucideIcon } from 'lucide-react';
 import { getFileUrl } from '../lib/api';
 import { stripAutofillImageRefs } from '../pdf/shared';
+import { splitParagraphs } from '../lib/format';
 import { CARD_CLASS } from '../lib/styles';
 import { SocialLinksRow } from './SocialIcons';
 import { RatingDisplay } from './RatingDisplay';
-import type { ShortlistOption } from '../lib/types';
+import type { CustomField, ShortlistOption } from '../lib/types';
 
 export function OpeningHoursBlock({ option }: { option: ShortlistOption }) {
   const hours = (option.openingHours || []).filter((row) => row.days || row.opens || row.closes);
@@ -70,18 +71,42 @@ export default function PublicOptionCard({ option }: { option: ShortlistOption }
           </section>
         )}
         {customFields.length > 0 && (
-          <dl className="space-y-3">
-            {customFields.map((field) => (
-              <div key={field.id}>
-                <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6865]">{field.label}</dt>
-                <dd className="mt-1 text-sm text-[#0A0A0A]">{field.value}</dd>
-              </div>
-            ))}
-          </dl>
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6865]">Additional details</h3>
+            <CustomFieldCards fields={customFields} />
+          </section>
         )}
       </div>
     </article>
   );
+}
+
+function CustomFieldCards({ fields }: { fields: CustomField[] }) {
+  return (
+    <div className="space-y-3">
+      {fields.map((field) => (
+        <div key={field.id} className="bg-[#F5F3F0] px-5 py-4">
+          <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#0A0A0A]">{field.label}</div>
+          <div className="text-left text-sm leading-[1.55] text-[#0A0A0A]">
+            {splitParagraphs(field.value).map((paragraph, index, paragraphs) => (
+              <p key={`${field.id}-paragraph-${index}`} className={index === paragraphs.length - 1 ? 'mb-0' : 'mb-2.5'}>
+                {renderSoftLineBreaks(paragraph)}
+              </p>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function renderSoftLineBreaks(text: string) {
+  return text.split('\n').map((line, index) => (
+    <span key={`${line}-${index}`}>
+      {index > 0 && <br />}
+      {line}
+    </span>
+  ));
 }
 
 function InfoRow({ Icon, children }: { Icon: LucideIcon; children: React.ReactNode }) {

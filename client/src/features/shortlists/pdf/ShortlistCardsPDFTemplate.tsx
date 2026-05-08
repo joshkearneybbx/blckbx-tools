@@ -1,5 +1,5 @@
 import { Document, Image, Link, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
-import type { Shortlist, ShortlistOption } from '../lib/types';
+import type { CustomField, Shortlist, ShortlistOption } from '../lib/types';
 import {
   COLORS,
   PdfSocialLinksRow,
@@ -16,6 +16,7 @@ import {
   sharedStyles,
   stripAutofillImageRefs,
 } from './shared';
+import { splitParagraphs } from '../lib/format';
 
 interface ShortlistCardsPDFTemplateProps {
   shortlist: Shortlist;
@@ -69,6 +70,10 @@ const styles = StyleSheet.create({
     objectFit: 'cover',
     marginBottom: 16,
   },
+  optionContent: {
+    flexDirection: 'column',
+    width: '100%',
+  },
   section: {
     marginTop: 16,
   },
@@ -78,6 +83,39 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  additionalDetailsIntro: {
+    marginBottom: 0,
+  },
+  customFieldCards: {
+    gap: 8,
+  },
+  customFieldCard: {
+    backgroundColor: COLORS.sand100,
+    paddingHorizontal: 14,
+  },
+  customFieldCardInner: {
+    paddingVertical: 12,
+  },
+  customFieldLabel: {
+    fontSize: 9,
+    fontWeight: 600,
+    color: COLORS.black,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  customFieldParagraph: {
+    fontSize: 10,
+    color: COLORS.black,
+    lineHeight: 1.55,
+    textAlign: 'left',
+  },
+  customFieldParagraphSpacer: {
+    height: 12,
+  },
+  customFieldLastParagraph: {
+    marginBottom: 12,
+  },
   fallback: {
     fontSize: 10,
     color: COLORS.textMuted,
@@ -172,10 +210,10 @@ function OptionContent({ option, baseUrl }: { option: ShortlistOption; baseUrl: 
   const hasAnyDetail = !!option.rating || details.length > 0 || hasOpeningHours || socialEntries.length > 0 || includedBlocks.length > 0 || noteBlocks.length > 0 || customFields.length > 0;
 
   return (
-    <View>
+    <View style={styles.optionContent}>
       {imageUrl && <Image src={proxyImageUrl(imageUrl)} style={styles.optionImage} />}
       {details.length > 0 && (
-        <View style={sharedStyles.sandCard}>
+        <View wrap={false} style={sharedStyles.sandCard}>
           {details.map((detail, index) => (
             <DetailRow key={detail.label} label={detail.label} value={detail.value} link={detail.link} last={index === details.length - 1} />
           ))}
@@ -215,17 +253,45 @@ function OptionContent({ option, baseUrl }: { option: ShortlistOption; baseUrl: 
       )}
 
       {customFields.length > 0 && (
-        <View wrap={false} style={styles.section}>
-          <Text style={sharedStyles.sectionHeading}>Additional details</Text>
-          <View style={sharedStyles.sandCard}>
-            {customFields.map((field, index) => (
-              <DetailRow key={field.id} label={field.label} value={field.value} last={index === customFields.length - 1} />
-            ))}
+        <View style={styles.section}>
+          <View wrap={false} minPresenceAhead={120} style={styles.additionalDetailsIntro}>
+            <Text style={sharedStyles.sectionHeading}>Additional details</Text>
           </View>
+          <CustomFieldCardsPdf fields={customFields} />
         </View>
       )}
 
       {!hasAnyDetail && <Text style={styles.fallback}>Contact details available on request.</Text>}
+    </View>
+  );
+}
+
+function CustomFieldCardsPdf({ fields }: { fields: CustomField[] }) {
+  return (
+    <View style={styles.customFieldCards}>
+      {fields.map((field) => {
+        const paragraphs = splitParagraphs(field.value);
+        if (paragraphs.length === 0) return null;
+
+        return (
+          <View key={field.id} style={styles.customFieldCard}>
+            <View style={styles.customFieldCardInner}>
+              <Text style={styles.customFieldLabel}>{field.label}</Text>
+              {paragraphs.map((paragraph, index) => {
+                const paragraphStyle: any[] = [styles.customFieldParagraph];
+                if (index === paragraphs.length - 1) paragraphStyle.push(styles.customFieldLastParagraph);
+
+                return (
+                  <View key={`${field.id}-paragraph-${index}`} wrap={false}>
+                    {index > 0 && <View style={styles.customFieldParagraphSpacer} />}
+                    <Text style={paragraphStyle}>{paragraph}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
