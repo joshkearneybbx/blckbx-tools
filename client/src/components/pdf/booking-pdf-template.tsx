@@ -250,6 +250,12 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: "right"
   },
+  detailValueColumn: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    flexShrink: 1
+  },
   flightRoute: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -655,6 +661,21 @@ function AccommodationCard({ segment }: { segment: AccommodationSegment }) {
             <Text style={styles.detailValue}>{segment.address}</Text>
           </View>
         ) : null}
+        {(() => {
+          const noteLines = cleanLines(segment.notes);
+          return noteLines.length ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Notes</Text>
+              <View style={styles.detailValueColumn}>
+                {noteLines.map((line, index) => (
+                  <Text key={`accom-note-${segment.id}-${index}`} style={styles.detailValue}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          ) : null;
+        })()}
       </View>
     </View>
   );
