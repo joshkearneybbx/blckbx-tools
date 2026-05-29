@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
 
   itemImageContainer: {
     width: "100%",
-    aspectRatio: 16 / 9,
+    height: 200,
   },
 
   itemImage: {
@@ -1484,7 +1484,7 @@ const SectionWithFirstItem = <T,>({
 
   return (
     <View style={styles.sectionContainer}>
-      <View style={styles.headerWithFirstItem} wrap={false}>
+      <View style={styles.headerWithFirstItem}>
         <SectionHeader title={title} />
         {renderItem(items[0], 0)}
       </View>
