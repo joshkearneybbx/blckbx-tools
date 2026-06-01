@@ -248,6 +248,7 @@ export type FlightSegment = {
   pnr: string;
   isConnecting: boolean;
   legs: FlightLeg[];
+  notes?: string;
 };
 
 export type AccommodationSegment = {

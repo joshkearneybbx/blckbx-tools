@@ -1800,6 +1800,10 @@ function FlightSegmentForm({
           ))}
         </div>
       ) : null}
+
+      <Field label="Notes">
+        <textarea className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.notes || ""} onChange={(event) => patch("notes", event.target.value)} />
+      </Field>
     </div>
   );
 }

@@ -606,6 +606,21 @@ function FlightCard({ segment }: { segment: FlightSegment }) {
             <Text style={styles.trackButtonText}>Track Flight {segment.flightNumber}</Text>
           </Link>
         ) : null}
+        {(() => {
+          const noteLines = cleanLines(segment.notes);
+          return noteLines.length ? (
+            <View style={{ flexDirection: "column" }}>
+              <Text style={styles.detailLabel}>Notes</Text>
+              <View style={{ flexDirection: "column", marginTop: 4 }}>
+                {noteLines.map((line, index) => (
+                  <Text key={`flight-note-${segment.id}-${index}`} style={styles.detailValue}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          ) : null;
+        })()}
       </View>
     </View>
   );
