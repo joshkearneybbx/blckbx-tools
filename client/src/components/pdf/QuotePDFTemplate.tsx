@@ -11,6 +11,7 @@ import {
   Svg,
 } from "@react-pdf/renderer";
 import logoUrl from "@assets/blckbx-logo-white.png";
+import type { BookingSegment } from "@/lib/types";
 
 // =============================================================================
 // FONT REGISTRATION — Inter (matches Booking PDF)
@@ -110,6 +111,7 @@ export interface QuoteData {
     price?: string;
   }>;
   notes?: string;
+  segments?: BookingSegment[];
 }
 
 export interface PassengerDetail {
@@ -788,6 +790,8 @@ const AccommodationCard = ({
 // =============================================================================
 // MAIN QUOTE PDF TEMPLATE
 // =============================================================================
+// TODO: Port segment rendering from booking-pdf-template.tsx when quote PDFs are ready
+// to use the ordered itinerary timeline instead of the legacy fixed slots.
 
 interface QuotePDFTemplateProps {
   data: QuoteData;

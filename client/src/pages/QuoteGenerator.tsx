@@ -40,6 +40,8 @@ import {
   type QuoteData,
 } from "@/components/pdf/QuotePDFTemplate";
 import { OptionsListEditor } from "@/components/quote/OptionsListEditor";
+import { SegmentBuilder } from "@/components/travel/SegmentBuilder";
+import type { BookingSegment } from "@/lib/types";
 import {
   OptionsListPDFTemplate,
   type AccommodationOption,
@@ -114,6 +116,7 @@ const EMPTY_QUOTE_DATA: QuoteData = {
   additionalNotes: "",
   activities: undefined,
   notes: "",
+  segments: [],
 };
 
 function getWebhookUrl(): string {
@@ -296,6 +299,7 @@ function normalizeQuoteData(payload: unknown): QuoteData {
     additionalNotes: sanitizeValue(source.additionalNotes),
     activities: normalizeActivities(source.activities),
     notes: sanitizeValue(source.notes),
+    segments: Array.isArray(source.segments) ? (source.segments as BookingSegment[]) : [],
   };
 }
 
@@ -1689,6 +1693,19 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
           {mode === "quote" ? (
           <>
+          <PreviewSection title="Itinerary" icon={Plane}>
+            <p className="mb-4 text-xs text-[#6B6B68]">
+              Build the trip timeline — add flights, accommodation, and transfers in
+              the order the client will experience them.
+            </p>
+            <SegmentBuilder
+              segments={quoteData.segments || []}
+              onChange={(segments) =>
+                updateQuoteData((current) => ({ ...current, segments }))
+              }
+            />
+          </PreviewSection>
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <PreviewSection title="Outbound Flight" icon={Plane}>
               <div className="space-y-4">
