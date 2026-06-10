@@ -1,13 +1,31 @@
 import { Copy, GripVertical, Plus, Trash2, X } from "lucide-react";
-import { useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { AccommodationOption } from "@/components/pdf/OptionsListPDFTemplate";
+import type { AccommodationOption, FlightLeg, FlightReturnType } from "@/components/pdf/OptionsListPDFTemplate";
+import { createLeg, LegsSection, legHasData } from "@/components/quote/FlightOptionCard";
 
 const INPUT_CLASS = "border-[#D4D0CB] bg-[#FAFAF8] text-sm text-[#0A0A0A] focus:border-[#0A0A0A] focus:ring-0";
+
+function autoResizeTextarea(element: HTMLTextAreaElement | null) {
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+}
+
+function useAutoResizeTextarea(value: string | undefined, active = true) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!active) return;
+    autoResizeTextarea(ref.current);
+  }, [value, active]);
+
+  return ref;
+}
 
 function convertToJpeg(file: File): Promise<string> {
   const MAX_DIMENSION = 1600;
@@ -67,12 +85,29 @@ export function AccommodationOptionCard({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const [highlightInput, setHighlightInput] = useState("");
+  const locationDistancesRef = useAutoResizeTextarea(option.locationDistances || "", expanded);
+  const areaSummaryRef = useAutoResizeTextarea(option.areaSummary || "", expanded);
+  const whyThisOneRef = useAutoResizeTextarea(option.whyThisOne || "", expanded);
+  const notesRef = useAutoResizeTextarea(option.notes || "", expanded);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: option.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const title = option.name || `Accommodation option ${index + 1}`;
+  const returnType = option.returnType || "return";
 
-  const update = (field: keyof AccommodationOption, value: string | string[]) => {
+  const update = (field: keyof AccommodationOption, value: string | string[] | FlightLeg[] | FlightReturnType) => {
     onChange({ ...option, [field]: value });
+  };
+
+  const addHighlight = () => {
+    const nextHighlight = highlightInput.trim();
+    if (!nextHighlight) return;
+    update("highlights", [...(option.highlights || []), nextHighlight]);
+    setHighlightInput("");
+  };
+
+  const removeHighlight = (highlightIndex: number) => {
+    update("highlights", (option.highlights || []).filter((_, index) => index !== highlightIndex));
   };
 
   const handlePhotos = async (files: FileList | null) => {
@@ -160,15 +195,117 @@ export function AccommodationOptionCard({
             <Input className={INPUT_CLASS} type="number" min={0} placeholder="Sleeps" value={String(option.sleeps || "")} onChange={(event) => update("sleeps", event.target.value)} />
             <Input className={INPUT_CLASS} placeholder="Board — B&B, Half Board..." value={option.boardBasis || ""} onChange={(event) => update("boardBasis", event.target.value)} />
           </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Highlights</label>
+            <div className="flex gap-2">
+              <Input
+                className={INPUT_CLASS}
+                placeholder="Villa highlight — e.g. Private pool"
+                value={highlightInput}
+                onChange={(event) => setHighlightInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addHighlight();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="border-[#D8D2C8] bg-white text-sm text-[#1A1A1A] hover:bg-[#F8F6F1]"
+                onClick={addHighlight}
+              >
+                Add
+              </Button>
+            </div>
+            {(option.highlights || []).length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {(option.highlights || []).map((highlight, highlightIndex) => (
+                  <span key={`${highlight}-${highlightIndex}`} className="inline-flex items-center gap-1 rounded-full border border-[#D8D2C8] bg-white px-3 py-1 text-xs text-[#1A1A1A]">
+                    {highlight}
+                    <button type="button" className="text-[#6B6B68] hover:text-[#1A1A1A]" onClick={() => removeHighlight(highlightIndex)} aria-label={`Remove ${highlight}`}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Location — distances</label>
+            <Textarea
+              ref={locationDistancesRef}
+              className={`${INPUT_CLASS} min-h-[90px] !w-full resize-y overflow-hidden`}
+              placeholder="One per line — e.g. Beach 800m"
+              value={option.locationDistances || ""}
+              onChange={(event) => {
+                autoResizeTextarea(event.currentTarget);
+                update("locationDistances", event.target.value);
+              }}
+              style={{ overflowY: "hidden", resize: "vertical" }}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#ECEAE5] pt-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Flights</p>
+              <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#6B6B68]">
+                Return flight
+                <select
+                  className="h-8 rounded-none border border-[#D4D0CB] bg-[#FAFAF8] px-2 text-xs font-normal normal-case tracking-normal text-[#0A0A0A] focus:border-[#0A0A0A] focus:outline-none"
+                  value={returnType}
+                  onChange={(event) => update("returnType", event.target.value as FlightReturnType)}
+                >
+                  <option value="return">Return</option>
+                  <option value="one-way">One-way</option>
+                  <option value="tbc">TBC</option>
+                </select>
+              </label>
+            </div>
+            <LegsSection title="Outbound" legs={option.outboundLegs || []} onChange={(legs) => update("outboundLegs", legs)} />
+            {returnType === "return" ? (
+              <LegsSection title="Return" legs={option.returnLegs || []} onChange={(legs) => update("returnLegs", legs)} />
+            ) : (
+              <div className="rounded-xl border border-dashed border-[#D8D2C8] bg-[#F8F6F1] px-4 py-3 text-xs text-[#6B6B68]">
+                Return flight fields are hidden for {returnType === "one-way" ? "one-way" : "TBC"} options. Existing return details are preserved if you switch back to Return.
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Input className={INPUT_CLASS} placeholder="Car hire — e.g. Group B hatchback, fully insured" value={option.carHire || ""} onChange={(event) => update("carHire", event.target.value)} />
+            <Input className={INPUT_CLASS} placeholder="Baggage — e.g. 22kg per person included" value={option.baggage || ""} onChange={(event) => update("baggage", event.target.value)} />
+          </div>
+
           <div className="space-y-1">
             <Textarea
-              className={`${INPUT_CLASS} min-h-[90px] !w-full`}
-              placeholder="Description"
-              value={option.description || ""}
-              onChange={(event) => update("description", event.target.value)}
+              ref={areaSummaryRef}
+              className={`${INPUT_CLASS} min-h-[110px] !w-full resize-y overflow-hidden`}
+              placeholder="About the area — the high-street-agent context for this location"
+              value={option.areaSummary || ""}
+              onChange={(event) => {
+                autoResizeTextarea(event.currentTarget);
+                update("areaSummary", event.target.value);
+              }}
+              style={{ overflowY: "hidden", resize: "vertical" }}
             />
-            <p className="text-xs text-[#6B6B68]">Keep description to 1–3 lines for best PDF layout.</p>
+            <p className="text-xs text-[#6B6B68]">2–4 sentences works best.</p>
           </div>
+
+          <Textarea
+            ref={whyThisOneRef}
+            className={`${INPUT_CLASS} min-h-[110px] !w-full resize-y overflow-hidden`}
+            placeholder="Why we picked this one — the rationale for this specific option"
+            value={option.whyThisOne || ""}
+            onChange={(event) => {
+              autoResizeTextarea(event.currentTarget);
+              update("whyThisOne", event.target.value);
+            }}
+            style={{ overflowY: "hidden", resize: "vertical" }}
+          />
 
           {/* Cover Photo */}
           <div className="space-y-3 rounded-xl border border-[#ECEAE5] bg-white p-3">
@@ -240,7 +377,17 @@ export function AccommodationOptionCard({
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input className={INPUT_CLASS} placeholder="From £4,500" value={option.priceFromText} maxLength={50} onChange={(event) => update("priceFromText", event.target.value)} />
-            <Textarea className={`${INPUT_CLASS} min-h-[90px] !w-full`} placeholder="Notes" value={option.notes || ""} onChange={(event) => update("notes", event.target.value)} />
+            <Textarea
+              ref={notesRef}
+              className={`${INPUT_CLASS} min-h-[90px] !w-full resize-y overflow-hidden`}
+              placeholder="Notes"
+              value={option.notes || ""}
+              onChange={(event) => {
+                autoResizeTextarea(event.currentTarget);
+                update("notes", event.target.value);
+              }}
+              style={{ overflowY: "hidden", resize: "vertical" }}
+            />
           </div>
         </div>
       ) : null}
@@ -257,7 +404,17 @@ export function createAccommodationOption(order: number): AccommodationOption {
     bedrooms: "",
     sleeps: "",
     boardBasis: "",
+    // Deprecated in favour of areaSummary/whyThisOne, but retained so old saved quotes still render.
     description: "",
+    highlights: [],
+    locationDistances: "",
+    outboundLegs: [createLeg()],
+    returnLegs: [createLeg()],
+    returnType: "return",
+    carHire: "",
+    baggage: "",
+    areaSummary: "",
+    whyThisOne: "",
     coverPhoto: "",
     photos: [],
     priceFromText: "",
@@ -275,6 +432,14 @@ export function accommodationOptionHasData(option: AccommodationOption): boolean
       String(option.sleeps || "").trim() ||
       option.boardBasis?.trim() ||
       option.description?.trim() ||
+      (option.highlights?.length ?? 0) > 0 ||
+      option.locationDistances?.trim() ||
+      option.carHire?.trim() ||
+      option.baggage?.trim() ||
+      option.areaSummary?.trim() ||
+      option.whyThisOne?.trim() ||
+      (option.outboundLegs || []).some(legHasData) ||
+      (option.returnLegs || []).some(legHasData) ||
       Boolean(option.coverPhoto) ||
       option.photos.length > 0 ||
       option.priceFromText.trim() ||

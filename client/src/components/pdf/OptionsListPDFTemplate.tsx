@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
 import logoUrl from "@assets/blckbx-logo-white.png";
 
 Font.register({
@@ -70,6 +71,15 @@ export interface AccommodationOption {
   bedrooms?: number | string;
   sleeps?: number | string;
   boardBasis?: string;
+  highlights?: string[];
+  locationDistances?: string;
+  outboundLegs?: FlightLeg[];
+  returnLegs?: FlightLeg[];
+  returnType?: FlightReturnType;
+  carHire?: string;
+  baggage?: string;
+  areaSummary?: string;
+  whyThisOne?: string;
   description?: string;
   coverPhoto?: string;
   photos: string[];
@@ -92,6 +102,7 @@ export interface OptionsListData {
   };
   clientName?: string;
   additionalNotes?: string;
+  recommendation?: string;
   options: OptionsListOption[];
 }
 
@@ -140,6 +151,16 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 20, fontWeight: 700, marginBottom: 10 },
   divider: { height: 2, backgroundColor: "#E8E5E0", marginBottom: 16 },
   introText: { color: "#6B6865", fontSize: 10, lineHeight: 1.5, marginBottom: 12 },
+  recommendationBox: {
+    borderWidth: 1,
+    borderColor: "#D4D0CB",
+    backgroundColor: "#F5F3F0",
+    padding: 12,
+    marginTop: 10,
+    gap: 6,
+  },
+  recommendationLabel: { fontSize: 8, fontWeight: 700, color: "#0A0A0A", textTransform: "uppercase", letterSpacing: 0.8 },
+  recommendationText: { fontSize: 10, color: "#0A0A0A", lineHeight: 1.4 },
 
   optionCard: {
     borderWidth: 1,
@@ -179,13 +200,45 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   coverPhoto: { width: "100%", height: 170, objectFit: "cover" },
-  accomBody: { padding: 12, gap: 7 },
+  accomBody: { padding: 12, gap: 8 },
   accomHeaderRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
-  accomName: { fontSize: 14, fontWeight: 700, flex: 1 },
+  accomHeaderText: { flex: 1, gap: 3 },
+  accomName: { fontSize: 14, fontWeight: 700 },
+  accomHeaderAside: { alignItems: "flex-end", gap: 4, maxWidth: 120 },
   accomOptionLabel: { fontSize: 9, color: "#6B6865", textTransform: "uppercase", letterSpacing: 0.8 },
   accomLocation: { fontSize: 9, color: "#6B6865" },
-  accomMeta: { fontSize: 9, color: "#0A0A0A" },
-  accomDescription: { fontSize: 9, lineHeight: 1.35, color: "#0A0A0A" },
+  accomPrice: { fontSize: 11, fontWeight: 700, textAlign: "right" },
+  factStrip: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  factChip: { backgroundColor: "#FAFAF8", paddingHorizontal: 5, paddingVertical: 3 },
+  factChipText: { fontSize: 9, color: "#6B6865" },
+  highlightChipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  highlightChip: {
+    alignSelf: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E3E2E2",
+    borderRadius: 2,
+    paddingVertical: 3,
+    paddingHorizontal: 9,
+  },
+  highlightChipText: { fontSize: 9, color: "#0A0A0A" },
+  locationDistancesText: { fontSize: 9, color: "#6B6865", lineHeight: 1.3 },
+  accomSubBox: { borderWidth: 1, borderColor: "#D4D0CB", backgroundColor: "#FAFAF8", padding: 8, gap: 5 },
+  detailTable: { borderWidth: 1, borderColor: "#D4D0CB", backgroundColor: "#FAFAF8" },
+  detailRow: { flexDirection: "row", gap: 8, paddingHorizontal: 8, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: "#D4D0CB" },
+  detailRowLast: { flexDirection: "row", gap: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  detailLabel: { width: 70, fontSize: 9, color: "#6B6865" },
+  detailValue: { flex: 1, fontSize: 9, color: "#0A0A0A", lineHeight: 1.35 },
+  narrativeCard: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E3E2E2",
+    borderRadius: 2,
+    padding: 9,
+    marginBottom: 6,
+    gap: 3,
+  },
+  accomDescription: { fontSize: 8, lineHeight: 1.35, color: "#0A0A0A" },
   galleryWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 14 },
   galleryCell: { objectFit: "cover" },
 });
@@ -269,6 +322,26 @@ function renderLegs(legs: FlightLeg[]) {
   });
 }
 
+function renderTextLines(value: string, style: Style | Style[], keyPrefix: string) {
+  return value.split(/\r?\n/).map((line, index) => (
+    <Text key={`${keyPrefix}-${index}`} style={style}>{line || " "}</Text>
+  ));
+}
+
+function coerceHighlights(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  if (typeof value === "string") return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  return [];
+}
+
+function formatLocationDistances(value: string | undefined): string {
+  return (value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function FlightOptionCard({ option, index }: { option: FlightOption; index: number }) {
   const airlineName = option.airlineName || (option.airlineIata ? option.airlineIata : "Flight option");
   const returnType = option.returnType || "return";
@@ -322,39 +395,129 @@ function getCellDimensions(photoCount: number): { width: string; height: number 
 }
 
 function AccommodationOptionCard({ option, index }: { option: AccommodationOption; index: number }) {
-  const meta = [
+  const highlights = coerceHighlights(option.highlights);
+  const locationDistances = formatLocationDistances(option.locationDistances);
+  const carHire = option.carHire?.trim() || "";
+  const baggage = option.baggage?.trim() || "";
+  const areaSummary = option.areaSummary?.trim() || "";
+  const whyThisOne = option.whyThisOne?.trim() || "";
+  const notes = option.notes?.trim() || "";
+  const returnType = option.returnType || "return";
+  const visibleOutboundLegs = (option.outboundLegs || []).filter(hasLegData);
+  const visibleReturnLegs = (option.returnLegs || []).filter(hasLegData);
+  const hasFlightDetails = visibleOutboundLegs.length > 0 || visibleReturnLegs.length > 0;
+  const facts = [
     option.nights ? `${option.nights} nights` : "",
     option.bedrooms ? `${option.bedrooms} bedrooms` : "",
     option.sleeps ? `sleeps ${option.sleeps}` : "",
     option.boardBasis || "",
+    carHire ? "Car hire included" : "",
   ].filter(Boolean);
+  const details = [
+    carHire ? { label: "Car hire", value: carHire } : null,
+    baggage ? { label: "Baggage", value: baggage } : null,
+  ].filter((row): row is { label: string; value: string } => Boolean(row));
   const coverSrc = option.coverPhoto || (option.photos || [])[0] || "";
 
   return (
-    <View style={styles.accomCard} wrap={false}>
+    <View style={styles.accomCard}>
       {coverSrc ? <Image src={coverSrc} style={styles.coverPhoto} /> : null}
       <View style={styles.accomBody}>
-        <View style={styles.accomHeaderRow}>
-          <Text style={styles.accomName}>{option.name || "Accommodation option"}</Text>
-          <Text style={styles.accomOptionLabel}>Option {index + 1}</Text>
+        <View style={styles.accomHeaderRow} minPresenceAhead={120}>
+          <View style={styles.accomHeaderText}>
+            <Text style={styles.accomName}>{option.name || "Accommodation option"}</Text>
+            {option.location ? <Text style={styles.accomLocation}>{option.location}</Text> : null}
+          </View>
+          <View style={styles.accomHeaderAside}>
+            <Text style={styles.accomOptionLabel}>Option {index + 1}</Text>
+            {option.priceFromText ? <Text style={styles.accomPrice}>{option.priceFromText}</Text> : null}
+          </View>
         </View>
-        {option.location ? <Text style={styles.accomLocation}>{option.location}</Text> : null}
-        {meta.length > 0 ? <Text style={styles.accomMeta}>{meta.join(" · ")}</Text> : null}
-        {option.description ? <Text style={styles.accomDescription}>{option.description}</Text> : null}
-        {option.notes ? (
+
+        {facts.length > 0 ? (
+          <View style={styles.factStrip}>
+            {facts.map((fact) => (
+              <View key={fact} style={styles.factChip}>
+                <Text style={styles.factChipText}>{fact}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {highlights.length > 0 ? (
+          <View style={styles.highlightChipWrap}>
+            {highlights.map((highlight, highlightIndex) => (
+              <View key={`${highlight}-${highlightIndex}`} style={styles.highlightChip}>
+                <Text style={styles.highlightChipText}>{highlight}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {locationDistances ? <Text style={styles.locationDistancesText}>{locationDistances}</Text> : null}
+
+        {details.length > 0 ? (
+          <View style={styles.detailTable}>
+            {details.map((row, rowIndex) => (
+              <View key={row.label} style={rowIndex === details.length - 1 ? styles.detailRowLast : styles.detailRow}>
+                <Text style={styles.detailLabel}>{row.label}</Text>
+                <Text style={styles.detailValue}>{row.value}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {areaSummary ? (
+          <View style={styles.narrativeCard}>
+            <Text style={styles.directionLabel}>About the area</Text>
+            {renderTextLines(areaSummary, styles.accomDescription, "area-summary")}
+          </View>
+        ) : null}
+
+        {whyThisOne ? (
+          <View style={styles.narrativeCard}>
+            <Text style={styles.directionLabel}>Why we picked this one</Text>
+            {renderTextLines(whyThisOne, styles.accomDescription, "why-this-one")}
+          </View>
+        ) : null}
+
+        {hasFlightDetails ? (
+          <View style={styles.accomSubBox}>
+            {visibleOutboundLegs.length > 0 ? (
+              <View>
+                <Text style={styles.directionLabel}>Outbound</Text>
+                <View>{renderLegs(visibleOutboundLegs)}</View>
+              </View>
+            ) : null}
+            {returnType === "return" && visibleReturnLegs.length > 0 ? (
+              <View>
+                <Text style={styles.directionLabel}>Return</Text>
+                <View>{renderLegs(visibleReturnLegs)}</View>
+              </View>
+            ) : null}
+            {returnType === "tbc" && visibleOutboundLegs.length > 0 ? (
+              <View>
+                <Text style={styles.directionLabel}>Return</Text>
+                <Text style={styles.mutedText}>Details to be confirmed</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {notes ? (
           <Text style={styles.mutedText}>
             <Text style={styles.notesLabel}>Notes: </Text>
-            {option.notes}
+            {notes}
           </Text>
         ) : null}
-        <Text style={styles.priceText}>{option.priceFromText}</Text>
       </View>
     </View>
   );
 }
 
 function AccommodationOptionGallery({ option }: { option: AccommodationOption }) {
-  const photos = (option.photos || []).filter(Boolean).slice(0, 6);
+  const allPhotos = (option.photos || []).filter(Boolean);
+  const photos = option.coverPhoto?.trim() ? allPhotos.slice(0, 6) : allPhotos.slice(1, 7);
   if (photos.length === 0) return null;
 
   const { width, height } = getCellDimensions(photos.length);
@@ -405,6 +568,12 @@ export function OptionsListPDFTemplate({
             <Text style={styles.coverMeta}>{today}</Text>
           </View>
           {data.additionalNotes ? <Text style={styles.introText}>{data.additionalNotes}</Text> : null}
+          {data.recommendation?.trim() ? (
+            <View style={styles.recommendationBox}>
+              <Text style={styles.recommendationLabel}>Our recommendation</Text>
+              <View>{renderTextLines(data.recommendation.trim(), styles.recommendationText, "recommendation")}</View>
+            </View>
+          ) : null}
         </View>
       </Page>
 

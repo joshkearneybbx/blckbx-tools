@@ -1,5 +1,5 @@
 import type { ChangeEvent, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { useLocation, useRoute } from "wouter";
 import {
@@ -62,6 +62,22 @@ const EDITABLE_INPUT_CLASS =
 const EDITABLE_TEXTAREA_CLASS =
   "min-h-[120px] w-full resize-none border border-[#D4D0CB] bg-[#FAFAF8] px-3 py-2 text-sm text-[#0A0A0A] outline-none focus:border-[#0A0A0A] focus:ring-0";
 
+function autoResizeTextarea(element: HTMLTextAreaElement | null) {
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+}
+
+function useAutoResizeTextarea(value: string | undefined) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    autoResizeTextarea(ref.current);
+  }, [value]);
+
+  return ref;
+}
+
 const EMPTY_ACCOMMODATION: NonNullable<QuoteData["accommodation"]> = {
   name: "",
   checkIn: "",
@@ -114,6 +130,7 @@ const EMPTY_QUOTE_DATA: QuoteData = {
   },
   description: "",
   additionalNotes: "",
+  recommendation: "",
   activities: undefined,
   notes: "",
   segments: [],
@@ -297,6 +314,7 @@ function normalizeQuoteData(payload: unknown): QuoteData {
     },
     description: sanitizeValue(source.description),
     additionalNotes: sanitizeValue(source.additionalNotes),
+    recommendation: sanitizeValue(source.recommendation),
     activities: normalizeActivities(source.activities),
     notes: sanitizeValue(source.notes),
     segments: Array.isArray(source.segments) ? (source.segments as BookingSegment[]) : [],
@@ -318,6 +336,14 @@ function createEmptyLeg(): FlightLeg {
 
 function normalizeReturnType(value: unknown): FlightReturnType {
   return value === "one-way" || value === "tbc" ? value : "return";
+}
+
+function normalizeHighlights(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item)).filter(Boolean);
+  if (typeof value === "string" && value.trim()) {
+    return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 function normalizeFlightLegs(value: unknown): FlightLeg[] {
@@ -348,7 +374,15 @@ function inferListTypeFromOptions(options: unknown[]): OptionsListType {
   const firstOption = options.find((option) => option && typeof option === "object") as Record<string, unknown> | undefined;
   if (!firstOption) return "flight";
 
-  if (Array.isArray(firstOption.outboundLegs) || Array.isArray(firstOption.returnLegs) || "airlineName" in firstOption) {
+  if ("airlineName" in firstOption || "airlineIata" in firstOption) {
+    return "flight";
+  }
+
+  if ("name" in firstOption || "bedrooms" in firstOption || "photos" in firstOption || "boardBasis" in firstOption) {
+    return "accommodation";
+  }
+
+  if (Array.isArray(firstOption.outboundLegs) || Array.isArray(firstOption.returnLegs)) {
     return "flight";
   }
 
@@ -400,6 +434,20 @@ function normalizeOptions(value: unknown, listType: OptionsListType): OptionsLis
         sleeps: sanitizeValue(source.sleeps),
         boardBasis: sanitizeValue(source.boardBasis),
         description: sanitizeValue(source.description),
+        highlights: normalizeHighlights(source.highlights),
+        locationDistances: sanitizeValue(source.locationDistances),
+        outboundLegs: Array.isArray(source.outboundLegs) && source.outboundLegs.length > 0
+          ? normalizeFlightLegs(source.outboundLegs)
+          : Array.isArray(source.flights) && source.flights.length > 0
+            ? normalizeFlightLegs(source.flights)
+            : [createEmptyLeg()],
+        returnLegs: Array.isArray(source.returnLegs) && source.returnLegs.length > 0 ? normalizeFlightLegs(source.returnLegs) : [createEmptyLeg()],
+        returnType: normalizeReturnType(source.returnType),
+        carHire: sanitizeValue(source.carHire),
+        baggage: sanitizeValue(source.baggage),
+        areaSummary: sanitizeValue(source.areaSummary),
+        whyThisOne: sanitizeValue(source.whyThisOne),
+        coverPhoto: sanitizeValue(source.coverPhoto),
         photos: Array.isArray(source.photos) ? source.photos.map((photo) => sanitizeValue(photo)).filter(Boolean) : [],
         priceFromText: sanitizeValue(source.priceFromText).slice(0, 50),
         notes: sanitizeValue(source.notes),
@@ -424,6 +472,7 @@ function buildOptionsListData(
     destination: currentQuoteData.destination,
     clientName: nextClientName.trim(),
     additionalNotes: currentQuoteData.additionalNotes || "",
+    recommendation: currentQuoteData.recommendation || "",
     options: options.map((option, index) => ({ ...option, order: index })),
   };
 }
@@ -657,6 +706,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const tripPhotosInputRef = useRef<HTMLInputElement | null>(null);
+  const recommendationTextareaRef = useAutoResizeTextarea(quoteData?.recommendation || "");
   const { toast } = useToast();
   const quoteId = embeddedQuoteId || (routeMatch ? routeParams?.id : undefined);
 
@@ -2096,6 +2146,23 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
               </div>
             </PreviewSection>
           </div>
+          ) : null}
+
+          {mode === "list" ? (
+            <PreviewSection title="Our Recommendation" icon={FileOutput}>
+              <textarea
+                ref={recommendationTextareaRef}
+                rows={5}
+                value={quoteData.recommendation || ""}
+                onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+                  autoResizeTextarea(event.currentTarget);
+                  updateQuoteData((current) => ({ ...current, recommendation: event.target.value }));
+                }}
+                placeholder="Top pick and any conditional steers for the customer."
+                className={`${EDITABLE_TEXTAREA_CLASS} resize-y overflow-hidden`}
+                style={{ width: "100%", minHeight: 140, display: "block", overflowY: "hidden", resize: "vertical" }}
+              />
+            </PreviewSection>
           ) : null}
 
           <PreviewSection title="Additional Notes" icon={FileOutput}>

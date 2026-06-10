@@ -15,7 +15,7 @@ interface AirlineEntry {
   iata: string;
 }
 
-function hasLegData(leg: FlightLeg): boolean {
+export function legHasData(leg: FlightLeg): boolean {
   return Boolean(
     leg.flightNumber?.trim() ||
       leg.depAirport?.trim() ||
@@ -27,7 +27,7 @@ function hasLegData(leg: FlightLeg): boolean {
   );
 }
 
-function createLeg(): FlightLeg {
+export function createLeg(): FlightLeg {
   return {
     id: crypto.randomUUID(),
     flightNumber: "",
@@ -85,7 +85,7 @@ function LegEditor({
   );
 }
 
-function LegsSection({
+export function LegsSection({
   title,
   legs,
   onChange,
@@ -290,7 +290,7 @@ export function flightOptionHasData(option: FlightOption): boolean {
       option.baggage.trim() ||
       option.priceFromText.trim() ||
       option.notes?.trim() ||
-      (option.outboundLegs || []).some(hasLegData) ||
-      (option.returnLegs || []).some(hasLegData)
+      (option.outboundLegs || []).some(legHasData) ||
+      (option.returnLegs || []).some(legHasData)
   );
 }

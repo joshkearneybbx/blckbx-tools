@@ -105,6 +105,7 @@ export interface QuoteData {
   };
   description?: string;
   additionalNotes?: string;
+  recommendation?: string;
   activities?: Array<{
     name: string;
     description?: string;
