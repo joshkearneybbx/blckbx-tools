@@ -371,21 +371,19 @@ function getRawListOptions(payload: Record<string, unknown>): unknown[] {
 }
 
 function inferListTypeFromOptions(options: unknown[]): OptionsListType {
-  const firstOption = options.find((option) => option && typeof option === "object") as Record<string, unknown> | undefined;
-  if (!firstOption) return "flight";
+  const hasFlightSpecificFields = options.some((option) => {
+    if (!option || typeof option !== "object") return false;
+    const source = option as Record<string, unknown>;
+    return Boolean(sanitizeValue(source.airlineName) || sanitizeValue(source.airlineIata));
+  });
 
-  if ("airlineName" in firstOption || "airlineIata" in firstOption) {
+  if (hasFlightSpecificFields) {
     return "flight";
   }
 
-  if ("name" in firstOption || "bedrooms" in firstOption || "photos" in firstOption || "boardBasis" in firstOption) {
-    return "accommodation";
-  }
-
-  if (Array.isArray(firstOption.outboundLegs) || Array.isArray(firstOption.returnLegs)) {
-    return "flight";
-  }
-
+  // Accommodation options and flight options can both contain outbound/return legs.
+  // Treat any list without flight-only airline fields as accommodation, including
+  // empty/ambiguous legacy payloads, which is the safer/common default.
   return "accommodation";
 }
 
@@ -395,7 +393,15 @@ function normalizeRecordMode(record: Record<string, unknown>, rawOptions: unknow
   return record.mode === "list" || rawOptions.length > 0 ? "list" : "quote";
 }
 
-function normalizeRecordListType(record: Record<string, unknown>, rawOptions: unknown[]): OptionsListType {
+function normalizeRecordListType(
+  record: Record<string, unknown>,
+  storedPayload: Record<string, unknown>,
+  rawOptions: unknown[]
+): OptionsListType {
+  if (storedPayload.listType === "accommodation" || storedPayload.listType === "flight") {
+    return storedPayload.listType;
+  }
+
   if (record.listType === "accommodation" || record.listType === "flight") {
     return record.listType;
   }
@@ -462,7 +468,8 @@ function normalizeOptions(value: unknown, listType: OptionsListType): OptionsLis
 function buildOptionsListData(
   currentQuoteData: QuoteData,
   options: OptionsListOption[],
-  nextClientName: string
+  nextClientName: string,
+  listType: OptionsListType
 ): OptionsListData {
   return {
     project: {
@@ -473,6 +480,7 @@ function buildOptionsListData(
     clientName: nextClientName.trim(),
     additionalNotes: currentQuoteData.additionalNotes || "",
     recommendation: currentQuoteData.recommendation || "",
+    listType,
     options: options.map((option, index) => ({ ...option, order: index })),
   };
 }
@@ -691,6 +699,14 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   const [mode, setMode] = useState<QuoteMode>("quote");
   const [listType, setListType] = useState<OptionsListType>("flight");
   const [listOptions, setListOptions] = useState<OptionsListOption[]>([]);
+  const listOptionsByTypeRef = useRef<Record<OptionsListType, OptionsListOption[]>>({
+    flight: [],
+    accommodation: [],
+  });
+  const listOptionsDirtyByTypeRef = useRef<Record<OptionsListType, boolean>>({
+    flight: false,
+    accommodation: false,
+  });
   const [clientName, setClientName] = useState("");
   const [passengers, setPassengers] = useState<PassengerDetail[]>([createPassenger()]);
   const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
@@ -709,6 +725,31 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
   const recommendationTextareaRef = useAutoResizeTextarea(quoteData?.recommendation || "");
   const { toast } = useToast();
   const quoteId = embeddedQuoteId || (routeMatch ? routeParams?.id : undefined);
+
+  const setListOptionsForType = (nextOptions: OptionsListOption[], nextListType: OptionsListType = listType) => {
+    listOptionsByTypeRef.current = {
+      ...listOptionsByTypeRef.current,
+      [nextListType]: nextOptions,
+    };
+    listOptionsDirtyByTypeRef.current = {
+      ...listOptionsDirtyByTypeRef.current,
+      [nextListType]: true,
+    };
+    setListOptions(nextOptions);
+  };
+
+  const resetListOptionsForType = (nextListType: OptionsListType = "flight", nextOptions: OptionsListOption[] = []) => {
+    listOptionsByTypeRef.current = {
+      flight: [],
+      accommodation: [],
+      [nextListType]: nextOptions,
+    };
+    listOptionsDirtyByTypeRef.current = {
+      flight: false,
+      accommodation: false,
+    };
+    setListOptions(nextOptions);
+  };
 
   const hasOptionalSections = useMemo(() => {
     if (!quoteData) return false;
@@ -748,7 +789,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setQuoteData(null);
     setMode("quote");
     setListType("flight");
-    setListOptions([]);
+    resetListOptionsForType("flight");
     setClientName("");
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
@@ -776,7 +817,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setSelectedFile(null);
     setMode("list");
     setListType("flight");
-    setListOptions([]);
+    resetListOptionsForType("flight");
     setQuoteData({ ...EMPTY_QUOTE_DATA, project: { ...EMPTY_QUOTE_DATA.project } });
     setClientName("");
     setPassengers([createPassenger()]);
@@ -795,13 +836,12 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     if (!confirmed) return;
 
     setMode(nextMode);
+    resetListOptionsForType("flight");
     if (nextMode === "list") {
-      setListOptions([]);
       setIsOutboundFlightIncluded(false);
       setIsReturnFlightIncluded(false);
       setIsAccommodationIncluded(false);
     } else {
-      setListOptions([]);
       setIsOutboundFlightIncluded(true);
       setIsReturnFlightIncluded(true);
       setIsAccommodationIncluded(true);
@@ -816,19 +856,19 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
   const switchListType = (nextListType: OptionsListType) => {
     if (nextListType === listType) return;
-    if (listOptions.length > 0) {
-      const confirmed = window.confirm(
-        "Switching mode will clear the current options/quote data. Trip details (client name, etc.) will be preserved. Continue?"
-      );
-      if (!confirmed) return;
-    }
+
+    const optionsByType = {
+      ...listOptionsByTypeRef.current,
+      [listType]: listOptions,
+    };
+    listOptionsByTypeRef.current = optionsByType;
     setListType(nextListType);
-    setListOptions([]);
+    setListOptions(optionsByType[nextListType]);
   };
 
   const buildStoredPayload = (currentQuoteData: QuoteData) => {
     if (mode === "list") {
-      return buildOptionsListData(currentQuoteData, listOptions, clientName);
+      return buildOptionsListData(currentQuoteData, listOptions, clientName, listType);
     }
 
     return {
@@ -855,6 +895,20 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     nextStatus?: "draft" | "sent";
   } = {}): Promise<boolean> => {
     if (!quoteData || !user?.id) return false;
+
+    if (mode === "list" && listOptions.length === 0 && !listOptionsDirtyByTypeRef.current[listType]) {
+      const otherListType: OptionsListType = listType === "flight" ? "accommodation" : "flight";
+      if (listOptionsByTypeRef.current[otherListType].length > 0) {
+        if (!silent) {
+          toast({
+            title: "Nothing to save on this tab",
+            description: `Switch back to ${otherListType === "flight" ? "Flights" : "Accommodation"} or add ${listType === "flight" ? "flight" : "accommodation"} options before saving. Existing options were not overwritten.`,
+            variant: "destructive",
+          });
+        }
+        return false;
+      }
+    }
 
     setIsSaving(true);
     const statusToSave = nextStatus || quoteRecordStatus;
@@ -954,7 +1008,11 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         const storedPayload = parseStoredQuoteData(record.quoteData);
         const rawOptions = getRawListOptions(storedPayload);
         const recordMode = normalizeRecordMode(record as unknown as Record<string, unknown>, rawOptions);
-        const recordListType = normalizeRecordListType(record as unknown as Record<string, unknown>, rawOptions);
+        const recordListType = normalizeRecordListType(
+          record as unknown as Record<string, unknown>,
+          storedPayload,
+          rawOptions
+        );
         const normalized = normalizeQuoteData(storedPayload);
         const normalizedPassengers = normalizeStoredPassengers(storedPayload, normalized.travellers.total);
         const resolvedQuoteData = syncTravellersFromPassengers(normalizedPassengers, normalized) || normalized;
@@ -995,7 +1053,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         setSelectedFile(null);
         setMode(recordMode);
         setListType(recordListType);
-        setListOptions(nextListOptions);
+        resetListOptionsForType(recordListType, nextListOptions);
         setQuoteData(resolvedQuoteData);
         setClientName(
           sanitizeValue(record.clientName) ||
@@ -1055,7 +1113,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setQuoteData(null);
     setMode("quote");
     setListType("flight");
-    setListOptions([]);
+    resetListOptionsForType("flight");
     setClientName("");
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
@@ -1096,7 +1154,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
       setMode("quote");
       setListType("flight");
-      setListOptions([]);
+      resetListOptionsForType("flight");
       setQuoteData(syncTravellersFromPassengers(initialPassengers, normalized));
       setClientName(extractedClientName);
       setPassengers(initialPassengers);
@@ -1121,7 +1179,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       setQuoteData(null);
       setMode("quote");
       setListType("flight");
-      setListOptions([]);
+      resetListOptionsForType("flight");
       setClientName("");
       setPassengers([createPassenger()]);
       setCoverPhoto(null);
@@ -2063,7 +2121,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
             <OptionsListEditor
               listType={listType}
               options={listOptions}
-              onChange={setListOptions}
+              onChange={setListOptionsForType}
               onPhotoError={(message) => toast({ title: "Photos failed", description: message, variant: "destructive" })}
             />
           ) : null}

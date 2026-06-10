@@ -103,6 +103,7 @@ export interface OptionsListData {
   clientName?: string;
   additionalNotes?: string;
   recommendation?: string;
+  listType?: OptionsListType;
   options: OptionsListOption[];
 }
 
