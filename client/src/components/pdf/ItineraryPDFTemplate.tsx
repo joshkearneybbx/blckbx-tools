@@ -1464,7 +1464,7 @@ const ItemCard = ({
 // =============================================================================
 
 const SectionHeader = ({ title }: { title: string }) => (
-  <Text style={styles.subSectionTitle} minPresenceAhead={160}>
+  <Text style={styles.subSectionTitle}>
     {title}
   </Text>
 );
@@ -1484,7 +1484,7 @@ const SectionWithFirstItem = <T,>({
 
   return (
     <View style={styles.sectionContainer}>
-      <View style={styles.headerWithFirstItem}>
+      <View style={styles.headerWithFirstItem} wrap={false}>
         <SectionHeader title={title} />
         {renderItem(items[0], 0)}
       </View>
