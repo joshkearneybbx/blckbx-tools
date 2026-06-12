@@ -435,6 +435,7 @@ function normalizeOptions(value: unknown, listType: OptionsListType): OptionsLis
         id: sanitizeValue(source.id) || crypto.randomUUID(),
         name: sanitizeValue(source.name),
         location: sanitizeValue(source.location),
+        bookingLink: sanitizeValue(source.bookingLink),
         nights: sanitizeValue(source.nights),
         bedrooms: sanitizeValue(source.bedrooms),
         sleeps: sanitizeValue(source.sleeps),
