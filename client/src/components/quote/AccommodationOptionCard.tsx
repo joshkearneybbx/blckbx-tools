@@ -13,7 +13,7 @@ import type {
 } from "@/components/pdf/OptionsListPDFTemplate";
 import { createLeg, LegsSection, legHasData } from "@/components/quote/FlightOptionCard";
 
-const INPUT_CLASS = "border-[#D4D0CB] bg-[#FAFAF8] text-sm text-[#0A0A0A] focus:border-[#0A0A0A] focus:ring-0";
+const INPUT_CLASS = "w-full border-[#D4D0CB] bg-[#FAFAF8] text-sm text-[#0A0A0A] focus:border-[#0A0A0A] focus:ring-0";
 
 function autoResizeTextarea(element: HTMLTextAreaElement | null) {
   if (!element) return;
@@ -348,7 +348,7 @@ function SubStayCard({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Input className={INPUT_CLASS} placeholder="Name" value={subStay.name} onChange={(event) => update("name", event.target.value)} />
         <Input className={INPUT_CLASS} placeholder="Location" value={subStay.location} onChange={(event) => update("location", event.target.value)} />
-        <label className="space-y-1 md:col-span-2">
+        <label className="block w-full space-y-1 md:col-span-2">
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Booking link (optional)</span>
           <Input
             className={INPUT_CLASS}
@@ -525,7 +525,7 @@ export function AccommodationOptionCard({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input className={INPUT_CLASS} placeholder="Name" value={option.name} onChange={(event) => update("name", event.target.value)} />
             <Input className={INPUT_CLASS} placeholder="Location" value={option.location} onChange={(event) => update("location", event.target.value)} />
-            <label className="space-y-1 md:col-span-2">
+            <label className="block w-full space-y-1 md:col-span-2">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Booking link (optional)</span>
               <Input
                 className={INPUT_CLASS}
