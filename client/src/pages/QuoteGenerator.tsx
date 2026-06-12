@@ -160,6 +160,12 @@ function sanitizeValue(value: unknown, fallback = ""): string {
   return fallback;
 }
 
+function normalizeBookingLinkValue(value: unknown): string {
+  const trimmed = sanitizeValue(value);
+  if (!trimmed) return "";
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function normalizeActivities(value: unknown): QuoteData["activities"] {
   if (!Array.isArray(value)) return undefined;
 
@@ -377,7 +383,7 @@ function normalizeSubStays(value: unknown): SubStay[] {
       id: sanitizeValue(source.id) || crypto.randomUUID(),
       name: sanitizeValue(source.name),
       location: sanitizeValue(source.location),
-      bookingLink: sanitizeValue(source.bookingLink),
+      bookingLink: normalizeBookingLinkValue(source.bookingLink),
       nights: sanitizeValue(source.nights),
       bedrooms: sanitizeValue(source.bedrooms),
       sleeps: sanitizeValue(source.sleeps),
@@ -463,7 +469,7 @@ function normalizeOptions(value: unknown, listType: OptionsListType): OptionsLis
         id: sanitizeValue(source.id) || crypto.randomUUID(),
         name: sanitizeValue(source.name),
         location: sanitizeValue(source.location),
-        bookingLink: sanitizeValue(source.bookingLink),
+        bookingLink: normalizeBookingLinkValue(source.bookingLink),
         nights: sanitizeValue(source.nights),
         bedrooms: sanitizeValue(source.bedrooms),
         sleeps: sanitizeValue(source.sleeps),
@@ -501,6 +507,23 @@ function buildOptionsListData(
   nextClientName: string,
   listType: OptionsListType
 ): OptionsListData {
+  const normalizedOptions = options.map((option, index) => {
+    if (listType !== "accommodation") {
+      return { ...option, order: index };
+    }
+
+    const accommodationOption = option as AccommodationOption;
+    return {
+      ...accommodationOption,
+      bookingLink: normalizeBookingLinkValue(accommodationOption.bookingLink),
+      subStays: (accommodationOption.subStays || []).map((subStay) => ({
+        ...subStay,
+        bookingLink: normalizeBookingLinkValue(subStay.bookingLink),
+      })),
+      order: index,
+    };
+  });
+
   return {
     project: {
       name: currentQuoteData.project.name,
@@ -511,7 +534,7 @@ function buildOptionsListData(
     additionalNotes: currentQuoteData.additionalNotes || "",
     recommendation: currentQuoteData.recommendation || "",
     listType,
-    options: options.map((option, index) => ({ ...option, order: index })),
+    options: normalizedOptions,
   };
 }
 
