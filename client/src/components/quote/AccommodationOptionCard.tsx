@@ -348,16 +348,19 @@ function SubStayCard({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Input className={INPUT_CLASS} placeholder="Name" value={subStay.name} onChange={(event) => update("name", event.target.value)} />
         <Input className={INPUT_CLASS} placeholder="Location" value={subStay.location} onChange={(event) => update("location", event.target.value)} />
-        <label className="block w-full space-y-1 md:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Booking link (optional)</span>
+        <div className="grid w-full gap-1 md:col-span-2">
+          <label htmlFor={`sub-stay-booking-link-${subStay.id}`} className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">
+            Booking link (optional)
+          </label>
           <Input
+            id={`sub-stay-booking-link-${subStay.id}`}
             className={INPUT_CLASS}
             placeholder="https://www.airbnb.co.uk/rooms/..."
             value={subStay.bookingLink || ""}
             onChange={(event) => update("bookingLink", event.target.value)}
             onBlur={(event) => update("bookingLink", normalizeBookingLink(event.target.value))}
           />
-        </label>
+        </div>
         <Input className={INPUT_CLASS} type="number" min={0} placeholder="Nights" value={String(subStay.nights || "")} onChange={(event) => update("nights", event.target.value)} />
         <Input className={INPUT_CLASS} type="number" min={0} placeholder="Bedrooms" value={String(subStay.bedrooms || "")} onChange={(event) => update("bedrooms", event.target.value)} />
         <Input className={INPUT_CLASS} type="number" min={0} placeholder="Sleeps" value={String(subStay.sleeps || "")} onChange={(event) => update("sleeps", event.target.value)} />
@@ -525,16 +528,19 @@ export function AccommodationOptionCard({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input className={INPUT_CLASS} placeholder="Name" value={option.name} onChange={(event) => update("name", event.target.value)} />
             <Input className={INPUT_CLASS} placeholder="Location" value={option.location} onChange={(event) => update("location", event.target.value)} />
-            <label className="block w-full space-y-1 md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Booking link (optional)</span>
+            <div className="grid w-full gap-1 md:col-span-2">
+              <label htmlFor={`booking-link-${option.id}`} className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">
+                Booking link (optional)
+              </label>
               <Input
+                id={`booking-link-${option.id}`}
                 className={INPUT_CLASS}
                 placeholder="https://www.airbnb.co.uk/rooms/..."
                 value={option.bookingLink || ""}
                 onChange={(event) => update("bookingLink", event.target.value)}
                 onBlur={(event) => update("bookingLink", normalizeBookingLink(event.target.value))}
               />
-            </label>
+            </div>
             <Input className={INPUT_CLASS} type="number" min={0} placeholder="Nights" value={String(option.nights || "")} onChange={(event) => update("nights", event.target.value)} />
             <Input className={INPUT_CLASS} type="number" min={0} placeholder="Bedrooms" value={String(option.bedrooms || "")} onChange={(event) => update("bedrooms", event.target.value)} />
             <Input className={INPUT_CLASS} type="number" min={0} placeholder="Sleeps" value={String(option.sleeps || "")} onChange={(event) => update("sleeps", event.target.value)} />
