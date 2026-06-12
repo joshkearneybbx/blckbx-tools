@@ -12,6 +12,7 @@ import {
 } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import logoUrl from "@assets/blckbx-logo-white.png";
+import { LinkIcon } from "@/components/pdf/PDFIcons";
 
 Font.register({
   family: "Inter",
@@ -225,8 +226,9 @@ const styles = StyleSheet.create({
   accomHeaderRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
   accomHeaderText: { flex: 1, gap: 3 },
   accomName: { fontSize: 14, fontWeight: 700 },
+  accomNameLinkWrap: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
   accomNameLink: { fontSize: 14, fontWeight: 700, color: "#0A0A0A", textDecoration: "underline" },
-  accomNameLinkGlyph: { fontSize: 9, fontWeight: 700, color: "#0A0A0A", textDecoration: "none" },
+  accomNameLinkIcon: { marginTop: 1 },
   subStayMarker: {
     alignSelf: "flex-start",
     backgroundColor: "#ECEAE5",
@@ -445,9 +447,12 @@ function AccommodationName({ name, bookingLink }: { name: string; bookingLink?: 
 
   return (
     <Link src={normalizedLink}>
-      <Text style={styles.accomNameLink}>
-        {name} <Text style={styles.accomNameLinkGlyph}>↗</Text>
-      </Text>
+      <View style={styles.accomNameLinkWrap}>
+        <Text style={styles.accomNameLink}>{name}</Text>
+        <View style={styles.accomNameLinkIcon}>
+          <LinkIcon size={10} color="#0A0A0A" />
+        </View>
+      </View>
     </Link>
   );
 }
