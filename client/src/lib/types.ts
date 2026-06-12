@@ -254,6 +254,7 @@ export type FlightSegment = {
 export type AccommodationSegment = {
   id: string;
   type: "accommodation";
+  parentId?: string;
   hotelName: string;
   roomType: string;
   boardBasis: string;

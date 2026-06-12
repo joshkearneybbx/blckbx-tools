@@ -491,6 +491,13 @@ export function emptyAccommodationSegment(): AccommodationSegment {
   };
 }
 
+export function emptySubAccommodationSegment(parentId: string): AccommodationSegment {
+  return {
+    ...emptyAccommodationSegment(),
+    parentId
+  };
+}
+
 export function createEmptyBookingData(): BookingData {
   return {
     bookingType: "trip",

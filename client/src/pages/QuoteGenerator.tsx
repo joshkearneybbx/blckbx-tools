@@ -1808,6 +1808,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
             </p>
             <SegmentBuilder
               segments={quoteData.segments || []}
+              allowSubAccommodation
               onChange={(segments) =>
                 updateQuoteData((current) => ({ ...current, segments }))
               }

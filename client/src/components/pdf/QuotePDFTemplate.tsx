@@ -11,7 +11,12 @@ import {
   Svg,
 } from "@react-pdf/renderer";
 import logoUrl from "@assets/blckbx-logo-white.png";
-import type { BookingSegment } from "@/lib/types";
+import type {
+  AccommodationSegment,
+  BookingSegment,
+  FlightSegment,
+  TransferSegment,
+} from "@/lib/types";
 
 // =============================================================================
 // FONT REGISTRATION — Inter (matches Booking PDF)
@@ -168,6 +173,100 @@ const hasFlightData = (
       flight.arrivalAirportCode?.trim() ||
       flight.departureDate?.trim() ||
       flight.arrivalDate?.trim()
+  );
+};
+
+const cleanLines = (value?: string): string[] =>
+  (value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+const hasAccommodationSegmentData = (segment: AccommodationSegment): boolean =>
+  Boolean(
+    segment.hotelName?.trim() ||
+      segment.roomType?.trim() ||
+      segment.boardBasis?.trim() ||
+      segment.checkInDate?.trim() ||
+      segment.checkOutDate?.trim() ||
+      segment.duration?.trim() ||
+      segment.address?.trim() ||
+      segment.notes?.trim() ||
+      segment.image?.trim()
+  );
+
+const hasFlightSegmentData = (segment: FlightSegment): boolean =>
+  Boolean(
+    segment.flightNumber?.trim() ||
+      segment.airline?.trim() ||
+      segment.departureAirport?.trim() ||
+      segment.departureCode?.trim() ||
+      segment.arrivalAirport?.trim() ||
+      segment.arrivalCode?.trim() ||
+      segment.departureDate?.trim() ||
+      segment.arrivalDate?.trim() ||
+      segment.notes?.trim() ||
+      segment.legs.some(
+        (leg) =>
+          leg.flightNumber?.trim() ||
+          leg.departureAirport?.trim() ||
+          leg.departureCode?.trim() ||
+          leg.arrivalAirport?.trim() ||
+          leg.arrivalCode?.trim() ||
+          leg.departureDate?.trim() ||
+          leg.arrivalDate?.trim()
+      )
+  );
+
+const hasTransferSegmentData = (segment: TransferSegment): boolean =>
+  Boolean(
+    segment.company?.trim() ||
+      segment.pickupTime?.trim() ||
+      segment.pickupLocation?.trim() ||
+      segment.dropoffLocation?.trim() ||
+      segment.vehicleDetails?.trim() ||
+      segment.contactNumber?.trim() ||
+      segment.paymentStatus?.trim() ||
+      segment.notes?.trim()
+  );
+
+const hasTimelineSegmentData = (segment: BookingSegment): boolean => {
+  if (segment.type === "accommodation") return hasAccommodationSegmentData(segment);
+  if (segment.type === "flight") return hasFlightSegmentData(segment);
+  return hasTransferSegmentData(segment);
+};
+
+const arrangeTimelineSegments = (segments: BookingSegment[]): BookingSegment[] => {
+  const topLevelAccommodationIds = new Set(
+    segments
+      .filter((segment): segment is AccommodationSegment =>
+        segment.type === "accommodation" && !segment.parentId
+      )
+      .map((segment) => segment.id)
+  );
+  const childrenByParent = new Map<string, AccommodationSegment[]>();
+  const topLevelSegments: BookingSegment[] = [];
+
+  segments.forEach((segment) => {
+    if (
+      segment.type === "accommodation" &&
+      segment.parentId &&
+      topLevelAccommodationIds.has(segment.parentId) &&
+      segment.parentId !== segment.id
+    ) {
+      const siblings = childrenByParent.get(segment.parentId) || [];
+      siblings.push(segment);
+      childrenByParent.set(segment.parentId, siblings);
+      return;
+    }
+
+    topLevelSegments.push(segment);
+  });
+
+  return topLevelSegments.flatMap((segment) =>
+    segment.type === "accommodation" && !segment.parentId
+      ? [segment, ...(childrenByParent.get(segment.id) || [])]
+      : [segment]
   );
 };
 
@@ -441,6 +540,36 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     color: "#0A0A0A",
     marginBottom: 4,
+  },
+  segmentImage: {
+    height: 120,
+    objectFit: "cover",
+    borderBottomWidth: 1,
+    borderBottomColor: "#D4D0CB",
+  },
+  additionalStayMarker: {
+    alignSelf: "flex-start",
+    backgroundColor: "#ECEAE5",
+    color: "#6B6865",
+    fontSize: 8,
+    fontWeight: 600,
+    letterSpacing: 0.4,
+    marginBottom: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    textTransform: "uppercase",
+  },
+  detailValueColumn: {
+    flexShrink: 1,
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  routeText: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#0A0A0A",
+    marginBottom: 8,
   },
 
   // Activity card
@@ -788,11 +917,215 @@ const AccommodationCard = ({
   </View>
 );
 
+const TimelineAccommodationCard = ({
+  segment,
+}: {
+  segment: AccommodationSegment;
+}) => {
+  const noteLines = cleanLines(segment.notes);
+
+  return (
+    <View wrap={false}>
+      {segment.parentId ? (
+        <Text style={styles.additionalStayMarker}>Additional stay — no flight between stays</Text>
+      ) : null}
+      <View style={styles.accomCard}>
+        {segment.image ? <Image src={segment.image} style={styles.segmentImage} /> : null}
+        <View style={styles.accomBody}>
+          <Text style={styles.accomName}>{segment.hotelName || "Accommodation"}</Text>
+          {segment.roomType ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Room Type</Text>
+              <Text style={styles.detailValue}>{segment.roomType}</Text>
+            </View>
+          ) : null}
+          {segment.boardBasis ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Board Basis</Text>
+              <Text style={styles.detailValue}>{segment.boardBasis}</Text>
+            </View>
+          ) : null}
+          {segment.checkInDate ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Check-in</Text>
+              <Text style={styles.detailValue}>{segment.checkInDate}</Text>
+            </View>
+          ) : null}
+          {segment.checkOutDate ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Check-out</Text>
+              <Text style={styles.detailValue}>
+                {segment.checkOutDate} {segment.checkOutTime || ""}
+              </Text>
+            </View>
+          ) : null}
+          {segment.duration ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Duration</Text>
+              <Text style={styles.detailValue}>{segment.duration}</Text>
+            </View>
+          ) : null}
+          {typeof segment.numberOfRooms === "number" && segment.numberOfRooms > 0 ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Rooms</Text>
+              <Text style={styles.detailValue}>{String(segment.numberOfRooms)}</Text>
+            </View>
+          ) : null}
+          {segment.address ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Address</Text>
+              <Text style={styles.detailValue}>{segment.address}</Text>
+            </View>
+          ) : null}
+          {noteLines.length ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Notes</Text>
+              <View style={styles.detailValueColumn}>
+                {noteLines.map((line, index) => (
+                  <Text key={`accom-note-${segment.id}-${index}`} style={styles.detailValue}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const TimelineFlightCard = ({ segment }: { segment: FlightSegment }) => {
+  const legs = segment.legs.length ? segment.legs : [];
+  const noteLines = cleanLines(segment.notes);
+
+  return (
+    <View style={styles.card} wrap={false}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardHeaderText}>
+          {segment.airline || segment.flightNumber || "Flight"}
+        </Text>
+      </View>
+      <View style={styles.cardBody}>
+        {legs.length ? (
+          legs.map((leg, index) => (
+            <View key={`flight-leg-${segment.id}-${leg.id || index}`}>
+              <Text style={styles.routeText}>
+                {leg.departureCode || extractAirportCode(leg.departureAirport)} → {leg.arrivalCode || extractAirportCode(leg.arrivalAirport)}
+              </Text>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Departure</Text>
+                <Text style={styles.detailValue}>
+                  {[leg.departureAirport, leg.departureDate, leg.departureTime]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Arrival</Text>
+                <Text style={styles.detailValue}>
+                  {[leg.arrivalAirport, leg.arrivalDate, leg.arrivalTime]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  {leg.arrivalNextDay ? " (+1 day)" : ""}
+                </Text>
+              </View>
+              {leg.flightNumber || segment.flightNumber ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Flight</Text>
+                  <Text style={styles.detailValue}>{leg.flightNumber || segment.flightNumber}</Text>
+                </View>
+              ) : null}
+            </View>
+          ))
+        ) : (
+          <Text style={styles.routeText}>
+            {segment.departureCode || extractAirportCode(segment.departureAirport)} → {segment.arrivalCode || extractAirportCode(segment.arrivalAirport)}
+          </Text>
+        )}
+        {segment.pnr ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>PNR</Text>
+            <Text style={styles.detailValue}>{segment.pnr}</Text>
+          </View>
+        ) : null}
+        {noteLines.length ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Notes</Text>
+            <View style={styles.detailValueColumn}>
+              {noteLines.map((line, index) => (
+                <Text key={`flight-note-${segment.id}-${index}`} style={styles.detailValue}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
+const TimelineTransferCard = ({ segment }: { segment: TransferSegment }) => {
+  const noteLines = cleanLines(segment.notes);
+  const pickupText = [segment.pickupTime, segment.pickupLocation].filter(Boolean).join(" from ");
+
+  return (
+    <View style={styles.card} wrap={false}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardHeaderText}>{segment.label || "Transfer"}</Text>
+      </View>
+      <View style={styles.cardBody}>
+        {segment.company ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Company</Text>
+            <Text style={styles.detailValue}>{segment.company}</Text>
+          </View>
+        ) : null}
+        {pickupText ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Pickup</Text>
+            <Text style={styles.detailValue}>{pickupText}</Text>
+          </View>
+        ) : null}
+        {segment.dropoffLocation ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Drop-off</Text>
+            <Text style={styles.detailValue}>{segment.dropoffLocation}</Text>
+          </View>
+        ) : null}
+        {segment.vehicleDetails ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Vehicle</Text>
+            <Text style={styles.detailValue}>{segment.vehicleDetails}</Text>
+          </View>
+        ) : null}
+        {noteLines.length ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Notes</Text>
+            <View style={styles.detailValueColumn}>
+              {noteLines.map((line, index) => (
+                <Text key={`transfer-note-${segment.id}-${index}`} style={styles.detailValue}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
+const TimelineSegmentCard = ({ segment }: { segment: BookingSegment }) => {
+  if (segment.type === "accommodation") return <TimelineAccommodationCard segment={segment} />;
+  if (segment.type === "flight") return <TimelineFlightCard segment={segment} />;
+  return <TimelineTransferCard segment={segment} />;
+};
+
 // =============================================================================
 // MAIN QUOTE PDF TEMPLATE
 // =============================================================================
-// TODO: Port segment rendering from booking-pdf-template.tsx when quote PDFs are ready
-// to use the ordered itinerary timeline instead of the legacy fixed slots.
 
 interface QuotePDFTemplateProps {
   data: QuoteData;
@@ -821,6 +1154,7 @@ export function QuotePDFTemplate({
     additionalNotes,
     activities,
     notes,
+    segments,
   } = data;
 
   const filteredActivities = (activities || []).filter(
@@ -839,6 +1173,8 @@ export function QuotePDFTemplate({
     .slice(0, 6);
   const validPassengers = (passengers || []).filter((passenger) => passenger.name.trim());
   const hasPassengers = validPassengers.length > 0;
+  const timelineSegments = arrangeTimelineSegments(segments || []).filter(hasTimelineSegmentData);
+  const hasTimelineSegments = timelineSegments.length > 0;
 
   return (
     <Document>
@@ -901,26 +1237,37 @@ export function QuotePDFTemplate({
             </View>
           )}
 
-          {hasOutboundFlight ? (
-            <View wrap={false}>
-              <Text style={styles.subSectionTitle}>Outbound Flight</Text>
-              <FlightCard flight={outboundTravel!} travellers={travellers} />
+          {hasTimelineSegments ? (
+            <View>
+              <Text style={styles.subSectionTitle}>Itinerary</Text>
+              {timelineSegments.map((segment) => (
+                <TimelineSegmentCard key={segment.id} segment={segment} />
+              ))}
             </View>
-          ) : null}
+          ) : (
+            <>
+              {hasOutboundFlight ? (
+                <View wrap={false}>
+                  <Text style={styles.subSectionTitle}>Outbound Flight</Text>
+                  <FlightCard flight={outboundTravel!} travellers={travellers} />
+                </View>
+              ) : null}
 
-          {hasAccommodation ? (
-            <View wrap={false}>
-              <Text style={styles.subSectionTitle}>Accommodation</Text>
-              <AccommodationCard accommodation={accommodation!} />
-            </View>
-          ) : null}
+              {hasAccommodation ? (
+                <View wrap={false}>
+                  <Text style={styles.subSectionTitle}>Accommodation</Text>
+                  <AccommodationCard accommodation={accommodation!} />
+                </View>
+              ) : null}
 
-          {hasReturnFlight ? (
-            <View wrap={false}>
-              <Text style={styles.subSectionTitle}>Return Flight</Text>
-              <FlightCard flight={returnTravel!} travellers={travellers} />
-            </View>
-          ) : null}
+              {hasReturnFlight ? (
+                <View wrap={false}>
+                  <Text style={styles.subSectionTitle}>Return Flight</Text>
+                  <FlightCard flight={returnTravel!} travellers={travellers} />
+                </View>
+              ) : null}
+            </>
+          )}
 
           {hasAdditionalNotes ? (
             <View wrap={false}>

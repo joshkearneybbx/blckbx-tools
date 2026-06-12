@@ -12,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 
 import {
   emptyAccommodationSegment,
+  emptySubAccommodationSegment,
   emptyFlightLeg,
   emptyFlightSegment,
   emptyTransferSegment,
@@ -139,6 +140,8 @@ export function SegmentShell({
   onMoveUp,
   onMoveDown,
   onDelete,
+  moveUpDisabled = false,
+  moveDownDisabled = false,
 }: {
   segmentType: BookingSegment["type"];
   title: string;
@@ -146,6 +149,8 @@ export function SegmentShell({
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
+  moveUpDisabled?: boolean;
+  moveDownDisabled?: boolean;
 }) {
   const Icon = getSegmentIcon(segmentType);
 
@@ -157,8 +162,8 @@ export function SegmentShell({
           <span>{title}</span>
         </div>
         <div className="flex items-center gap-2">
-          <IconActionButton onClick={onMoveUp} icon={ChevronUp} label="Move up" />
-          <IconActionButton onClick={onMoveDown} icon={ChevronDown} label="Move down" />
+          <IconActionButton onClick={onMoveUp} icon={ChevronUp} label="Move up" disabled={moveUpDisabled} />
+          <IconActionButton onClick={onMoveDown} icon={ChevronDown} label="Move down" disabled={moveDownDisabled} />
           <IconActionButton onClick={onDelete} icon={Trash2} label="Remove segment" tone="danger" />
         </div>
       </div>
@@ -167,13 +172,108 @@ export function SegmentShell({
   );
 }
 
+function isAccommodationSegment(segment: BookingSegment): segment is AccommodationSegment {
+  return segment.type === "accommodation";
+}
+
+function isSubAccommodationSegment(segment: BookingSegment): segment is AccommodationSegment {
+  return isAccommodationSegment(segment) && Boolean(segment.parentId);
+}
+
+function normalizeSubAccommodationOrder(segments: BookingSegment[]): BookingSegment[] {
+  const topLevelAccommodationIds = new Set(
+    segments
+      .filter((segment): segment is AccommodationSegment =>
+        isAccommodationSegment(segment) && !segment.parentId
+      )
+      .map((segment) => segment.id)
+  );
+  const childrenByParent = new Map<string, AccommodationSegment[]>();
+  const topLevelSegments: BookingSegment[] = [];
+
+  segments.forEach((segment) => {
+    if (isAccommodationSegment(segment) && segment.parentId) {
+      if (topLevelAccommodationIds.has(segment.parentId) && segment.parentId !== segment.id) {
+        const siblings = childrenByParent.get(segment.parentId) || [];
+        siblings.push(segment);
+        childrenByParent.set(segment.parentId, siblings);
+        return;
+      }
+
+      topLevelSegments.push({ ...segment, parentId: undefined });
+      return;
+    }
+
+    topLevelSegments.push(segment);
+  });
+
+  return topLevelSegments.flatMap((segment) => {
+    if (isAccommodationSegment(segment) && !segment.parentId) {
+      return [segment, ...(childrenByParent.get(segment.id) || [])];
+    }
+
+    return [segment];
+  });
+}
+
+function blockEnd(segments: BookingSegment[], startIndex: number) {
+  const segment = segments[startIndex];
+  if (!isAccommodationSegment(segment) || segment.parentId) return startIndex;
+
+  let endIndex = startIndex;
+  while (endIndex + 1 < segments.length) {
+    const next = segments[endIndex + 1];
+    if (!next || !isAccommodationSegment(next) || next.parentId !== segment.id) break;
+    endIndex += 1;
+  }
+  return endIndex;
+}
+
+function blockStart(segments: BookingSegment[], index: number) {
+  const segment = segments[index];
+  if (!isSubAccommodationSegment(segment)) return index;
+
+  const parentIndex = segments.findIndex((item) => item.id === segment.parentId);
+  return parentIndex >= 0 ? parentIndex : index;
+}
+
+function canMoveUp(segments: BookingSegment[], index: number) {
+  const segment = segments[index];
+  if (!segment) return false;
+  if (isSubAccommodationSegment(segment)) {
+    const previous = segments[index - 1];
+    return Boolean(
+      previous && isAccommodationSegment(previous) && previous.parentId === segment.parentId
+    );
+  }
+
+  return index > 0;
+}
+
+function canMoveDown(segments: BookingSegment[], index: number) {
+  const segment = segments[index];
+  if (!segment) return false;
+  if (isSubAccommodationSegment(segment)) {
+    const next = segments[index + 1];
+    return Boolean(next && isAccommodationSegment(next) && next.parentId === segment.parentId);
+  }
+
+  return blockEnd(segments, index) < segments.length - 1;
+}
+
 export function SegmentBuilder({
   segments,
   onChange,
+  allowSubAccommodation = false,
 }: {
   segments: BookingSegment[];
   onChange: (segments: BookingSegment[]) => void;
+  allowSubAccommodation?: boolean;
 }) {
+  const visibleSegments = allowSubAccommodation ? normalizeSubAccommodationOrder(segments) : segments;
+  const commit = (nextSegments: BookingSegment[]) =>
+    onChange(allowSubAccommodation ? normalizeSubAccommodationOrder(nextSegments) : nextSegments);
+
   const addSegment = (type: BookingSegment["type"]) => {
     const next =
       type === "transfer"
@@ -181,27 +281,76 @@ export function SegmentBuilder({
         : type === "flight"
           ? emptyFlightSegment()
           : emptyAccommodationSegment();
-    onChange([...segments, next]);
+    commit([...visibleSegments, next]);
+  };
+
+  const addSubAccommodation = (parentId: string) => {
+    const parentIndex = visibleSegments.findIndex((segment) => segment.id === parentId);
+    if (parentIndex < 0) return;
+
+    const insertIndex = blockEnd(visibleSegments, parentIndex) + 1;
+    commit([
+      ...visibleSegments.slice(0, insertIndex),
+      emptySubAccommodationSegment(parentId),
+      ...visibleSegments.slice(insertIndex),
+    ]);
   };
 
   const moveUp = (index: number) => {
-    if (index === 0) return;
-    const next = [...segments];
-    [next[index - 1], next[index]] = [next[index], next[index - 1]];
-    onChange(next);
+    if (!canMoveUp(visibleSegments, index)) return;
+
+    const segment = visibleSegments[index];
+    if (isSubAccommodationSegment(segment)) {
+      const next = [...visibleSegments];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      commit(next);
+      return;
+    }
+
+    const currentStart = index;
+    const currentEnd = blockEnd(visibleSegments, currentStart);
+    const previousEnd = currentStart - 1;
+    const previousStart = blockStart(visibleSegments, previousEnd);
+    commit([
+      ...visibleSegments.slice(0, previousStart),
+      ...visibleSegments.slice(currentStart, currentEnd + 1),
+      ...visibleSegments.slice(previousStart, currentStart),
+      ...visibleSegments.slice(currentEnd + 1),
+    ]);
   };
 
   const moveDown = (index: number) => {
-    if (index >= segments.length - 1) return;
-    const next = [...segments];
-    [next[index + 1], next[index]] = [next[index], next[index + 1]];
-    onChange(next);
+    if (!canMoveDown(visibleSegments, index)) return;
+
+    const segment = visibleSegments[index];
+    if (isSubAccommodationSegment(segment)) {
+      const next = [...visibleSegments];
+      [next[index + 1], next[index]] = [next[index], next[index + 1]];
+      commit(next);
+      return;
+    }
+
+    const currentStart = index;
+    const currentEnd = blockEnd(visibleSegments, currentStart);
+    const nextStart = currentEnd + 1;
+    const nextEnd = blockEnd(visibleSegments, nextStart);
+    commit([
+      ...visibleSegments.slice(0, currentStart),
+      ...visibleSegments.slice(nextStart, nextEnd + 1),
+      ...visibleSegments.slice(currentStart, currentEnd + 1),
+      ...visibleSegments.slice(nextEnd + 1),
+    ]);
   };
 
-  const remove = (id: string) => onChange(segments.filter((s) => s.id !== id));
+  const remove = (segment: BookingSegment) =>
+    commit(
+      visibleSegments.filter(
+        (item) => item.id !== segment.id && (!isAccommodationSegment(item) || item.parentId !== segment.id)
+      )
+    );
 
   const update = (next: BookingSegment) =>
-    onChange(segments.map((s) => (s.id === next.id ? next : s)));
+    commit(visibleSegments.map((s) => (s.id === next.id ? next : s)));
 
   return (
     <div className="space-y-4">
@@ -218,14 +367,16 @@ export function SegmentBuilder({
       </div>
 
       <div className="space-y-4">
-        {segments.map((segment, index) => (
+        {visibleSegments.map((segment, index) => (
           <SegmentShell
             key={segment.id}
             segmentType={segment.type}
-            title={segmentLabel(segment)}
+            title={isSubAccommodationSegment(segment) ? `${segmentLabel(segment)} (Additional stay)` : segmentLabel(segment)}
             onMoveUp={() => moveUp(index)}
             onMoveDown={() => moveDown(index)}
-            onDelete={() => remove(segment.id)}
+            onDelete={() => remove(segment)}
+            moveUpDisabled={!canMoveUp(visibleSegments, index)}
+            moveDownDisabled={!canMoveDown(visibleSegments, index)}
           >
             {segment.type === "transfer" ? (
               <TransferSegmentForm segment={segment} onChange={update} />
@@ -234,12 +385,17 @@ export function SegmentBuilder({
               <FlightSegmentForm segment={segment} onChange={update} />
             ) : null}
             {segment.type === "accommodation" ? (
-              <AccommodationSegmentForm segment={segment} onChange={update} />
+              <AccommodationSegmentForm
+                segment={segment}
+                onChange={update}
+                allowSubAccommodation={allowSubAccommodation && !segment.parentId}
+                onAddSubAccommodation={() => addSubAccommodation(segment.id)}
+              />
             ) : null}
           </SegmentShell>
         ))}
 
-        {segments.length === 0 ? (
+        {visibleSegments.length === 0 ? (
           <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 border border-dashed border-[hsl(var(--sand-300))] bg-white px-6 py-8 text-center">
             <div className="text-sm font-medium text-[hsl(var(--base-black))]">
               No itinerary segments yet
@@ -410,12 +566,26 @@ export function FlightSegmentForm({
 export function AccommodationSegmentForm({
   segment,
   onChange,
+  allowSubAccommodation = false,
+  onAddSubAccommodation,
 }: {
   segment: AccommodationSegment;
   onChange: (segment: AccommodationSegment) => void;
+  allowSubAccommodation?: boolean;
+  onAddSubAccommodation?: () => void;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
+      {allowSubAccommodation ? (
+        <div className="md:col-span-2">
+          <BookingsButton
+            label="Add sub-accommodation"
+            icon={Plus}
+            tone="secondary"
+            onClick={onAddSubAccommodation}
+          />
+        </div>
+      ) : null}
       <Field label="Hotel Name"><input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.hotelName} onChange={(event) => onChange({ ...segment, hotelName: event.target.value })} /></Field>
       <Field label="Room Type"><input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.roomType} onChange={(event) => onChange({ ...segment, roomType: event.target.value })} /></Field>
       <Field label="Board Basis"><input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.boardBasis} onChange={(event) => onChange({ ...segment, boardBasis: event.target.value })} /></Field>
