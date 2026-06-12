@@ -12,6 +12,7 @@ import {
 } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import logoUrl from "@assets/blckbx-logo-white.png";
+import { LinkIcon } from "@/components/pdf/PDFIcons";
 
 Font.register({
   family: "Inter",
@@ -67,6 +68,7 @@ export interface AccommodationOption {
   id: string;
   name: string;
   location: string;
+  bookingLink?: string;
   nights?: number | string;
   bedrooms?: number | string;
   sleeps?: number | string;
@@ -205,6 +207,9 @@ const styles = StyleSheet.create({
   accomHeaderRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
   accomHeaderText: { flex: 1, gap: 3 },
   accomName: { fontSize: 14, fontWeight: 700 },
+  accomNameLinkWrap: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
+  accomNameLink: { fontSize: 14, fontWeight: 700, color: "#0A0A0A", textDecoration: "underline" },
+  accomNameLinkIcon: { marginTop: 2 },
   accomHeaderAside: { alignItems: "flex-end", gap: 4, maxWidth: 120 },
   accomOptionLabel: { fontSize: 9, color: "#6B6865", textTransform: "uppercase", letterSpacing: 0.8 },
   accomLocation: { fontSize: 9, color: "#6B6865" },
@@ -343,6 +348,12 @@ function formatLocationDistances(value: string | undefined): string {
     .join(" · ");
 }
 
+function normalizeBookingLink(value?: string): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function FlightOptionCard({ option, index }: { option: FlightOption; index: number }) {
   const airlineName = option.airlineName || (option.airlineIata ? option.airlineIata : "Flight option");
   const returnType = option.returnType || "return";
@@ -403,6 +414,7 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
   const areaSummary = option.areaSummary?.trim() || "";
   const whyThisOne = option.whyThisOne?.trim() || "";
   const notes = option.notes?.trim() || "";
+  const bookingLink = normalizeBookingLink(option.bookingLink);
   const returnType = option.returnType || "return";
   const visibleOutboundLegs = (option.outboundLegs || []).filter(hasLegData);
   const visibleReturnLegs = (option.returnLegs || []).filter(hasLegData);
@@ -426,7 +438,16 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
       <View style={styles.accomBody}>
         <View style={styles.accomHeaderRow} minPresenceAhead={120}>
           <View style={styles.accomHeaderText}>
-            <Text style={styles.accomName}>{option.name || "Accommodation option"}</Text>
+            {bookingLink ? (
+              <Link src={bookingLink} style={styles.accomNameLinkWrap}>
+                <Text style={styles.accomNameLink}>{option.name || "Accommodation option"}</Text>
+                <View style={styles.accomNameLinkIcon}>
+                  <LinkIcon size={10} color="#0A0A0A" />
+                </View>
+              </Link>
+            ) : (
+              <Text style={styles.accomName}>{option.name || "Accommodation option"}</Text>
+            )}
             {option.location ? <Text style={styles.accomLocation}>{option.location}</Text> : null}
           </View>
           <View style={styles.accomHeaderAside}>

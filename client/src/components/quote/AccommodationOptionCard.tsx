@@ -27,6 +27,12 @@ function useAutoResizeTextarea(value: string | undefined, active = true) {
   return ref;
 }
 
+function normalizeBookingLink(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function convertToJpeg(file: File): Promise<string> {
   const MAX_DIMENSION = 1600;
   const QUALITY = 0.82;
@@ -190,6 +196,16 @@ export function AccommodationOptionCard({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input className={INPUT_CLASS} placeholder="Name" value={option.name} onChange={(event) => update("name", event.target.value)} />
             <Input className={INPUT_CLASS} placeholder="Location" value={option.location} onChange={(event) => update("location", event.target.value)} />
+            <label className="space-y-1 md:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6B6B68]">Booking link (optional)</span>
+              <Input
+                className={INPUT_CLASS}
+                placeholder="https://www.airbnb.co.uk/rooms/..."
+                value={option.bookingLink || ""}
+                onChange={(event) => update("bookingLink", event.target.value)}
+                onBlur={(event) => update("bookingLink", normalizeBookingLink(event.target.value))}
+              />
+            </label>
             <Input className={INPUT_CLASS} type="number" min={0} placeholder="Nights" value={String(option.nights || "")} onChange={(event) => update("nights", event.target.value)} />
             <Input className={INPUT_CLASS} type="number" min={0} placeholder="Bedrooms" value={String(option.bedrooms || "")} onChange={(event) => update("bedrooms", event.target.value)} />
             <Input className={INPUT_CLASS} type="number" min={0} placeholder="Sleeps" value={String(option.sleeps || "")} onChange={(event) => update("sleeps", event.target.value)} />
@@ -400,6 +416,7 @@ export function createAccommodationOption(order: number): AccommodationOption {
     id: crypto.randomUUID(),
     name: "",
     location: "",
+    bookingLink: "",
     nights: "",
     bedrooms: "",
     sleeps: "",
@@ -427,6 +444,7 @@ export function accommodationOptionHasData(option: AccommodationOption): boolean
   return Boolean(
     option.name.trim() ||
       option.location.trim() ||
+      option.bookingLink?.trim() ||
       String(option.nights || "").trim() ||
       String(option.bedrooms || "").trim() ||
       String(option.sleeps || "").trim() ||
