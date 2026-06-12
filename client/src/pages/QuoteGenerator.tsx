@@ -51,6 +51,7 @@ import {
   type OptionsListData,
   type OptionsListOption,
   type OptionsListType,
+  type SubStay,
 } from "@/components/pdf/OptionsListPDFTemplate";
 
 type Status = "upload" | "processing" | "result" | "error";
@@ -366,6 +367,33 @@ function normalizeFlightLegs(value: unknown): FlightLeg[] {
   return legs.length > 0 ? legs : [createEmptyLeg()];
 }
 
+function normalizeSubStays(value: unknown): SubStay[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.reduce<SubStay[]>((acc, subStay) => {
+    if (!subStay || typeof subStay !== "object") return acc;
+    const source = subStay as Record<string, unknown>;
+    acc.push({
+      id: sanitizeValue(source.id) || crypto.randomUUID(),
+      name: sanitizeValue(source.name),
+      location: sanitizeValue(source.location),
+      bookingLink: sanitizeValue(source.bookingLink),
+      nights: sanitizeValue(source.nights),
+      bedrooms: sanitizeValue(source.bedrooms),
+      sleeps: sanitizeValue(source.sleeps),
+      boardBasis: sanitizeValue(source.boardBasis),
+      description: sanitizeValue(source.description),
+      highlights: normalizeHighlights(source.highlights),
+      locationDistances: sanitizeValue(source.locationDistances),
+      areaSummary: sanitizeValue(source.areaSummary),
+      coverPhoto: sanitizeValue(source.coverPhoto),
+      photos: Array.isArray(source.photos) ? source.photos.map((photo) => sanitizeValue(photo)).filter(Boolean) : [],
+      priceFromText: sanitizeValue(source.priceFromText).slice(0, 50),
+    });
+    return acc;
+  }, []);
+}
+
 function getRawListOptions(payload: Record<string, unknown>): unknown[] {
   return Array.isArray(payload.options) ? payload.options : [];
 }
@@ -458,6 +486,7 @@ function normalizeOptions(value: unknown, listType: OptionsListType): OptionsLis
         photos: Array.isArray(source.photos) ? source.photos.map((photo) => sanitizeValue(photo)).filter(Boolean) : [],
         priceFromText: sanitizeValue(source.priceFromText).slice(0, 50),
         notes: sanitizeValue(source.notes),
+        subStays: normalizeSubStays(source.subStays),
         order: Number.isFinite(Number(source.order)) ? Number(source.order) : index,
       } as AccommodationOption;
     })

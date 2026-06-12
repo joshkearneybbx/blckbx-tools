@@ -61,6 +61,12 @@ function duplicateAccommodationOption(option: AccommodationOption): Accommodatio
     id: crypto.randomUUID(),
     coverPhoto: "",
     photos: [],
+    subStays: (duplicate.subStays || []).map((subStay) => ({
+      ...subStay,
+      id: crypto.randomUUID(),
+      coverPhoto: "",
+      photos: [],
+    })),
   };
 }
 
@@ -175,7 +181,7 @@ export function OptionsListEditor({
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]">{title}</h2>
           <p className="mt-1 text-xs text-[#6B6B68]">
-            Drag options to reorder. A maximum of 10 options is supported for accommodation photo storage.
+            Drag options to reorder. A maximum of 10 parent options is supported for accommodation photo storage.
           </p>
         </div>
         <Button

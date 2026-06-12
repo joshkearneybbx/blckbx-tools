@@ -64,6 +64,24 @@ export interface FlightOption {
   order: number;
 }
 
+export interface SubStay {
+  id: string;
+  name: string;
+  location: string;
+  bookingLink?: string;
+  nights?: number | string;
+  bedrooms?: number | string;
+  sleeps?: number | string;
+  boardBasis?: string;
+  highlights?: string[];
+  locationDistances?: string;
+  areaSummary?: string;
+  description?: string;
+  coverPhoto?: string;
+  photos: string[];
+  priceFromText: string;
+}
+
 export interface AccommodationOption {
   id: string;
   name: string;
@@ -87,6 +105,7 @@ export interface AccommodationOption {
   photos: string[];
   priceFromText: string;
   notes?: string;
+  subStays?: SubStay[];
   order: number;
 }
 
@@ -210,6 +229,19 @@ const styles = StyleSheet.create({
   accomNameLinkWrap: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
   accomNameLink: { fontSize: 14, fontWeight: 700, color: "#0A0A0A", textDecoration: "underline" },
   accomNameLinkIcon: { marginTop: 2 },
+  subStayMarker: {
+    alignSelf: "flex-start",
+    backgroundColor: "#ECEAE5",
+    color: "#6B6865",
+    fontSize: 8,
+    fontWeight: 600,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    textTransform: "uppercase",
+  },
+  subStayWrap: { marginTop: 10 },
   accomHeaderAside: { alignItems: "flex-end", gap: 4, maxWidth: 120 },
   accomOptionLabel: { fontSize: 9, color: "#6B6865", textTransform: "uppercase", letterSpacing: 0.8 },
   accomLocation: { fontSize: 9, color: "#6B6865" },
@@ -406,6 +438,23 @@ function getCellDimensions(photoCount: number): { width: string; height: number 
   return { width: "32%", height: Math.round(GALLERY_WIDTH * 0.32 * 0.70) };
 }
 
+function AccommodationName({ name, bookingLink }: { name: string; bookingLink?: string }) {
+  const normalizedLink = normalizeBookingLink(bookingLink);
+
+  if (!normalizedLink) {
+    return <Text style={styles.accomName}>{name}</Text>;
+  }
+
+  return (
+    <Link src={normalizedLink} style={styles.accomNameLinkWrap}>
+      <Text style={styles.accomNameLink}>{name}</Text>
+      <View style={styles.accomNameLinkIcon}>
+        <LinkIcon size={10} color="#0A0A0A" />
+      </View>
+    </Link>
+  );
+}
+
 function AccommodationOptionCard({ option, index }: { option: AccommodationOption; index: number }) {
   const highlights = coerceHighlights(option.highlights);
   const locationDistances = formatLocationDistances(option.locationDistances);
@@ -414,7 +463,6 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
   const areaSummary = option.areaSummary?.trim() || "";
   const whyThisOne = option.whyThisOne?.trim() || "";
   const notes = option.notes?.trim() || "";
-  const bookingLink = normalizeBookingLink(option.bookingLink);
   const returnType = option.returnType || "return";
   const visibleOutboundLegs = (option.outboundLegs || []).filter(hasLegData);
   const visibleReturnLegs = (option.returnLegs || []).filter(hasLegData);
@@ -438,16 +486,7 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
       <View style={styles.accomBody}>
         <View style={styles.accomHeaderRow} minPresenceAhead={120}>
           <View style={styles.accomHeaderText}>
-            {bookingLink ? (
-              <Link src={bookingLink} style={styles.accomNameLinkWrap}>
-                <Text style={styles.accomNameLink}>{option.name || "Accommodation option"}</Text>
-                <View style={styles.accomNameLinkIcon}>
-                  <LinkIcon size={10} color="#0A0A0A" />
-                </View>
-              </Link>
-            ) : (
-              <Text style={styles.accomName}>{option.name || "Accommodation option"}</Text>
-            )}
+            <AccommodationName name={option.name || "Accommodation option"} bookingLink={option.bookingLink} />
             {option.location ? <Text style={styles.accomLocation}>{option.location}</Text> : null}
           </View>
           <View style={styles.accomHeaderAside}>
@@ -537,9 +576,81 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
   );
 }
 
-function AccommodationOptionGallery({ option }: { option: AccommodationOption }) {
-  const allPhotos = (option.photos || []).filter(Boolean);
-  const photos = option.coverPhoto?.trim() ? allPhotos.slice(0, 6) : allPhotos.slice(1, 7);
+function SubStayCard({ subStay }: { subStay: SubStay }) {
+  const highlights = coerceHighlights(subStay.highlights);
+  const locationDistances = formatLocationDistances(subStay.locationDistances);
+  const areaSummary = subStay.areaSummary?.trim() || "";
+  const description = subStay.description?.trim() || "";
+  const facts = [
+    subStay.nights ? `${subStay.nights} nights` : "",
+    subStay.bedrooms ? `${subStay.bedrooms} bedrooms` : "",
+    subStay.sleeps ? `sleeps ${subStay.sleeps}` : "",
+    subStay.boardBasis || "",
+  ].filter(Boolean);
+  const coverSrc = subStay.coverPhoto || (subStay.photos || [])[0] || "";
+
+  return (
+    <View style={styles.subStayWrap} wrap={false}>
+      <Text style={styles.subStayMarker}>Additional stay — shares flights above</Text>
+      <View style={styles.accomCard}>
+        {coverSrc ? <Image src={coverSrc} style={styles.coverPhoto} /> : null}
+        <View style={styles.accomBody}>
+          <View style={styles.accomHeaderRow} minPresenceAhead={120}>
+            <View style={styles.accomHeaderText}>
+              <AccommodationName name={subStay.name || "Additional stay"} bookingLink={subStay.bookingLink} />
+              {subStay.location ? <Text style={styles.accomLocation}>{subStay.location}</Text> : null}
+            </View>
+            {subStay.priceFromText ? (
+              <View style={styles.accomHeaderAside}>
+                <Text style={styles.accomPrice}>{subStay.priceFromText}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {facts.length > 0 ? (
+            <View style={styles.factStrip}>
+              {facts.map((fact) => (
+                <View key={fact} style={styles.factChip}>
+                  <Text style={styles.factChipText}>{fact}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {highlights.length > 0 ? (
+            <View style={styles.highlightChipWrap}>
+              {highlights.map((highlight, highlightIndex) => (
+                <View key={`${highlight}-${highlightIndex}`} style={styles.highlightChip}>
+                  <Text style={styles.highlightChipText}>{highlight}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {locationDistances ? <Text style={styles.locationDistancesText}>{locationDistances}</Text> : null}
+
+          {areaSummary ? (
+            <View style={styles.narrativeCard}>
+              <Text style={styles.directionLabel}>About the area</Text>
+              {renderTextLines(areaSummary, styles.accomDescription, `sub-area-${subStay.id}`)}
+            </View>
+          ) : null}
+
+          {description ? (
+            <View style={styles.narrativeCard}>
+              <Text style={styles.directionLabel}>Description</Text>
+              {renderTextLines(description, styles.accomDescription, `sub-description-${subStay.id}`)}
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function StayGallery({ photos: sourcePhotos, coverPhoto }: { photos?: string[]; coverPhoto?: string }) {
+  const allPhotos = (sourcePhotos || []).filter(Boolean);
+  const photos = coverPhoto?.trim() ? allPhotos.slice(0, 6) : allPhotos.slice(1, 7);
   if (photos.length === 0) return null;
 
   const { width, height } = getCellDimensions(photos.length);
@@ -553,6 +664,14 @@ function AccommodationOptionGallery({ option }: { option: AccommodationOption })
       ))}
     </View>
   );
+}
+
+function AccommodationOptionGallery({ option }: { option: AccommodationOption }) {
+  return <StayGallery photos={option.photos} coverPhoto={option.coverPhoto} />;
+}
+
+function SubStayGallery({ subStay }: { subStay: SubStay }) {
+  return <StayGallery photos={subStay.photos} coverPhoto={subStay.coverPhoto} />;
 }
 
 interface OptionsListPDFTemplateProps {
@@ -627,6 +746,12 @@ export function OptionsListPDFTemplate({
             <View style={styles.divider} />
             <AccommodationOptionCard option={option} index={index} />
             <AccommodationOptionGallery option={option} />
+            {(option.subStays || []).map((subStay) => (
+              <View key={subStay.id || `sub-stay-${index}`}>
+                <SubStayCard subStay={subStay} />
+                <SubStayGallery subStay={subStay} />
+              </View>
+            ))}
           </Page>
         ))
       )}
