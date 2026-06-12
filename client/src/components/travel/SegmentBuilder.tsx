@@ -388,7 +388,7 @@ export function SegmentBuilder({
               <AccommodationSegmentForm
                 segment={segment}
                 onChange={update}
-                allowSubAccommodation={allowSubAccommodation && !segment.parentId}
+                allowSubAccommodation={allowSubAccommodation}
                 onAddSubAccommodation={() => addSubAccommodation(segment.id)}
               />
             ) : null}
@@ -574,9 +574,11 @@ export function AccommodationSegmentForm({
   allowSubAccommodation?: boolean;
   onAddSubAccommodation?: () => void;
 }) {
+  const canAddSubAccommodation = allowSubAccommodation && !segment.parentId;
+
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      {allowSubAccommodation ? (
+      {canAddSubAccommodation ? (
         <div className="md:col-span-2">
           <BookingsButton
             label="Add sub-accommodation"
