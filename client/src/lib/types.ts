@@ -201,6 +201,7 @@ export type TransferSegment = {
   id: string;
   type: "transfer";
   label: string;
+  mode: string;
   company: string;
   pickupTime: string;
   pickupLocation: string;

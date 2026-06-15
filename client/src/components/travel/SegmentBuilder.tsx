@@ -18,6 +18,7 @@ import {
   emptyTransferSegment,
   segmentLabel,
 } from "@/lib/bookings";
+import { TRANSPORT_MODES, transferLabel } from "@/lib/transfer-labels";
 import type {
   AccommodationSegment,
   BookingSegment,
@@ -419,6 +420,18 @@ export function TransferSegmentForm({
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
+      <Field label="Transport" className="md:col-span-2">
+        <select
+          className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
+          value={segment.mode || ""}
+          onChange={(event) => onChange({ ...segment, mode: event.target.value })}
+        >
+          <option value="">— Select transport —</option>
+          {TRANSPORT_MODES.map((mode) => (
+            <option key={mode} value={mode}>{mode}</option>
+          ))}
+        </select>
+      </Field>
       <Field label="Transfer Type">
         <select
           className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
@@ -435,22 +448,22 @@ export function TransferSegmentForm({
       <Field label="Custom Label">
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.label} onChange={(event) => onChange({ ...segment, label: event.target.value })} />
       </Field>
-      <Field label="Company">
+      <Field label={transferLabel("company", segment.mode)}>
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.company} onChange={(event) => onChange({ ...segment, company: event.target.value })} />
       </Field>
-      <Field label="Pickup Time">
+      <Field label={transferLabel("pickupTime", segment.mode)}>
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.pickupTime} onChange={(event) => onChange({ ...segment, pickupTime: event.target.value })} />
       </Field>
       <Field label="Payment Status">
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.paymentStatus} onChange={(event) => onChange({ ...segment, paymentStatus: event.target.value })} />
       </Field>
-      <Field label="Pickup Location">
+      <Field label={transferLabel("pickupLocation", segment.mode)}>
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.pickupLocation} onChange={(event) => onChange({ ...segment, pickupLocation: event.target.value })} />
       </Field>
-      <Field label="Dropoff Location">
+      <Field label={transferLabel("dropoffLocation", segment.mode)}>
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.dropoffLocation} onChange={(event) => onChange({ ...segment, dropoffLocation: event.target.value })} />
       </Field>
-      <Field label="Vehicle Details">
+      <Field label={transferLabel("vehicleDetails", segment.mode)}>
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.vehicleDetails} onChange={(event) => onChange({ ...segment, vehicleDetails: event.target.value })} />
       </Field>
       <Field label="Contact Number">

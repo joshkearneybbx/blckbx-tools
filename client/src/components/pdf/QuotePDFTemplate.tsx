@@ -11,6 +11,7 @@ import {
   Svg,
 } from "@react-pdf/renderer";
 import logoUrl from "@assets/blckbx-logo-white.png";
+import { transferLabel } from "@/lib/transfer-labels";
 import type {
   AccommodationSegment,
   BookingSegment,
@@ -1073,30 +1074,30 @@ const TimelineTransferCard = ({ segment }: { segment: TransferSegment }) => {
   return (
     <View style={styles.card} wrap={false}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardHeaderText}>{segment.label || "Transfer"}</Text>
+        <Text style={styles.cardHeaderText}>{[segment.mode, segment.label].filter(Boolean).join(" · ") || "Transfer"}</Text>
       </View>
       <View style={styles.cardBody}>
         {segment.company ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Company</Text>
+            <Text style={styles.detailLabel}>{transferLabel("company", segment.mode)}</Text>
             <Text style={styles.detailValue}>{segment.company}</Text>
           </View>
         ) : null}
         {pickupText ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Pickup</Text>
+            <Text style={styles.detailLabel}>{transferLabel("pickupLocation", segment.mode)}</Text>
             <Text style={styles.detailValue}>{pickupText}</Text>
           </View>
         ) : null}
         {segment.dropoffLocation ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Drop-off</Text>
+            <Text style={styles.detailLabel}>{transferLabel("dropoffLocation", segment.mode)}</Text>
             <Text style={styles.detailValue}>{segment.dropoffLocation}</Text>
           </View>
         ) : null}
         {segment.vehicleDetails ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Vehicle</Text>
+            <Text style={styles.detailLabel}>{transferLabel("vehicleDetails", segment.mode)}</Text>
             <Text style={styles.detailValue}>{segment.vehicleDetails}</Text>
           </View>
         ) : null}

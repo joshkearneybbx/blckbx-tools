@@ -17,6 +17,7 @@ import {
   formatPassengerType
 } from "@/lib/bookings";
 import { bookingPdfCarHireHero, bookingPdfCarIconPath, bookingPdfHero, bookingPdfLogo } from "@/lib/booking-pdf-assets";
+import { transferLabel } from "@/lib/transfer-labels";
 import type {
   AccommodationSegment,
   BookingRecord,
@@ -698,7 +699,8 @@ function AccommodationCard({ segment }: { segment: AccommodationSegment }) {
 
 function hasTransferData(segment: TransferSegment): boolean {
   return Boolean(
-    segment.company ||
+    segment.mode?.trim() ||
+      segment.company ||
       segment.pickupTime ||
       segment.pickupLocation ||
       segment.dropoffLocation ||
@@ -731,30 +733,30 @@ function SegmentCard({ segment }: { segment: BookingSegment }) {
   return (
     <View style={styles.segmentCard}>
       <View style={styles.segmentHeader}>
-        <Text style={styles.segmentHeaderText}>{segment.label || "Transfer"}</Text>
+        <Text style={styles.segmentHeaderText}>{[segment.mode, segment.label].filter(Boolean).join(" · ") || "Transfer"}</Text>
       </View>
       <View style={styles.segmentBody}>
         {segment.company ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Company</Text>
+            <Text style={styles.detailLabel}>{transferLabel("company", segment.mode)}</Text>
             <Text style={styles.detailValue}>{segment.company}</Text>
           </View>
         ) : null}
         {hasPickup ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Pickup</Text>
+            <Text style={styles.detailLabel}>{transferLabel("pickupLocation", segment.mode)}</Text>
             <Text style={styles.detailValue}>{pickupText}</Text>
           </View>
         ) : null}
         {segment.dropoffLocation ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Dropoff</Text>
+            <Text style={styles.detailLabel}>{transferLabel("dropoffLocation", segment.mode)}</Text>
             <Text style={styles.detailValue}>{segment.dropoffLocation}</Text>
           </View>
         ) : null}
         {segment.vehicleDetails ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Vehicle</Text>
+            <Text style={styles.detailLabel}>{transferLabel("vehicleDetails", segment.mode)}</Text>
             <Text style={styles.detailValue}>{segment.vehicleDetails}</Text>
           </View>
         ) : null}

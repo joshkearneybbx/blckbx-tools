@@ -418,6 +418,7 @@ export function emptyTransferSegment(label = "Transfer to Airport"): TransferSeg
     id: createId("transfer"),
     type: "transfer",
     label,
+    mode: "",
     company: "",
     pickupTime: "",
     pickupLocation: "",
