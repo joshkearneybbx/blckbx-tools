@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   Car,
+  CarFront,
   ChevronDown,
   ChevronUp,
   Hotel,
@@ -16,15 +17,18 @@ import {
   emptyFlightLeg,
   emptyFlightSegment,
   emptyTransferSegment,
+  emptyVehicleSegment,
   segmentLabel,
 } from "@/lib/bookings";
 import { TRANSPORT_MODES, transferLabel } from "@/lib/transfer-labels";
+import { VEHICLE_TYPES } from "@/lib/vehicle-types";
 import type {
   AccommodationSegment,
   BookingSegment,
   FlightLeg,
   FlightSegment,
   TransferSegment,
+  VehicleHireSegment,
 } from "@/lib/types";
 
 const buttonToneClasses = {
@@ -40,6 +44,7 @@ export const SEGMENT_OPTIONS = [
   { label: "Transfer", value: "transfer", icon: Car },
   { label: "Flight", value: "flight", icon: Plane },
   { label: "Accommodation", value: "accommodation", icon: Hotel },
+  { label: "Vehicle Hire", value: "vehicle", icon: CarFront },
 ] as const;
 
 async function readFileAsDataUrl(file: File) {
@@ -131,6 +136,7 @@ function Field({
 export function getSegmentIcon(type: BookingSegment["type"]): LucideIcon {
   if (type === "flight") return Plane;
   if (type === "accommodation") return Hotel;
+  if (type === "vehicle") return CarFront;
   return Car;
 }
 
@@ -281,7 +287,9 @@ export function SegmentBuilder({
         ? emptyTransferSegment()
         : type === "flight"
           ? emptyFlightSegment()
-          : emptyAccommodationSegment();
+          : type === "vehicle"
+            ? emptyVehicleSegment()
+            : emptyAccommodationSegment();
     commit([...visibleSegments, next]);
   };
 
@@ -393,6 +401,9 @@ export function SegmentBuilder({
                 onAddSubAccommodation={() => addSubAccommodation(segment.id)}
               />
             ) : null}
+            {segment.type === "vehicle" ? (
+              <VehicleSegmentForm segment={segment} onChange={update} />
+            ) : null}
           </SegmentShell>
         ))}
 
@@ -468,6 +479,55 @@ export function TransferSegmentForm({
       </Field>
       <Field label="Contact Number">
         <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.contactNumber} onChange={(event) => onChange({ ...segment, contactNumber: event.target.value })} />
+      </Field>
+      <Field label="Notes" className="md:col-span-2">
+        <textarea className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} />
+      </Field>
+    </div>
+  );
+}
+
+export function VehicleSegmentForm({
+  segment,
+  onChange,
+}: {
+  segment: VehicleHireSegment;
+  onChange: (segment: VehicleHireSegment) => void;
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <Field label="Vehicle Type" className="md:col-span-2">
+        <select
+          className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]"
+          value={segment.vehicleType || ""}
+          onChange={(event) => onChange({ ...segment, vehicleType: event.target.value })}
+        >
+          <option value="">— Select vehicle —</option>
+          {VEHICLE_TYPES.map((type) => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Provider">
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.provider} onChange={(event) => onChange({ ...segment, provider: event.target.value })} />
+      </Field>
+      <Field label="Collection Date">
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" type="date" value={segment.collectionDate} onChange={(event) => onChange({ ...segment, collectionDate: event.target.value })} />
+      </Field>
+      <Field label="Collection Location">
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.collectionLocation} onChange={(event) => onChange({ ...segment, collectionLocation: event.target.value })} />
+      </Field>
+      <Field label="Return Date">
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" type="date" value={segment.returnDate} onChange={(event) => onChange({ ...segment, returnDate: event.target.value })} />
+      </Field>
+      <Field label="Return Location">
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.returnLocation} onChange={(event) => onChange({ ...segment, returnLocation: event.target.value })} />
+      </Field>
+      <Field label="Booking Reference">
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.bookingReference} onChange={(event) => onChange({ ...segment, bookingReference: event.target.value })} />
+      </Field>
+      <Field label="Price">
+        <input className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.price} onChange={(event) => onChange({ ...segment, price: event.target.value })} />
       </Field>
       <Field label="Notes" className="md:col-span-2">
         <textarea className="w-full border border-[hsl(var(--sand-300))] bg-white px-3 py-2 text-sm text-[hsl(var(--base-black))] outline-none focus:border-[hsl(var(--base-black))]" value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} />

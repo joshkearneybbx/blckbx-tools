@@ -8,7 +8,8 @@ import type {
   CarHireData,
   FlightLeg,
   FlightSegment,
-  TransferSegment
+  TransferSegment,
+  VehicleHireSegment
 } from "@/lib/types";
 
 export const DEFAULT_WELCOME_MESSAGE =
@@ -492,6 +493,22 @@ export function emptyAccommodationSegment(): AccommodationSegment {
   };
 }
 
+export function emptyVehicleSegment(): VehicleHireSegment {
+  return {
+    id: createId("vehicle"),
+    type: "vehicle",
+    vehicleType: "",
+    provider: "",
+    collectionDate: "",
+    collectionLocation: "",
+    returnDate: "",
+    returnLocation: "",
+    bookingReference: "",
+    price: "",
+    notes: ""
+  };
+}
+
 export function emptySubAccommodationSegment(parentId: string): AccommodationSegment {
   return {
     ...emptyAccommodationSegment(),
@@ -615,6 +632,10 @@ export function segmentLabel(segment: BookingSegment) {
 
   if (segment.type === "flight") {
     return segment.flightNumber || "Flight";
+  }
+
+  if (segment.type === "vehicle") {
+    return segment.vehicleType || "Vehicle Hire";
   }
 
   return segment.hotelName || "Accommodation";

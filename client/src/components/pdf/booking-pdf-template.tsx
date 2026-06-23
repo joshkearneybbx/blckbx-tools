@@ -23,7 +23,8 @@ import type {
   BookingRecord,
   BookingSegment,
   FlightSegment,
-  TransferSegment
+  TransferSegment,
+  VehicleHireSegment
 } from "@/lib/types";
 
 Font.register({
@@ -711,6 +712,20 @@ function hasTransferData(segment: TransferSegment): boolean {
   );
 }
 
+function hasVehicleData(segment: VehicleHireSegment): boolean {
+  return Boolean(
+    segment.vehicleType?.trim() ||
+      segment.provider ||
+      segment.collectionDate ||
+      segment.collectionLocation ||
+      segment.returnDate ||
+      segment.returnLocation ||
+      segment.bookingReference ||
+      segment.price ||
+      segment.notes
+  );
+}
+
 function SegmentCard({ segment }: { segment: BookingSegment }) {
   if (segment.type === "flight") {
     return <FlightCard segment={segment} />;
@@ -718,6 +733,74 @@ function SegmentCard({ segment }: { segment: BookingSegment }) {
 
   if (segment.type === "accommodation") {
     return <AccommodationCard segment={segment} />;
+  }
+
+  if (segment.type === "vehicle") {
+    if (!hasVehicleData(segment)) {
+      return null;
+    }
+
+    const noteLines = cleanLines(segment.notes);
+    const collectionText = [segment.collectionDate, segment.collectionLocation]
+      .filter(Boolean)
+      .join(" · ");
+    const returnText = [segment.returnDate, segment.returnLocation]
+      .filter(Boolean)
+      .join(" · ");
+
+    return (
+      <View style={styles.segmentCard}>
+        <View style={styles.segmentHeader}>
+          <Text style={styles.segmentHeaderText}>
+            {segment.vehicleType || "Vehicle Hire"}
+          </Text>
+        </View>
+        <View style={styles.segmentBody}>
+          {segment.provider ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Provider</Text>
+              <Text style={styles.detailValue}>{segment.provider}</Text>
+            </View>
+          ) : null}
+          {collectionText ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Collection</Text>
+              <Text style={styles.detailValue}>{collectionText}</Text>
+            </View>
+          ) : null}
+          {returnText ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Return</Text>
+              <Text style={styles.detailValue}>{returnText}</Text>
+            </View>
+          ) : null}
+          {segment.bookingReference ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Booking Reference</Text>
+              <Text style={styles.detailValue}>{segment.bookingReference}</Text>
+            </View>
+          ) : null}
+          {segment.price ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Price</Text>
+              <Text style={styles.detailValue}>{segment.price}</Text>
+            </View>
+          ) : null}
+          {noteLines.length ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Notes</Text>
+              <View style={styles.detailValueColumn}>
+                {noteLines.map((line, index) => (
+                  <Text key={`vehicle-note-${segment.id}-${index}`} style={styles.detailValue}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    );
   }
 
   if (!hasTransferData(segment)) {

@@ -269,7 +269,22 @@ export type AccommodationSegment = {
   notes: string;
 };
 
-export type BookingSegment = TransferSegment | FlightSegment | AccommodationSegment;
+export type VehicleHireSegment = {
+  id: string;
+  type: "vehicle";
+  vehicleType: string;
+  provider: string;
+  collectionDate: string;
+  collectionLocation: string;
+  returnDate: string;
+  returnLocation: string;
+  bookingReference: string;
+  price: string;
+  notes: string;
+};
+
+export type BookingSegment =
+  TransferSegment | FlightSegment | AccommodationSegment | VehicleHireSegment;
 
 export type BookingData = {
   bookingType?: BookingType;

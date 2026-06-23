@@ -17,6 +17,7 @@ import type {
   BookingSegment,
   FlightSegment,
   TransferSegment,
+  VehicleHireSegment,
 } from "@/lib/types";
 
 // =============================================================================
@@ -231,9 +232,23 @@ const hasTransferSegmentData = (segment: TransferSegment): boolean =>
       segment.notes?.trim()
   );
 
+const hasVehicleSegmentData = (segment: VehicleHireSegment): boolean =>
+  Boolean(
+    segment.vehicleType?.trim() ||
+      segment.provider?.trim() ||
+      segment.collectionDate?.trim() ||
+      segment.collectionLocation?.trim() ||
+      segment.returnDate?.trim() ||
+      segment.returnLocation?.trim() ||
+      segment.bookingReference?.trim() ||
+      segment.price?.trim() ||
+      segment.notes?.trim()
+  );
+
 const hasTimelineSegmentData = (segment: BookingSegment): boolean => {
   if (segment.type === "accommodation") return hasAccommodationSegmentData(segment);
   if (segment.type === "flight") return hasFlightSegmentData(segment);
+  if (segment.type === "vehicle") return hasVehicleSegmentData(segment);
   return hasTransferSegmentData(segment);
 };
 
@@ -1118,9 +1133,68 @@ const TimelineTransferCard = ({ segment }: { segment: TransferSegment }) => {
   );
 };
 
+const TimelineVehicleCard = ({ segment }: { segment: VehicleHireSegment }) => {
+  const noteLines = cleanLines(segment.notes);
+  const collectionText = [segment.collectionDate, segment.collectionLocation].filter(Boolean).join(" · ");
+  const returnText = [segment.returnDate, segment.returnLocation].filter(Boolean).join(" · ");
+
+  return (
+    <View style={styles.card} wrap={false}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardHeaderText}>{segment.vehicleType || "Vehicle Hire"}</Text>
+      </View>
+      <View style={styles.cardBody}>
+        {segment.provider ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Provider</Text>
+            <Text style={styles.detailValue}>{segment.provider}</Text>
+          </View>
+        ) : null}
+        {collectionText ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Collection</Text>
+            <Text style={styles.detailValue}>{collectionText}</Text>
+          </View>
+        ) : null}
+        {returnText ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Return</Text>
+            <Text style={styles.detailValue}>{returnText}</Text>
+          </View>
+        ) : null}
+        {segment.bookingReference ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Booking Reference</Text>
+            <Text style={styles.detailValue}>{segment.bookingReference}</Text>
+          </View>
+        ) : null}
+        {segment.price ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Price</Text>
+            <Text style={styles.detailValue}>{segment.price}</Text>
+          </View>
+        ) : null}
+        {noteLines.length ? (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Notes</Text>
+            <View style={styles.detailValueColumn}>
+              {noteLines.map((line, index) => (
+                <Text key={`vehicle-note-${segment.id}-${index}`} style={styles.detailValue}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
 const TimelineSegmentCard = ({ segment }: { segment: BookingSegment }) => {
   if (segment.type === "accommodation") return <TimelineAccommodationCard segment={segment} />;
   if (segment.type === "flight") return <TimelineFlightCard segment={segment} />;
+  if (segment.type === "vehicle") return <TimelineVehicleCard segment={segment} />;
   return <TimelineTransferCard segment={segment} />;
 };
 
