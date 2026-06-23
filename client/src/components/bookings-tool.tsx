@@ -24,6 +24,7 @@ import {
   emptyFlightSegment,
   emptyPassenger,
   emptyTransferSegment,
+  emptyVehicleSegment,
   formatLongDate,
   parseStoredQuoteData,
   segmentLabel
@@ -44,7 +45,8 @@ import {
   IconActionButton,
   SEGMENT_OPTIONS,
   SegmentShell,
-  TransferSegmentForm
+  TransferSegmentForm,
+  VehicleSegmentForm
 } from "@/components/travel/SegmentBuilder";
 import { useToast } from "@/hooks/use-toast";
 import { pb } from "@/lib/pocketbase";
@@ -1092,7 +1094,9 @@ export function BookingsTool() {
                           ? emptyTransferSegment()
                           : option.value === "flight"
                             ? emptyFlightSegment()
-                            : emptyAccommodationSegment()
+                            : option.value === "vehicle"
+                              ? emptyVehicleSegment()
+                              : emptyAccommodationSegment()
                       ])
                     )
                   }
@@ -1164,6 +1168,19 @@ export function BookingsTool() {
 
                   {segment.type === "accommodation" ? (
                     <AccommodationSegmentForm
+                      segment={segment}
+                      onChange={(next) =>
+                        patchBooking((booking) =>
+                          updateSegmentList(booking, (segments) =>
+                            segments.map((item) => (item.id === next.id ? next : item))
+                          )
+                        )
+                      }
+                    />
+                  ) : null}
+
+                  {segment.type === "vehicle" ? (
+                    <VehicleSegmentForm
                       segment={segment}
                       onChange={(next) =>
                         patchBooking((booking) =>
