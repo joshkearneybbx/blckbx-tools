@@ -470,7 +470,7 @@ export function emptyFlightSegment(): FlightSegment {
     arrivalNextDay: false,
     pnr: "",
     isConnecting: false,
-    legs: [emptyFlightLeg()],
+    legs: [],
     notes: ""
   };
 }
