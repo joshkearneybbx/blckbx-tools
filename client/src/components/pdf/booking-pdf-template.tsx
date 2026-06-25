@@ -18,6 +18,7 @@ import {
 } from "@/lib/bookings";
 import { bookingPdfCarHireHero, bookingPdfCarIconPath, bookingPdfHero, bookingPdfLogo } from "@/lib/booking-pdf-assets";
 import { transferLabel } from "@/lib/transfer-labels";
+import { proxyImageUrl } from "@/features/shortlists/pdf/shared";
 import type {
   AccommodationSegment,
   BookingRecord,
@@ -631,7 +632,7 @@ function FlightCard({ segment }: { segment: FlightSegment }) {
 function AccommodationCard({ segment }: { segment: AccommodationSegment }) {
   return (
     <View style={styles.segmentCard}>
-      {segment.image ? <Image src={segment.image} style={styles.accommodationImage} /> : null}
+      {segment.image ? <Image src={proxyImageUrl(segment.image)} style={styles.accommodationImage} /> : null}
       <View style={styles.segmentBody}>
         <Text style={styles.sectionTitle}>{segment.hotelName || "Accommodation"}</Text>
         {segment.roomType ? (
@@ -1074,7 +1075,7 @@ function formatRemainingBalance(totalValue: string, depositValue: string): strin
 }
 
 function TripBookingPDFTemplate({ booking }: { booking: BookingRecord }) {
-  const heroImage = booking.coverImage || bookingPdfHero;
+  const heroImage = proxyImageUrl(booking.coverImage) || bookingPdfHero;
   const hasAdditionalInfo = Boolean(booking.bookingData.additionalInfo?.trim());
   const hasItineraryContent = booking.bookingData.segments.length > 0 || hasAdditionalInfo;
 

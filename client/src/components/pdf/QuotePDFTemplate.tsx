@@ -12,9 +12,11 @@ import {
 } from "@react-pdf/renderer";
 import logoUrl from "@assets/blckbx-logo-white.png";
 import { transferLabel } from "@/lib/transfer-labels";
+import { proxyImageUrl } from "@/features/shortlists/pdf/shared";
 import type {
   AccommodationSegment,
   BookingSegment,
+  FlightLeg,
   FlightSegment,
   TransferSegment,
   VehicleHireSegment,
@@ -146,6 +148,43 @@ const getLocationName = (location: string): string => {
 
 const formatPassengerType = (type: PassengerDetail["type"]): string =>
   type === "child" ? "Child" : "Adult";
+
+const getOrdinalSuffix = (day: number): string => {
+  const lastTwoDigits = day % 100;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 13) return "th";
+
+  const lastDigit = day % 10;
+  if (lastDigit === 1) return "st";
+  if (lastDigit === 2) return "nd";
+  if (lastDigit === 3) return "rd";
+  return "th";
+};
+
+const formatDateGB = (iso: string): string => {
+  const trimmed = (iso || "").trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (!match) return trimmed;
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    !Number.isFinite(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return trimmed;
+  }
+
+  const monthName = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1];
+  return `${day}${getOrdinalSuffix(day)} ${monthName} ${year}`;
+};
 
 const hasAccommodationData = (accommodation: QuoteData["accommodation"]): boolean => {
   if (!accommodation) return false;
@@ -503,14 +542,19 @@ const styles = StyleSheet.create({
   // Detail rows
   detailRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: 12,
+    width: "100%",
   },
   detailLabel: {
     color: "#6B6865",
+    width: 86,
+    flexShrink: 0,
   },
   detailValue: {
+    flexGrow: 1,
     flexShrink: 1,
+    flexBasis: 0,
     textAlign: "right",
   },
 
@@ -576,16 +620,41 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   detailValueColumn: {
+    flexGrow: 1,
     flexShrink: 1,
+    flexBasis: 0,
     flexDirection: "column",
     alignItems: "flex-end",
     gap: 2,
+  },
+  detailRowStacked: {
+    flexDirection: "column",
+    gap: 4,
+    width: "100%",
+  },
+  detailValueFull: {
+    width: "100%",
+    textAlign: "left",
+    lineHeight: 1.35,
   },
   routeText: {
     fontSize: 13,
     fontWeight: 700,
     color: "#0A0A0A",
     marginBottom: 8,
+  },
+  timelineRoute: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  timelineRouteCode: {
+    width: 44,
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#0A0A0A",
+    textAlign: "center",
   },
 
   // Activity card
@@ -808,6 +877,8 @@ const FlightCard = ({
   const toName = getLocationName(flight.arrivalAirport);
   const departureDate = flight.departureDate || "";
   const arrivalDate = flight.arrivalDate || departureDate;
+  const formattedDepartureDate = formatDateGB(departureDate);
+  const formattedArrivalDate = formatDateGB(arrivalDate);
   const arrivesNextDay = Boolean(
     departureDate && flight.arrivalDate && arrivalDate && departureDate !== arrivalDate
   );
@@ -832,8 +903,8 @@ const FlightCard = ({
             <Text style={styles.airportCode}>{fromCode}</Text>
             <Text style={styles.airportName}>{fromName}</Text>
             <Text style={styles.flightTime}>{flight.departureTime || "--:--"}</Text>
-            {departureDate ? (
-              <Text style={styles.flightDateText}>{departureDate}</Text>
+            {formattedDepartureDate ? (
+              <Text style={styles.flightDateText}>{formattedDepartureDate}</Text>
             ) : null}
           </View>
 
@@ -862,8 +933,8 @@ const FlightCard = ({
             <Text style={styles.airportCode}>{toCode}</Text>
             <Text style={styles.airportName}>{toName}</Text>
             <Text style={styles.flightTime}>{flight.arrivalTime || "--:--"}</Text>
-            {arrivalDate ? (
-              <Text style={styles.flightDateText}>{arrivalDate}</Text>
+            {formattedArrivalDate ? (
+              <Text style={styles.flightDateText}>{formattedArrivalDate}</Text>
             ) : null}
           </View>
         </View>
@@ -903,11 +974,11 @@ const AccommodationCard = ({
       <Text style={styles.accomName}>{accommodation.name}</Text>
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>Check-in</Text>
-        <Text style={styles.detailValue}>{accommodation.checkIn}</Text>
+        <Text style={styles.detailValue}>{formatDateGB(accommodation.checkIn)}</Text>
       </View>
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>Check-out</Text>
-        <Text style={styles.detailValue}>{accommodation.checkOut}</Text>
+        <Text style={styles.detailValue}>{formatDateGB(accommodation.checkOut)}</Text>
       </View>
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>Duration</Text>
@@ -946,7 +1017,7 @@ const TimelineAccommodationCard = ({
         <Text style={styles.additionalStayMarker}>Additional stay — no flight between stays</Text>
       ) : null}
       <View style={styles.accomCard}>
-        {segment.image ? <Image src={segment.image} style={styles.segmentImage} /> : null}
+        {segment.image ? <Image src={proxyImageUrl(segment.image)} style={styles.segmentImage} /> : null}
         <View style={styles.accomBody}>
           <Text style={styles.accomName}>{segment.hotelName || "Accommodation"}</Text>
           {segment.roomType ? (
@@ -964,14 +1035,14 @@ const TimelineAccommodationCard = ({
           {segment.checkInDate ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Check-in</Text>
-              <Text style={styles.detailValue}>{segment.checkInDate}</Text>
+              <Text style={styles.detailValue}>{formatDateGB(segment.checkInDate)}</Text>
             </View>
           ) : null}
           {segment.checkOutDate ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Check-out</Text>
               <Text style={styles.detailValue}>
-                {segment.checkOutDate} {segment.checkOutTime || ""}
+                {formatDateGB(segment.checkOutDate)} {segment.checkOutTime || ""}
               </Text>
             </View>
           ) : null}
@@ -994,15 +1065,13 @@ const TimelineAccommodationCard = ({
             </View>
           ) : null}
           {noteLines.length ? (
-            <View style={styles.detailRow}>
+            <View style={styles.detailRowStacked}>
               <Text style={styles.detailLabel}>Notes</Text>
-              <View style={styles.detailValueColumn}>
-                {noteLines.map((line, index) => (
-                  <Text key={`accom-note-${segment.id}-${index}`} style={styles.detailValue}>
-                    {line}
-                  </Text>
-                ))}
-              </View>
+              {noteLines.map((line, index) => (
+                <Text key={`accom-note-${segment.id}-${index}`} style={styles.detailValueFull}>
+                  {line}
+                </Text>
+              ))}
             </View>
           ) : null}
         </View>
@@ -1011,9 +1080,121 @@ const TimelineAccommodationCard = ({
   );
 };
 
+const TimelineRoute = ({ departureCode, arrivalCode }: { departureCode: string; arrivalCode: string }) => (
+  <View style={styles.timelineRoute}>
+    <Text style={styles.timelineRouteCode}>{departureCode}</Text>
+    <View style={styles.flightPath}>
+      <View style={styles.flightPathLine} />
+      <Svg
+        width={14}
+        height={14}
+        viewBox="0 0 24 24"
+        style={{ marginHorizontal: 4, transform: "rotate(90deg)" }}
+      >
+        <Path
+          d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+          fill="#6B6865"
+        />
+      </Svg>
+      <View style={styles.flightPathLine} />
+    </View>
+    <Text style={styles.timelineRouteCode}>{arrivalCode}</Text>
+  </View>
+);
+
 const TimelineFlightCard = ({ segment }: { segment: FlightSegment }) => {
-  const legs = segment.legs.length ? segment.legs : [];
+  const realLegs = segment.legs.filter((leg) =>
+    Boolean(
+      (leg.departureCode || "").trim() ||
+        (leg.departureAirport || "").trim() ||
+        (leg.flightNumber || "").trim()
+    )
+  );
   const noteLines = cleanLines(segment.notes);
+
+  // For connecting flights the data model stores leg 0 (origin) in segment.*
+  // and the subsequent legs (1..N) in segment.legs[]. For direct flights,
+  // segment.* holds the only leg. Build one ordered list so the renderer
+  // always emits leg 0 first, then the connecting tail.
+  const originLeg: FlightLeg = {
+    id: "origin",
+    flightNumber: segment.flightNumber,
+    airline: segment.airline,
+    departureAirport: segment.departureAirport,
+    departureCode: segment.departureCode,
+    departureTerminal: segment.departureTerminal,
+    arrivalAirport: segment.arrivalAirport,
+    arrivalCode: segment.arrivalCode,
+    arrivalTerminal: segment.arrivalTerminal,
+    departureDate: segment.departureDate,
+    departureTime: segment.departureTime,
+    arrivalDate: segment.arrivalDate,
+    arrivalTime: segment.arrivalTime,
+    arrivalNextDay: segment.arrivalNextDay,
+    layoverDuration: "",
+  };
+
+  const hasOriginLeg = Boolean(
+    (segment.departureCode || "").trim() ||
+      (segment.departureAirport || "").trim() ||
+      (segment.flightNumber || "").trim()
+  );
+
+  // Defensive dedup: if the origin leg has also been duplicated into legs[0]
+  // (same departure + arrival codes), don't render it twice.
+  const codeOf = (leg: { departureCode?: string; departureAirport?: string }) =>
+    ((leg.departureCode || "").trim() || extractAirportCode(leg.departureAirport || "")).trim();
+  const arrivalCodeOf = (leg: { arrivalCode?: string; arrivalAirport?: string }) =>
+    ((leg.arrivalCode || "").trim() || extractAirportCode(leg.arrivalAirport || "")).trim();
+  const firstRealLeg = realLegs[0];
+  const originDuplicated =
+    hasOriginLeg &&
+    Boolean(firstRealLeg) &&
+    Boolean(codeOf(originLeg)) &&
+    codeOf(originLeg) === codeOf(firstRealLeg) &&
+    arrivalCodeOf(originLeg) === arrivalCodeOf(firstRealLeg);
+
+  const legsToRender: FlightLeg[] = [];
+  if (realLegs.length) {
+    if (hasOriginLeg && !originDuplicated) {
+      legsToRender.push(originLeg);
+    }
+    legsToRender.push(...realLegs);
+  } else if (hasOriginLeg) {
+    legsToRender.push(originLeg);
+  }
+
+  const renderLegView = (leg: FlightLeg, index: number) => (
+    <View key={`flight-leg-${segment.id}-${leg.id || index}`}>
+      <TimelineRoute
+        departureCode={leg.departureCode || extractAirportCode(leg.departureAirport)}
+        arrivalCode={leg.arrivalCode || extractAirportCode(leg.arrivalAirport)}
+      />
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Departure</Text>
+        <Text style={styles.detailValue}>
+          {[leg.departureAirport, formatDateGB(leg.departureDate), leg.departureTime]
+            .filter(Boolean)
+            .join(" · ")}
+        </Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Arrival</Text>
+        <Text style={styles.detailValue}>
+          {[leg.arrivalAirport, formatDateGB(leg.arrivalDate), leg.arrivalTime]
+            .filter(Boolean)
+            .join(" · ")}
+          {leg.arrivalNextDay ? " (+1 day)" : ""}
+        </Text>
+      </View>
+      {leg.flightNumber || segment.flightNumber ? (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Flight</Text>
+          <Text style={styles.detailValue}>{leg.flightNumber || segment.flightNumber}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
 
   return (
     <View style={styles.card} wrap={false}>
@@ -1023,42 +1204,7 @@ const TimelineFlightCard = ({ segment }: { segment: FlightSegment }) => {
         </Text>
       </View>
       <View style={styles.cardBody}>
-        {legs.length ? (
-          legs.map((leg, index) => (
-            <View key={`flight-leg-${segment.id}-${leg.id || index}`}>
-              <Text style={styles.routeText}>
-                {leg.departureCode || extractAirportCode(leg.departureAirport)} → {leg.arrivalCode || extractAirportCode(leg.arrivalAirport)}
-              </Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Departure</Text>
-                <Text style={styles.detailValue}>
-                  {[leg.departureAirport, leg.departureDate, leg.departureTime]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Arrival</Text>
-                <Text style={styles.detailValue}>
-                  {[leg.arrivalAirport, leg.arrivalDate, leg.arrivalTime]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  {leg.arrivalNextDay ? " (+1 day)" : ""}
-                </Text>
-              </View>
-              {leg.flightNumber || segment.flightNumber ? (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Flight</Text>
-                  <Text style={styles.detailValue}>{leg.flightNumber || segment.flightNumber}</Text>
-                </View>
-              ) : null}
-            </View>
-          ))
-        ) : (
-          <Text style={styles.routeText}>
-            {segment.departureCode || extractAirportCode(segment.departureAirport)} → {segment.arrivalCode || extractAirportCode(segment.arrivalAirport)}
-          </Text>
-        )}
+        {legsToRender.map((leg, index) => renderLegView(leg, index))}
         {segment.pnr ? (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>PNR</Text>
@@ -1066,15 +1212,13 @@ const TimelineFlightCard = ({ segment }: { segment: FlightSegment }) => {
           </View>
         ) : null}
         {noteLines.length ? (
-          <View style={styles.detailRow}>
+          <View style={styles.detailRowStacked}>
             <Text style={styles.detailLabel}>Notes</Text>
-            <View style={styles.detailValueColumn}>
-              {noteLines.map((line, index) => (
-                <Text key={`flight-note-${segment.id}-${index}`} style={styles.detailValue}>
-                  {line}
-                </Text>
-              ))}
-            </View>
+            {noteLines.map((line, index) => (
+              <Text key={`flight-note-${segment.id}-${index}`} style={styles.detailValueFull}>
+                {line}
+              </Text>
+            ))}
           </View>
         ) : null}
       </View>
@@ -1084,7 +1228,7 @@ const TimelineFlightCard = ({ segment }: { segment: FlightSegment }) => {
 
 const TimelineTransferCard = ({ segment }: { segment: TransferSegment }) => {
   const noteLines = cleanLines(segment.notes);
-  const pickupText = [segment.pickupTime, segment.pickupLocation].filter(Boolean).join(" from ");
+  const pickupText = [formatDateGB(segment.pickupTime), segment.pickupLocation].filter(Boolean).join(" from ");
 
   return (
     <View style={styles.card} wrap={false}>
@@ -1117,15 +1261,13 @@ const TimelineTransferCard = ({ segment }: { segment: TransferSegment }) => {
           </View>
         ) : null}
         {noteLines.length ? (
-          <View style={styles.detailRow}>
+          <View style={styles.detailRowStacked}>
             <Text style={styles.detailLabel}>Notes</Text>
-            <View style={styles.detailValueColumn}>
-              {noteLines.map((line, index) => (
-                <Text key={`transfer-note-${segment.id}-${index}`} style={styles.detailValue}>
-                  {line}
-                </Text>
-              ))}
-            </View>
+            {noteLines.map((line, index) => (
+              <Text key={`transfer-note-${segment.id}-${index}`} style={styles.detailValueFull}>
+                {line}
+              </Text>
+            ))}
           </View>
         ) : null}
       </View>
@@ -1135,8 +1277,8 @@ const TimelineTransferCard = ({ segment }: { segment: TransferSegment }) => {
 
 const TimelineVehicleCard = ({ segment }: { segment: VehicleHireSegment }) => {
   const noteLines = cleanLines(segment.notes);
-  const collectionText = [segment.collectionDate, segment.collectionLocation].filter(Boolean).join(" · ");
-  const returnText = [segment.returnDate, segment.returnLocation].filter(Boolean).join(" · ");
+  const collectionText = [formatDateGB(segment.collectionDate), segment.collectionLocation].filter(Boolean).join(" · ");
+  const returnText = [formatDateGB(segment.returnDate), segment.returnLocation].filter(Boolean).join(" · ");
 
   return (
     <View style={styles.card} wrap={false}>
@@ -1175,15 +1317,13 @@ const TimelineVehicleCard = ({ segment }: { segment: VehicleHireSegment }) => {
           </View>
         ) : null}
         {noteLines.length ? (
-          <View style={styles.detailRow}>
+          <View style={styles.detailRowStacked}>
             <Text style={styles.detailLabel}>Notes</Text>
-            <View style={styles.detailValueColumn}>
-              {noteLines.map((line, index) => (
-                <Text key={`vehicle-note-${segment.id}-${index}`} style={styles.detailValue}>
-                  {line}
-                </Text>
-              ))}
-            </View>
+            {noteLines.map((line, index) => (
+              <Text key={`vehicle-note-${segment.id}-${index}`} style={styles.detailValueFull}>
+                {line}
+              </Text>
+            ))}
           </View>
         ) : null}
       </View>
@@ -1268,7 +1408,7 @@ export function QuotePDFTemplate({
           <Text style={styles.coverTitle}>{project.name}</Text>
           <View style={styles.coverMetaRow}>
             {clientName ? <Text style={styles.coverClientName}>{clientName}</Text> : <View />}
-            {destination.dates ? <Text style={styles.coverDates}>{destination.dates}</Text> : null}
+            {destination.dates ? <Text style={styles.coverDates}>{formatDateGB(destination.dates)}</Text> : null}
           </View>
 
           {hasDescription ? (
@@ -1304,7 +1444,7 @@ export function QuotePDFTemplate({
                 >
                   <Text>
                     {passenger.name}
-                    {passenger.dateOfBirth ? ` (DOB: ${passenger.dateOfBirth})` : ""}
+                    {passenger.dateOfBirth ? ` (DOB: ${formatDateGB(passenger.dateOfBirth)})` : ""}
                   </Text>
                   <Text style={styles.detailLabel}>{formatPassengerType(passenger.type)}</Text>
                 </View>
@@ -1436,7 +1576,7 @@ export function QuotePDFTemplate({
               <View>
                 <Text style={styles.pricingLabel}>Deposit</Text>
                 {pricing.depositDeadline && (
-                  <Text style={styles.pricingDeadline}>Due by {pricing.depositDeadline}</Text>
+                  <Text style={styles.pricingDeadline}>Due by {formatDateGB(pricing.depositDeadline)}</Text>
                 )}
               </View>
               <Text style={styles.pricingValue}>{pricing.deposit}</Text>
@@ -1446,7 +1586,7 @@ export function QuotePDFTemplate({
               <View>
                 <Text style={styles.pricingLabel}>Balance</Text>
                 {pricing.balanceDeadline && (
-                  <Text style={styles.pricingDeadline}>Due by {pricing.balanceDeadline}</Text>
+                  <Text style={styles.pricingDeadline}>Due by {formatDateGB(pricing.balanceDeadline)}</Text>
                 )}
               </View>
               <Text style={styles.pricingValue}>{pricing.balance}</Text>

@@ -13,6 +13,7 @@ import {
 import type { Style } from "@react-pdf/types";
 import logoUrl from "@assets/blckbx-logo-white.png";
 import { LinkIcon } from "@/components/pdf/PDFIcons";
+import { proxyImageUrl } from "@/features/shortlists/pdf/shared";
 
 Font.register({
   family: "Inter",
@@ -484,7 +485,7 @@ function AccommodationOptionCard({ option, index }: { option: AccommodationOptio
 
   return (
     <View style={styles.accomCard}>
-      {coverSrc ? <Image src={coverSrc} style={styles.coverPhoto} /> : null}
+      {coverSrc ? <Image src={proxyImageUrl(coverSrc)} style={styles.coverPhoto} /> : null}
       <View style={styles.accomBody}>
         <View style={styles.accomHeaderRow} minPresenceAhead={120}>
           <View style={styles.accomHeaderText}>
@@ -595,7 +596,7 @@ function SubStayCard({ subStay }: { subStay: SubStay }) {
     <View style={styles.subStayWrap} wrap={false}>
       <Text style={styles.subStayMarker}>Additional stay — shares flights above</Text>
       <View style={styles.accomCard}>
-        {coverSrc ? <Image src={coverSrc} style={styles.coverPhoto} /> : null}
+        {coverSrc ? <Image src={proxyImageUrl(coverSrc)} style={styles.coverPhoto} /> : null}
         <View style={styles.accomBody}>
           <View style={styles.accomHeaderRow} minPresenceAhead={120}>
             <View style={styles.accomHeaderText}>
@@ -661,7 +662,7 @@ function StayGallery({ photos: sourcePhotos, coverPhoto }: { photos?: string[]; 
     <View style={styles.galleryWrap}>
       {photos.map((photo, photoIndex) => (
         <View key={`gallery-${photoIndex}`} style={{ width }}>
-          <Image src={photo} style={{ width: "100%", height, objectFit: "cover" }} />
+          <Image src={proxyImageUrl(photo)} style={{ width: "100%", height, objectFit: "cover" }} />
         </View>
       ))}
     </View>
