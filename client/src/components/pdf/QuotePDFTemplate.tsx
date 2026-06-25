@@ -1388,6 +1388,11 @@ export function QuotePDFTemplate({
     .slice(0, 6);
   const validPassengers = (passengers || []).filter((passenger) => passenger.name.trim());
   const hasPassengers = validPassengers.length > 0;
+  const hasPricing = Boolean(
+    (pricing.totalCost || "").trim() ||
+      (pricing.deposit || "").trim() ||
+      (pricing.balance || "").trim()
+  );
   const timelineSegments = arrangeTimelineSegments(segments || []).filter(hasTimelineSegmentData);
   const hasTimelineSegments = timelineSegments.length > 0;
 
@@ -1562,16 +1567,22 @@ export function QuotePDFTemplate({
       {/* ================================================================== */}
       <Page size="A4" style={styles.page}>
         <Sidebar tripTitle={project.name} />
+        {hasPricing ? (
         <Text style={styles.sectionTitle}>Pricing</Text>
-        <View style={styles.divider} />
+        ) : null}
+        {hasPricing ? <View style={styles.divider} /> : null}
 
+        {hasPricing ? (
         <View style={styles.pricingCard} wrap={false}>
+          {pricing.totalCost?.trim() ? (
           <View style={styles.pricingHeader}>
             <Text style={styles.pricingHeaderLabel}>TOTAL COST</Text>
             <Text style={styles.pricingHeaderAmount}>{pricing.totalCost}</Text>
           </View>
+          ) : null}
 
           <View style={styles.pricingBody}>
+            {pricing.deposit?.trim() ? (
             <View style={styles.pricingRow}>
               <View>
                 <Text style={styles.pricingLabel}>Deposit</Text>
@@ -1581,7 +1592,9 @@ export function QuotePDFTemplate({
               </View>
               <Text style={styles.pricingValue}>{pricing.deposit}</Text>
             </View>
+            ) : null}
 
+            {pricing.balance?.trim() ? (
             <View style={styles.pricingRowLast}>
               <View>
                 <Text style={styles.pricingLabel}>Balance</Text>
@@ -1591,6 +1604,7 @@ export function QuotePDFTemplate({
               </View>
               <Text style={styles.pricingValue}>{pricing.balance}</Text>
             </View>
+            ) : null}
 
             <Text style={styles.pricingDisclaimer}>
               Prices are subject to availability and may change until booking is confirmed. Contact
@@ -1598,6 +1612,7 @@ export function QuotePDFTemplate({
             </Text>
           </View>
         </View>
+        ) : null}
 
         {/* Payment / Contact Section */}
         <Text style={styles.subSectionTitle}>Making Payment</Text>
