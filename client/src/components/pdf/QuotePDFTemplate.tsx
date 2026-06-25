@@ -1565,6 +1565,7 @@ export function QuotePDFTemplate({
       {/* ================================================================== */}
       {/* PRICING + PAYMENT PAGE                                             */}
       {/* ================================================================== */}
+      {hasPricing ? (
       <Page size="A4" style={styles.page}>
         <Sidebar tripTitle={project.name} />
         {hasPricing ? (
@@ -1615,13 +1616,18 @@ export function QuotePDFTemplate({
         ) : null}
 
         {/* Payment / Contact Section */}
+        {hasPricing ? (
         <Text style={styles.subSectionTitle}>Making Payment</Text>
+        ) : null}
 
+        {hasPricing ? (
         <View style={styles.contactCard} wrap={false}>
           <Text style={styles.contactHeading}>Ready to book?</Text>
           <Text style={styles.contactSubtext}>• Let your assistant know in the app</Text>
         </View>
+        ) : null}
 
+        {hasPricing ? (
         <View style={styles.tcSection}>
           <Text style={styles.tcHeading}>Terms &amp; Conditions</Text>
           <Text style={styles.tcText}>
@@ -1632,7 +1638,9 @@ export function QuotePDFTemplate({
             .
           </Text>
         </View>
+        ) : null}
       </Page>
+      ) : null}
     </Document>
   );
 }
