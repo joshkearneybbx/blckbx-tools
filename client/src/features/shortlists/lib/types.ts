@@ -26,6 +26,7 @@ export interface CustomField {
 }
 
 export interface OpeningHoursEntry {
+  id: string;
   days: string;
   opens: string;
   closes: string;

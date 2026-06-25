@@ -194,7 +194,7 @@ function ComparisonTable({ options, baseUrl, imageHeight }: { options: Shortlist
 
   return (
     <View style={[styles.table, { width: tableWidth }]}>
-      <View style={styles.row}>
+      <View style={styles.row} wrap={false}>
         <View style={[styles.cell, styles.fieldCell]}>
           <Text style={styles.fieldLabel}>Field</Text>
         </View>
@@ -204,8 +204,10 @@ function ComparisonTable({ options, baseUrl, imageHeight }: { options: Shortlist
           </View>
         ))}
       </View>
-      {rows.map((row) => (
-        <View key={row.label} style={row.label === 'Image' ? [styles.row, styles.imageRow] : styles.row}>
+      {rows.map((row) => {
+        const splittable = row.label === "What's Included";
+        return (
+        <View key={row.label} style={row.label === 'Image' ? [styles.row, styles.imageRow] : styles.row} wrap={!splittable ? false : undefined}>
           <View style={[styles.cell, styles.fieldCell]}>
             <Text style={styles.fieldLabel}>{row.label}</Text>
           </View>
@@ -215,7 +217,8 @@ function ComparisonTable({ options, baseUrl, imageHeight }: { options: Shortlist
             </View>
           ))}
         </View>
-      ))}
+        );
+      })}
     </View>
   );
 }

@@ -8,14 +8,16 @@ interface OpeningHoursEditorProps {
 }
 
 export default function OpeningHoursEditor({ value, onChange }: OpeningHoursEditorProps) {
-  const rows = value || [];
+  const rows = (value || []).map((row) =>
+    row.id ? row : { ...row, id: crypto.randomUUID() }
+  );
 
   const updateRow = (index: number, field: keyof OpeningHoursEntry, nextValue: string) => {
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: nextValue } : row)));
   };
 
   const addRow = () => {
-    onChange([...rows, { days: '', opens: '09:00', closes: '17:00' }]);
+    onChange([...rows, { id: crypto.randomUUID(), days: '', opens: '09:00', closes: '17:00' }]);
   };
 
   const removeRow = (index: number) => {
@@ -25,7 +27,7 @@ export default function OpeningHoursEditor({ value, onChange }: OpeningHoursEdit
   return (
     <div className="space-y-3">
       {rows.map((row, index) => (
-        <div key={`${row.days}-${index}`} className="grid grid-cols-[1fr_120px_120px_40px] gap-2">
+        <div key={row.id} className="grid grid-cols-[1fr_120px_120px_40px] gap-2">
           <input
             type="text"
             value={row.days}
