@@ -56,8 +56,31 @@ import {
 
 type Status = "upload" | "processing" | "result" | "error";
 type QuoteMode = "quote" | "list";
+type QuoteOptionImageKind = "optionGallery" | "optionCover" | "subStayGallery" | "subStayCover";
+
+type QuoteOptionImageUpload = {
+  optionId: string;
+  subStayId?: string;
+  kind: QuoteOptionImageKind;
+  image: string;
+  order: number;
+  filename: string;
+};
+
+type QuoteOptionImageRecord = Record<string, unknown> & {
+  id: string;
+  collectionId?: string;
+  collectionName?: string;
+  optionId?: string;
+  subStayId?: string;
+  kind?: string;
+  image?: string | string[];
+  order?: number;
+  created?: string;
+};
 
 const DEFAULT_QUOTE_WEBHOOK_URL = "https://n8n.blckbx.co.uk/webhook/pts-import";
+const QUOTE_OPTION_IMAGES_COLLECTION = "blckbx_quotes_option_images";
 const EDITABLE_INPUT_CLASS =
   "h-9 border border-[#D4D0CB] bg-[#FAFAF8] px-3 py-1.5 text-right text-sm text-[#0A0A0A] focus:border-[#0A0A0A] focus:ring-0";
 const EDITABLE_TEXTAREA_CLASS =
@@ -627,6 +650,241 @@ function base64ToFile(base64: string, filename: string): File {
   return new File([bytes], filename, { type: mime });
 }
 
+async function imageValueToFile(imageValue: string, filename: string): Promise<File | null> {
+  const trimmed = imageValue.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith("data:")) {
+    return base64ToFile(trimmed, filename);
+  }
+
+  const response = await fetch(trimmed);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch option image (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type || "image/jpeg" });
+}
+
+function cloneForStorage<T>(payload: T): T {
+  if (typeof structuredClone === "function") {
+    return structuredClone(payload);
+  }
+  return JSON.parse(JSON.stringify(payload)) as T;
+}
+
+function stripOptionImagesFromQuoteData<T>(payload: T): T {
+  const cleanedPayload = cloneForStorage(payload);
+  const source = cleanedPayload && typeof cleanedPayload === "object"
+    ? (cleanedPayload as Record<string, unknown>)
+    : null;
+
+  if (!source || !Array.isArray(source.options)) {
+    return cleanedPayload;
+  }
+
+  source.options = source.options.map((option) => {
+    if (!option || typeof option !== "object") return option;
+
+    const nextOption = { ...(option as Record<string, unknown>) };
+    nextOption.coverPhoto = "";
+    nextOption.photos = [];
+
+    if (Array.isArray(nextOption.subStays)) {
+      nextOption.subStays = nextOption.subStays.map((subStay) => {
+        if (!subStay || typeof subStay !== "object") return subStay;
+        return {
+          ...(subStay as Record<string, unknown>),
+          coverPhoto: "",
+          photos: [],
+        };
+      });
+    }
+
+    return nextOption;
+  });
+
+  return cleanedPayload;
+}
+
+function collectOptionImageUploads(payload: unknown): QuoteOptionImageUpload[] {
+  const source = parseStoredQuoteData(payload);
+  const options = Array.isArray(source.options) ? source.options : [];
+  const uploads: QuoteOptionImageUpload[] = [];
+
+  options.forEach((option, optionIndex) => {
+    if (!option || typeof option !== "object") return;
+    const nextOption = option as Record<string, unknown>;
+    const optionId = sanitizeValue(nextOption.id);
+    if (!optionId) return;
+
+    const optionCoverPhoto = sanitizeValue(nextOption.coverPhoto);
+    if (optionCoverPhoto) {
+      uploads.push({
+        optionId,
+        kind: "optionCover",
+        image: optionCoverPhoto,
+        order: 0,
+        filename: `option-${optionIndex + 1}-cover.jpg`,
+      });
+    }
+
+    const optionPhotos = Array.isArray(nextOption.photos) ? nextOption.photos : [];
+    optionPhotos.forEach((photo, photoIndex) => {
+      const image = sanitizeValue(photo);
+      if (!image) return;
+      uploads.push({
+        optionId,
+        kind: "optionGallery",
+        image,
+        order: photoIndex,
+        filename: `option-${optionIndex + 1}-gallery-${photoIndex + 1}.jpg`,
+      });
+    });
+
+    const subStays = Array.isArray(nextOption.subStays) ? nextOption.subStays : [];
+    subStays.forEach((subStay, subStayIndex) => {
+      if (!subStay || typeof subStay !== "object") return;
+      const nextSubStay = subStay as Record<string, unknown>;
+      const subStayId = sanitizeValue(nextSubStay.id);
+      if (!subStayId) return;
+
+      const subStayCoverPhoto = sanitizeValue(nextSubStay.coverPhoto);
+      if (subStayCoverPhoto) {
+        uploads.push({
+          optionId,
+          subStayId,
+          kind: "subStayCover",
+          image: subStayCoverPhoto,
+          order: 0,
+          filename: `option-${optionIndex + 1}-substay-${subStayIndex + 1}-cover.jpg`,
+        });
+      }
+
+      const subStayPhotos = Array.isArray(nextSubStay.photos) ? nextSubStay.photos : [];
+      subStayPhotos.forEach((photo, photoIndex) => {
+        const image = sanitizeValue(photo);
+        if (!image) return;
+        uploads.push({
+          optionId,
+          subStayId,
+          kind: "subStayGallery",
+          image,
+          order: photoIndex,
+          filename: `option-${optionIndex + 1}-substay-${subStayIndex + 1}-gallery-${photoIndex + 1}.jpg`,
+        });
+      });
+    });
+  });
+
+  return uploads;
+}
+
+function hasOptionImagesPayload(payload: unknown): boolean {
+  const source = parseStoredQuoteData(payload);
+  return Array.isArray(source.options);
+}
+
+function isQuoteOptionImageKind(value: string): value is QuoteOptionImageKind {
+  return value === "optionGallery" || value === "optionCover" || value === "subStayGallery" || value === "subStayCover";
+}
+
+function getQuoteOptionImageFileName(record: QuoteOptionImageRecord): string {
+  if (Array.isArray(record.image)) {
+    return sanitizeValue(record.image[0]);
+  }
+  return sanitizeValue(record.image);
+}
+
+function getQuoteOptionImageRecordUrl(record: QuoteOptionImageRecord): string {
+  const fileName = getQuoteOptionImageFileName(record);
+  return fileName ? pb.files.getUrl(record, fileName) : "";
+}
+
+function buildQuoteOptionImageRecordByUrl(
+  records: QuoteOptionImageRecord[]
+): Record<string, QuoteOptionImageRecord> {
+  return records.reduce<Record<string, QuoteOptionImageRecord>>((acc, record) => {
+    const url = getQuoteOptionImageRecordUrl(record);
+    if (url) acc[url] = record;
+    return acc;
+  }, {});
+}
+
+function quoteOptionImageGroupKey(optionId: string, kind: QuoteOptionImageKind, subStayId = ""): string {
+  return `${optionId}::${subStayId}::${kind}`;
+}
+
+function sortQuoteOptionImageRecords(records: QuoteOptionImageRecord[]): QuoteOptionImageRecord[] {
+  return [...records].sort((a, b) => {
+    const orderDiff = Number(a.order || 0) - Number(b.order || 0);
+    if (orderDiff !== 0) return orderDiff;
+    return sanitizeValue(a.created).localeCompare(sanitizeValue(b.created));
+  });
+}
+
+function mergeOptionImageRecordsIntoOptions(
+  options: OptionsListOption[],
+  imageRecords: QuoteOptionImageRecord[]
+): OptionsListOption[] {
+  if (imageRecords.length === 0) return options;
+
+  const galleryByKey = new Map<string, string[]>();
+  const coverByKey = new Map<string, string>();
+
+  sortQuoteOptionImageRecords(imageRecords).forEach((record) => {
+    const optionId = sanitizeValue(record.optionId);
+    const subStayId = sanitizeValue(record.subStayId);
+    const kind = sanitizeValue(record.kind);
+    const fileName = getQuoteOptionImageFileName(record);
+    if (!optionId || !fileName || !isQuoteOptionImageKind(kind)) return;
+
+    const url = getQuoteOptionImageRecordUrl(record);
+    if (!url) return;
+
+    const key = quoteOptionImageGroupKey(optionId, kind, subStayId);
+    if (kind === "optionCover" || kind === "subStayCover") {
+      coverByKey.set(key, url);
+      return;
+    }
+
+    galleryByKey.set(key, [...(galleryByKey.get(key) || []), url]);
+  });
+
+  return options.map((option) => {
+    const optionId = sanitizeValue(option.id);
+    if (!optionId || !("photos" in option)) return option;
+
+    const accommodationOption = option as AccommodationOption;
+    const optionCoverKey = quoteOptionImageGroupKey(optionId, "optionCover");
+    const optionGalleryKey = quoteOptionImageGroupKey(optionId, "optionGallery");
+    const optionCoverPhoto = coverByKey.get(optionCoverKey);
+    const optionPhotos = galleryByKey.get(optionGalleryKey);
+
+    return {
+      ...accommodationOption,
+      coverPhoto: optionCoverPhoto ?? accommodationOption.coverPhoto,
+      photos: optionPhotos && optionPhotos.length > 0 ? optionPhotos : accommodationOption.photos,
+      subStays: (accommodationOption.subStays || []).map((subStay) => {
+        const subStayId = sanitizeValue(subStay.id);
+        if (!subStayId) return subStay;
+
+        const subStayCoverKey = quoteOptionImageGroupKey(optionId, "subStayCover", subStayId);
+        const subStayGalleryKey = quoteOptionImageGroupKey(optionId, "subStayGallery", subStayId);
+        const subStayCoverPhoto = coverByKey.get(subStayCoverKey);
+        const subStayPhotos = galleryByKey.get(subStayGalleryKey);
+
+        return {
+          ...subStay,
+          coverPhoto: subStayCoverPhoto ?? subStay.coverPhoto,
+          photos: subStayPhotos && subStayPhotos.length > 0 ? subStayPhotos : subStay.photos,
+        };
+      }),
+    } as AccommodationOption;
+  });
+}
+
 function parseStoredQuoteData(value: unknown): Record<string, unknown> {
   if (!value) return {};
   if (typeof value === "string") {
@@ -760,6 +1018,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     flight: false,
     accommodation: false,
   });
+  const optionImageRecordByUrlRef = useRef<Record<string, QuoteOptionImageRecord>>({});
   const [clientName, setClientName] = useState("");
   const [passengers, setPassengers] = useState<PassengerDetail[]>([createPassenger()]);
   const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
@@ -843,6 +1102,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setMode("quote");
     setListType("flight");
     resetListOptionsForType("flight");
+    optionImageRecordByUrlRef.current = {};
     setClientName("");
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
@@ -871,6 +1131,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setMode("list");
     setListType("flight");
     resetListOptionsForType("flight");
+    optionImageRecordByUrlRef.current = {};
     setQuoteData({ ...EMPTY_QUOTE_DATA, project: { ...EMPTY_QUOTE_DATA.project } });
     setClientName("");
     setPassengers([createPassenger()]);
@@ -890,6 +1151,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
     setMode(nextMode);
     resetListOptionsForType("flight");
+    optionImageRecordByUrlRef.current = {};
     if (nextMode === "list") {
       setIsOutboundFlightIncluded(false);
       setIsReturnFlightIncluded(false);
@@ -967,56 +1229,128 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     const statusToSave = nextStatus || quoteRecordStatus;
 
     try {
-      const formData = new FormData();
-      formData.append("user", user.id);
-      formData.append("tripName", quoteData.project.name || (mode === "list" ? "Untitled Options List" : "Untitled Quote"));
-      formData.append("quoteReference", mode === "list" ? "" : quoteData.project.quoteReference || "");
-      formData.append("clientName", clientName.trim());
-      formData.append("destination", quoteData.destination.name || "");
-      formData.append("dates", quoteData.destination.dates || "");
-      formData.append("status", statusToSave);
-      formData.append("mode", mode);
-      formData.append("listType", mode === "list" ? listType : "");
       const storedPayload = buildStoredPayload(quoteData);
-      formData.append("quoteData", JSON.stringify(storedPayload));
+      const storagePayload = stripOptionImagesFromQuoteData(storedPayload);
+      const hasOptionImages = hasOptionImagesPayload(storedPayload);
+      let refreshedImageRecords: QuoteOptionImageRecord[] | null = null;
 
-      if (coverPhoto) {
-        formData.append("coverPhoto", base64ToFile(coverPhoto, "cover-photo.jpg"));
-      }
+      const buildQuoteFormData = (payload: unknown, includeFiles = true) => {
+        const formData = new FormData();
+        formData.append("user", user.id);
+        formData.append("tripName", quoteData.project.name || (mode === "list" ? "Untitled Options List" : "Untitled Quote"));
+        formData.append("quoteReference", mode === "list" ? "" : quoteData.project.quoteReference || "");
+        formData.append("clientName", clientName.trim());
+        formData.append("destination", quoteData.destination.name || "");
+        formData.append("dates", quoteData.destination.dates || "");
+        formData.append("status", statusToSave);
+        formData.append("mode", mode);
+        formData.append("listType", mode === "list" ? listType : "");
+        formData.append("quoteData", JSON.stringify(payload));
 
-      if (tripPhotos.length > 0) {
-        tripPhotos.forEach((photo, index) => {
-          formData.append("tripPhotos", base64ToFile(photo, `trip-photo-${index + 1}.jpg`));
-        });
-      }
-
-      if (mode === "list" && listType === "accommodation") {
-        if (savedRecordId) {
-          const existingRecord = await pb.collection("blckbx_quotes").getOne(savedRecordId, { requestKey: null });
-          // Rebuild all flat option photo fields from the current options array on every save.
-          // This keeps photos aligned after delete, reorder, and mid-array duplicate insertion.
-          for (let optionIndex = 0; optionIndex < 10; optionIndex += 1) {
-            const fieldName = `option${optionIndex + 1}Photos`;
-            const existingFiles = Array.isArray(existingRecord[fieldName]) ? existingRecord[fieldName] : [];
-            existingFiles.forEach((filename: string) => formData.append(`${fieldName}-`, filename));
-          }
+        if (includeFiles && coverPhoto) {
+          formData.append("coverPhoto", base64ToFile(coverPhoto, "cover-photo.jpg"));
         }
 
-        (listOptions as AccommodationOption[]).slice(0, 10).forEach((option, optionIndex) => {
-          option.photos.slice(0, 6).forEach((photo, photoIndex) => {
-            formData.append(
-              `option${optionIndex + 1}Photos`,
-              base64ToFile(photo, `option-${optionIndex + 1}-photo-${photoIndex + 1}.jpg`)
-            );
+        if (includeFiles && tripPhotos.length > 0) {
+          tripPhotos.forEach((photo, index) => {
+            formData.append("tripPhotos", base64ToFile(photo, `trip-photo-${index + 1}.jpg`));
           });
-        });
+        }
+
+        return formData;
+      };
+
+      let persistedQuoteId = savedRecordId || null;
+
+      if (!persistedQuoteId && hasOptionImages) {
+        // Create a safe draft first with the unstripped payload so option image data is not lost
+        // if the separate image sync fails before the final stripped update.
+        const initialRecord = await pb.collection("blckbx_quotes").create(
+          buildQuoteFormData(storedPayload, false)
+        );
+        persistedQuoteId = initialRecord.id;
+        setSavedRecordId(initialRecord.id);
       }
 
-      if (savedRecordId) {
-        await pb.collection("blckbx_quotes").update(savedRecordId, formData);
+      if (persistedQuoteId && hasOptionImages) {
+        const optionImageUploads = collectOptionImageUploads(storedPayload);
+        const existingImageRecords = await pb.collection(QUOTE_OPTION_IMAGES_COLLECTION).getFullList({
+          filter: `quote = "${persistedQuoteId}"`,
+          requestKey: null,
+        }) as QuoteOptionImageRecord[];
+        const existingRecordByUrl = buildQuoteOptionImageRecordByUrl(existingImageRecords);
+        const keptRecordIds = new Set<string>();
+
+        for (const upload of optionImageUploads) {
+          const existingRecord = existingRecordByUrl[upload.image];
+
+          if (existingRecord?.id) {
+            keptRecordIds.add(existingRecord.id);
+            const patch: Record<string, string | number> = {};
+            const nextSubStayId = upload.subStayId || "";
+
+            if (sanitizeValue(existingRecord.optionId) !== upload.optionId) patch.optionId = upload.optionId;
+            if (sanitizeValue(existingRecord.subStayId) !== nextSubStayId) patch.subStayId = nextSubStayId;
+            if (sanitizeValue(existingRecord.kind) !== upload.kind) patch.kind = upload.kind;
+            if (Number(existingRecord.order || 0) !== upload.order) patch.order = upload.order;
+
+            if (Object.keys(patch).length > 0) {
+              await pb.collection(QUOTE_OPTION_IMAGES_COLLECTION).update(existingRecord.id, patch, { requestKey: null });
+            }
+            continue;
+          }
+
+          const imageFile = await imageValueToFile(upload.image, upload.filename);
+          if (!imageFile) continue;
+
+          const imageFormData = new FormData();
+          imageFormData.append("quote", persistedQuoteId);
+          imageFormData.append("user", user.id);
+          imageFormData.append("optionId", upload.optionId);
+          if (upload.subStayId) {
+            imageFormData.append("subStayId", upload.subStayId);
+          }
+          imageFormData.append("kind", upload.kind);
+          imageFormData.append("order", String(upload.order));
+          imageFormData.append("image", imageFile, upload.filename);
+
+          const createdRecord = await pb.collection(QUOTE_OPTION_IMAGES_COLLECTION).create(imageFormData, { requestKey: null }) as QuoteOptionImageRecord;
+          keptRecordIds.add(createdRecord.id);
+        }
+
+        await Promise.all(
+          existingImageRecords
+            .filter((record) => !keptRecordIds.has(record.id))
+            .map((record) => pb.collection(QUOTE_OPTION_IMAGES_COLLECTION).delete(record.id, { requestKey: null }))
+        );
+
+        refreshedImageRecords = await pb.collection(QUOTE_OPTION_IMAGES_COLLECTION).getFullList({
+          filter: `quote = "${persistedQuoteId}"`,
+          sort: "order,created",
+          requestKey: null,
+        }) as QuoteOptionImageRecord[];
+      }
+
+      const finalFormData = buildQuoteFormData(storagePayload);
+      if (persistedQuoteId) {
+        await pb.collection("blckbx_quotes").update(persistedQuoteId, finalFormData);
       } else {
-        const record = await pb.collection("blckbx_quotes").create(formData);
+        const record = await pb.collection("blckbx_quotes").create(finalFormData);
+        persistedQuoteId = record.id;
         setSavedRecordId(record.id);
+      }
+
+      if (refreshedImageRecords) {
+        optionImageRecordByUrlRef.current = buildQuoteOptionImageRecordByUrl(refreshedImageRecords);
+
+        if (mode === "list" && listType === "accommodation") {
+          const refreshedOptions = mergeOptionImageRecordsIntoOptions(listOptions, refreshedImageRecords);
+          listOptionsByTypeRef.current = {
+            ...listOptionsByTypeRef.current,
+            accommodation: refreshedOptions,
+          };
+          setListOptions(refreshedOptions);
+        }
       }
 
       setQuoteRecordStatus(statusToSave);
@@ -1056,9 +1390,12 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
 
       try {
         const record = await pb.collection("blckbx_quotes").getOne(quoteId);
+        console.log("blckbx_quotes record:", record);
+        console.log("record.quoteData raw:", record.quoteData);
         if (cancelled) return;
 
         const storedPayload = parseStoredQuoteData(record.quoteData);
+        console.log("storedPayload / quoteData:", storedPayload);
         const rawOptions = getRawListOptions(storedPayload);
         const recordMode = normalizeRecordMode(record as unknown as Record<string, unknown>, rawOptions);
         const recordListType = normalizeRecordListType(
@@ -1079,6 +1416,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         }
 
         let nextTripPhotos: string[] = [];
+        let nextOptionImageRecordByUrl: Record<string, QuoteOptionImageRecord> = {};
         if (Array.isArray(record.tripPhotos) && record.tripPhotos.length > 0) {
           nextTripPhotos = await Promise.all(
             record.tripPhotos.map((filename: string) =>
@@ -1088,17 +1426,30 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         }
 
         if (recordMode === "list" && recordListType === "accommodation") {
-          nextListOptions = await Promise.all(
-            nextListOptions.map(async (option, optionIndex) => {
-              const fieldName = `option${optionIndex + 1}Photos`;
-              const filenames = Array.isArray(record[fieldName]) ? record[fieldName] : [];
-              if (filenames.length === 0) return option;
-              const photos = await Promise.all(
-                filenames.map((filename: string) => fileUrlToDataUrl(pb.files.getUrl(record, filename)))
-              );
-              return { ...(option as AccommodationOption), photos: photos.filter(Boolean) };
-            })
-          );
+          const optionImageRecords = await pb.collection(QUOTE_OPTION_IMAGES_COLLECTION).getFullList({
+            filter: `quote = "${record.id}"`,
+            sort: "order,created",
+            requestKey: null,
+          }) as QuoteOptionImageRecord[];
+          console.log("optionImageRecords JSON:", JSON.stringify(optionImageRecords, null, 2));
+
+          if (optionImageRecords.length > 0) {
+            nextOptionImageRecordByUrl = buildQuoteOptionImageRecordByUrl(optionImageRecords);
+            nextListOptions = mergeOptionImageRecordsIntoOptions(nextListOptions, optionImageRecords);
+          } else {
+            // Legacy fallback for drafts saved before the dedicated option-image collection.
+            nextListOptions = await Promise.all(
+              nextListOptions.map(async (option, optionIndex) => {
+                const fieldName = `option${optionIndex + 1}Photos`;
+                const filenames = Array.isArray(record[fieldName]) ? record[fieldName] : [];
+                if (filenames.length === 0) return option;
+                const photos = await Promise.all(
+                  filenames.map((filename: string) => fileUrlToDataUrl(pb.files.getUrl(record, filename)))
+                );
+                return { ...(option as AccommodationOption), photos: photos.filter(Boolean) };
+              })
+            );
+          }
         }
 
         if (cancelled) return;
@@ -1107,6 +1458,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
         setMode(recordMode);
         setListType(recordListType);
         resetListOptionsForType(recordListType, nextListOptions);
+        optionImageRecordByUrlRef.current = nextOptionImageRecordByUrl;
         setQuoteData(resolvedQuoteData);
         setClientName(
           sanitizeValue(record.clientName) ||
@@ -1167,6 +1519,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
     setMode("quote");
     setListType("flight");
     resetListOptionsForType("flight");
+    optionImageRecordByUrlRef.current = {};
     setClientName("");
     setPassengers([createPassenger()]);
     setCoverPhoto(null);
@@ -1208,6 +1561,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       setMode("quote");
       setListType("flight");
       resetListOptionsForType("flight");
+      optionImageRecordByUrlRef.current = {};
       setQuoteData(syncTravellersFromPassengers(initialPassengers, normalized));
       setClientName(extractedClientName);
       setPassengers(initialPassengers);
@@ -1233,6 +1587,7 @@ export default function QuoteGenerator({ embeddedQuoteId, onBack }: QuoteGenerat
       setMode("quote");
       setListType("flight");
       resetListOptionsForType("flight");
+      optionImageRecordByUrlRef.current = {};
       setClientName("");
       setPassengers([createPassenger()]);
       setCoverPhoto(null);
