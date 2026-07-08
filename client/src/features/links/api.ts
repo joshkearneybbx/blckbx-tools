@@ -11,6 +11,40 @@ export type LinksClientResult = {
   name: string;
 };
 
+export type LinksFileStatus = "live" | "expired";
+
+export type LinksFileRow = {
+  id: string;
+  title: string;
+  client_name: string;
+  uploader_email: string;
+  uploaded_at: string;
+  expires_at: string;
+  status: LinksFileStatus | string;
+  size_bytes: number | string;
+  url: string;
+};
+
+export type LinksFileListResponse = {
+  page: number;
+  per_page: number;
+  total: number;
+  rows: LinksFileRow[];
+};
+
+export type ListFilesInput = {
+  q?: string;
+  clientId?: string;
+  status?: LinksFileStatus | "all";
+  page?: number;
+  perPage?: number;
+};
+
+export type DownloadFileResponse = {
+  blob: Blob;
+  filename: string;
+};
+
 export type LinksApiErrorKind = "auth" | "bad_request" | "too_large" | "network" | "generic";
 
 export class LinksApiError extends Error {
@@ -98,6 +132,35 @@ function parseXhrBody(xhr: XMLHttpRequest): unknown {
   }
 }
 
+function normalizeFileRow(item: unknown): LinksFileRow | null {
+  if (!item || typeof item !== "object") return null;
+  const record = item as Record<string, unknown>;
+
+  if (typeof record.id !== "string") return null;
+
+  return {
+    id: record.id,
+    title: typeof record.title === "string" ? record.title : "Untitled link",
+    client_name: typeof record.client_name === "string" ? record.client_name : "—",
+    uploader_email: typeof record.uploader_email === "string" ? record.uploader_email : "",
+    uploaded_at: typeof record.uploaded_at === "string" ? record.uploaded_at : "",
+    expires_at: typeof record.expires_at === "string" ? record.expires_at : "",
+    status: typeof record.status === "string" ? record.status : "expired",
+    size_bytes: typeof record.size_bytes === "number" || typeof record.size_bytes === "string" ? record.size_bytes : 0,
+    url: typeof record.url === "string" ? record.url : "",
+  };
+}
+
+function filenameFromDisposition(disposition: string | null, fallback: string): string {
+  if (!disposition) return fallback;
+
+  const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utfMatch?.[1]) return decodeURIComponent(utfMatch[1].replace(/"/g, ""));
+
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return match?.[1] || fallback;
+}
+
 export function uploadFile({ file, clientName, title, onProgress }: UploadFileInput): Promise<LinksUploadResponse> {
   const token = getFreshToken();
   const formData = new FormData();
@@ -176,6 +239,101 @@ export async function searchClients(q: string): Promise<LinksClientResult[]> {
     })
     .filter((item): item is LinksClientResult => Boolean(item))
     .slice(0, 10);
+}
+
+export async function listFiles({ q = "", clientId = "", status = "all", page = 1, perPage = 25 }: ListFilesInput): Promise<LinksFileListResponse> {
+  const token = getFreshToken();
+  const params = new URLSearchParams();
+  const trimmedQ = q.trim();
+
+  if (trimmedQ) params.set("q", trimmedQ);
+  if (clientId) params.set("client_id", clientId);
+  if (status && status !== "all") params.set("status", status);
+  params.set("page", String(Math.max(1, page)));
+  params.set("per_page", String(perPage));
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/links/files?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: token,
+      },
+    });
+  } catch {
+    throw new LinksApiError("network", "Network error. Archive is unavailable right now.");
+  }
+
+  const body = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw toLinksApiError(response.status, body);
+  }
+
+  const record = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const rows = Array.isArray(record.rows) ? record.rows : [];
+
+  return {
+    page: typeof record.page === "number" ? record.page : page,
+    per_page: typeof record.per_page === "number" ? record.per_page : perPage,
+    total: typeof record.total === "number" ? record.total : 0,
+    rows: rows.map(normalizeFileRow).filter((row): row is LinksFileRow => Boolean(row)),
+  };
+}
+
+export async function reissueFile(id: string): Promise<LinksFileRow> {
+  const token = getFreshToken();
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/links/files/${encodeURIComponent(id)}/reissue`, {
+      method: "POST",
+      headers: {
+        Authorization: token,
+      },
+    });
+  } catch {
+    throw new LinksApiError("network", "Network error. Reissue is unavailable right now.");
+  }
+
+  const body = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw toLinksApiError(response.status, body);
+  }
+
+  const row = normalizeFileRow(body);
+  if (!row) {
+    throw new LinksApiError("generic", "The Links service returned an invalid reissue response.");
+  }
+
+  return row;
+}
+
+export async function downloadFile(id: string, fallbackFilename = "link.html"): Promise<DownloadFileResponse> {
+  const token = getFreshToken();
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/links/files/${encodeURIComponent(id)}/download`, {
+      method: "GET",
+      headers: {
+        Authorization: token,
+      },
+    });
+  } catch {
+    throw new LinksApiError("network", "Network error. Download is unavailable right now.");
+  }
+
+  if (!response.ok) {
+    const body = await parseResponseBody(response);
+    throw toLinksApiError(response.status, body);
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: filenameFromDisposition(response.headers.get("content-disposition"), fallbackFilename),
+  };
 }
 
 export function isLinksApiError(error: unknown): error is LinksApiError {
