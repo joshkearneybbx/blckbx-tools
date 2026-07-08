@@ -743,7 +743,7 @@ export default function LinksPage() {
           <p className="links-preheading">LINKS</p>
           <h1 className="links-title" data-testid="links-page-title">Links Library</h1>
           <p className="links-intro">
-            Upload and archive client links. This shell is ready for the Links API integration.
+            Upload client HTML files and manage shareable links.
           </p>
         </header>
 
