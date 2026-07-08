@@ -10,6 +10,7 @@ import {
   Plane,
   MapPin,
   ListChecks,
+  Link2,
   BookOpen,
   ShoppingBag,
   UtensilsCrossed,
@@ -88,6 +89,15 @@ const TOOL_ITEMS: DockItemConfig[] = [
     Icon: ListChecks,
     toolSlug: "shortlists",
     active: (location) => location.startsWith("/shortlists"),
+  },
+  {
+    key: "links",
+    label: "Links",
+    route: "/links",
+    Icon: Link2,
+    toolSlug: "links",
+    active: (location) => location.startsWith("/links"),
+    badge: true,
   },
   {
     key: "task-guide",

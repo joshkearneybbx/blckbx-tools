@@ -6,6 +6,7 @@ export type ToolSlug =
   | "travel-hub"
   | "itinerary"
   | "shortlists"
+  | "links"
   | "task-guide"
   | "big-purchases"
   | "meals";
@@ -18,6 +19,7 @@ export const TOOL_SLUGS: ToolSlug[] = [
   "travel-hub",
   "itinerary",
   "shortlists",
+  "links",
   "task-guide",
   "big-purchases",
   "meals",
