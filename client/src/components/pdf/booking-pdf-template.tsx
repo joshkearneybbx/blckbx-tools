@@ -388,6 +388,31 @@ const styles = StyleSheet.create({
     color: "#0A0A0A",
     textDecoration: "underline"
   },
+  visaNoteBlock: {
+    marginTop: 6
+  },
+  visaNoteText: {
+    lineHeight: 1.4
+  },
+  tcSection: {
+    marginTop: 20,
+  },
+  tcHeading: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#0A0A0A",
+    marginBottom: 4,
+  },
+  tcText: {
+    fontSize: 9,
+    color: "#6B6865",
+    lineHeight: 1.4,
+  },
+  tcLink: {
+    fontSize: 9,
+    color: "#0A0A0A",
+    textDecoration: "underline",
+  },
   legCard: {
     backgroundColor: "#F5F3F0",
     padding: 12,
@@ -895,6 +920,32 @@ function CarHireSection({ title, children }: { title: string; children: React.Re
   );
 }
 
+function VisaRequirementNote() {
+  return (
+    <View style={styles.visaNoteBlock}>
+      <Text style={styles.visaNoteText}>
+        <Text style={{ fontWeight: 700 }}>Visas are compulsory for entry where required.</Text>{" "}
+        It is your responsibility to check and obtain valid passports, visas and any other travel documents for every destination on your itinerary, and to confirm requirements with the relevant embassy or consulate. Failure to hold the correct documentation may result in denied entry, for which we accept no responsibility.
+      </Text>
+    </View>
+  );
+}
+
+function TermsAndConditionsBlock() {
+  return (
+    <View style={styles.tcSection}>
+      <Text style={styles.tcHeading}>Terms &amp; Conditions</Text>
+      <Text style={styles.tcText}>
+        By proceeding with this booking, you agree to our{" "}
+        <Link src="https://tools.blckbx.co.uk/blckbx-travel-terms-and-conditions.pdf">
+          <Text style={styles.tcLink}>terms and conditions</Text>
+        </Link>
+        .
+      </Text>
+    </View>
+  );
+}
+
 function CarHireBookingPDFTemplate({ booking }: { booking: BookingRecord }) {
   const data = booking.carHireData || booking.bookingData.carHireData || {};
   const heroImage = bookingPdfCarHireHero;
@@ -1016,6 +1067,18 @@ function CarHireBookingPDFTemplate({ booking }: { booking: BookingRecord }) {
             </View></View>
           </CarHireSection>
         ) : null}
+      </Page>
+
+      <Page size="A4" style={styles.page}>
+        <Sidebar tripName={booking.tripName} />
+        <Text style={styles.sectionTitle}>Important Information</Text>
+        <View style={styles.divider} />
+        <View style={styles.card}>
+          <View style={styles.segmentBody}>
+            <VisaRequirementNote />
+            <TermsAndConditionsBlock />
+          </View>
+        </View>
       </Page>
     </Document>
   );
@@ -1218,6 +1281,8 @@ function TripBookingPDFTemplate({ booking }: { booking: BookingRecord }) {
                 )}
               </View>
             ))}
+            <VisaRequirementNote />
+            <TermsAndConditionsBlock />
           </View>
         </View>
       </Page>
