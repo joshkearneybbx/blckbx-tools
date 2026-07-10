@@ -70,7 +70,7 @@ function isHtmlFile(file: File): boolean {
 function getErrorMessage(type: UploadErrorType, fallback: string): string {
   if (type === "type") return "Upload an .html or .htm file only.";
   if (type === "size") return "That file is too large. Upload an HTML file smaller than 50 MB.";
-  if (type === "missing") return "Choose an HTML file, client name, and title before uploading.";
+  if (type === "missing") return "Choose an HTML file, client name, title, and area before uploading.";
   if (type === "network") return "Network error. Check your connection and try again.";
   return fallback || "The Links service could not complete the request.";
 }
@@ -95,6 +95,7 @@ export default function LinksPage() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [clientName, setClientName] = useState("");
+  const [area, setArea] = useState<"BOH" | "Travel" | "">("");
   const [selectedClient, setSelectedClient] = useState<LinksClientResult | null>(null);
   const [clientResults, setClientResults] = useState<LinksClientResult[]>([]);
   const [isClientSearchOpen, setIsClientSearchOpen] = useState(false);
@@ -127,7 +128,7 @@ export default function LinksPage() {
 
   const trimmedClientName = clientName.trim();
   const trimmedTitle = title.trim();
-  const canSubmit = Boolean(file && trimmedClientName && trimmedTitle && !isUploading);
+  const canSubmit = Boolean(file && trimmedClientName && trimmedTitle && area && !isUploading);
   const rows = archiveData?.rows || [];
   const archiveTotal = archiveData?.total || 0;
   const archivePageCount = Math.max(1, Math.ceil(archiveTotal / ARCHIVE_PER_PAGE));
@@ -314,7 +315,7 @@ export default function LinksPage() {
   };
 
   const handleSubmit = async () => {
-    if (!file || !trimmedClientName || !trimmedTitle) {
+    if (!file || !trimmedClientName || !trimmedTitle || !area) {
       setSpecificError("missing");
       return;
     }
@@ -329,6 +330,7 @@ export default function LinksPage() {
         file,
         clientName: trimmedClientName,
         title: trimmedTitle,
+        area,
         onProgress: setUploadProgress,
       });
       setUploadProgress(100);
@@ -508,6 +510,23 @@ export default function LinksPage() {
             data-testid="links-title-input"
           />
         </label>
+
+        <div className="links-field">
+          <span>Area</span>
+          <div className="links-filter-pills" data-testid="links-area-filter">
+            {(["BOH", "Travel"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={`links-filter-pill${area === value ? " is-active" : ""}`}
+                onClick={() => setArea(value)}
+                data-testid={`links-area-${value.toLowerCase()}`}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {errorType && (

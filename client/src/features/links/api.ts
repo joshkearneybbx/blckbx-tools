@@ -65,6 +65,7 @@ type UploadFileInput = {
   file: File;
   clientName: string;
   title: string;
+  area: "BOH" | "Travel";
   onProgress?: (percent: number) => void;
 };
 
@@ -161,12 +162,13 @@ function filenameFromDisposition(disposition: string | null, fallback: string): 
   return match?.[1] || fallback;
 }
 
-export function uploadFile({ file, clientName, title, onProgress }: UploadFileInput): Promise<LinksUploadResponse> {
+export function uploadFile({ file, clientName, title, area, onProgress }: UploadFileInput): Promise<LinksUploadResponse> {
   const token = getFreshToken();
   const formData = new FormData();
   formData.append("file", file);
   formData.append("client_name", clientName);
   formData.append("title", title);
+  formData.append("area", area);
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
