@@ -79,8 +79,8 @@ export default function ClientInterests() {
   return (
     <div className="space-y-6">
       <div className="panel px-6 py-5">
-        <div className="label">Research Hub</div>
-        <h1 className="mt-2 text-[32px] font-semibold text-[var(--text)]">Client Interests</h1>
+        <div className="label">Recommendations Manager</div>
+        <h1 className="page-title mt-2">Client Interests</h1>
         <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
           Capture manual taste signals, brand affinities, and client preference notes directly against client profiles.
         </p>

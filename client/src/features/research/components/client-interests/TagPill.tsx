@@ -45,7 +45,7 @@ export function TagPill({
         </span>
       ) : null}
       <span
-        className="absolute bottom-0 left-0 h-[2px] bg-[#3ECFB2]"
+        className="absolute bottom-0 left-0 h-[2px] bg-[var(--bb-near-black)]"
         style={{ width: `${toPercent(interest.strength)}%` }}
       />
     </div>

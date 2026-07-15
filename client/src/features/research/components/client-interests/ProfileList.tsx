@@ -36,15 +36,17 @@ export function ProfileList({
             key={profile._key}
             type="button"
             onClick={() => onSelect(profile)}
-            className={`w-full border border-[var(--border)] bg-[var(--sand-100)] px-4 py-4 text-left transition-colors ${
-              selected ? "border-l-[3px] border-l-[var(--black)] bg-white" : "hover:border-[var(--black)]"
+            className={`w-full border bg-[var(--sand-100)] px-4 py-4 text-left transition-colors ${
+              selected
+                ? "border border-[var(--bb-near-black)] bg-white"
+                : "border border-[var(--border)] hover:border-[var(--bb-near-black)]"
             }`}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--text)]">{buildName(profile)}</div>
                 {profile.is_primary ? (
-                  <div className="mt-2 inline-flex items-center bg-[#3ECFB2] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[#0A0A0A]">
+                  <div className="mt-2 inline-flex items-center border border-[var(--bb-rule)] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--bb-body)]">
                     Primary
                   </div>
                 ) : null}

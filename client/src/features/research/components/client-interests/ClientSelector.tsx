@@ -4,13 +4,13 @@ import type { ClientAccount } from "../../lib/types";
 function getTierClass(tier?: string | null) {
   switch (tier) {
     case "premium":
-      return "bg-[#0A0A0A] text-[#FAFAF8]";
+      return "bg-[var(--bb-near-black)] text-white";
     case "luxury":
-      return "border border-[#3ECFB2] bg-[#0A0A0A] text-[#FAFAF8]";
+      return "border border-[var(--bb-rule)] bg-[var(--bb-near-black)] text-white";
     case "ultra":
-      return "bg-[#0A0A0A] text-[#3ECFB2]";
+      return "bg-[var(--bb-near-black)] text-[var(--bb-taupe)]";
     default:
-      return "bg-[#E8E5E0] text-[#0A0A0A]";
+      return "bg-[var(--bb-hover)] text-[var(--bb-near-black)] border border-[var(--bb-rule)]";
   }
 }
 

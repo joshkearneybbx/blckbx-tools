@@ -81,7 +81,8 @@ export function AddInterestForm({
       <div className="label mb-3 block">Add Interest</div>
       <div className="space-y-4">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-[var(--muted)]" />
+          {/* Match ClientSelector: .search-field sets padding-left so icon doesn't overlap text */}
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]" />
           <input
             value={query}
             onChange={(event) => {
@@ -89,7 +90,7 @@ export function AddInterestForm({
               setSelectedTag(null);
             }}
             placeholder="Type to search tags..."
-            className="field h-11 pl-10"
+            className="field search-field h-11"
           />
           {(results.length > 0 || showCreate || isLoading) && !selectedTag ? (
             <div className="menu-panel absolute left-0 right-0 top-[calc(100%+6px)] z-20">
@@ -136,7 +137,7 @@ export function AddInterestForm({
             value={strength}
             onChange={(event) => setStrength(Number(event.target.value))}
             className="w-full"
-            style={{ accentColor: "#3ECFB2" }}
+            style={{ accentColor: "var(--bb-near-black)" }}
           />
           <div className="mt-1 flex justify-between text-xs text-[var(--muted)]">
             <span>Mentioned</span>
@@ -155,13 +156,13 @@ export function AddInterestForm({
         </div>
 
         {duplicateMessage ? <div className="text-sm text-[var(--error)]">{duplicateMessage}</div> : null}
-        {success ? <div className="text-sm text-[#1ea868]">Interest added</div> : null}
+        {success ? <div className="text-sm text-[var(--success)]">Interest added</div> : null}
 
         <button
           type="button"
           disabled={!selectedTag || isSaving}
           onClick={handleAdd}
-          className="inline-flex items-center justify-center border border-[#E7C51C] bg-[#E7C51C] px-4 py-2 text-sm font-medium text-[#0A0A0A] disabled:cursor-not-allowed disabled:opacity-50"
+          className="button-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSaving ? "Adding..." : "Add Interest"}
         </button>

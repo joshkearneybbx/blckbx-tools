@@ -198,7 +198,7 @@ export function InterestProfile({
   return (
     <div className="flex min-h-[720px] flex-col bg-white">
       <div className="border-b border-[var(--border)] px-8 py-6">
-        <h2 className="text-[28px] font-semibold text-[var(--text)]">{fullName(profile)}</h2>
+        <h2 className="section-title">{fullName(profile)}</h2>
         <div className="mt-1 text-sm text-[var(--muted)]">{client.account_name}</div>
       </div>
 
@@ -254,7 +254,7 @@ export function InterestProfile({
                   value={editInterestStrength}
                   onChange={(event) => setEditInterestStrength(Number(event.target.value))}
                   className="w-full"
-                  style={{ accentColor: "#3ECFB2" }}
+                  style={{ accentColor: "var(--bb-near-black)" }}
                 />
               </div>
               <textarea
@@ -353,7 +353,7 @@ export function InterestProfile({
               Notes
             </h3>
             {notesStatus === "saving" ? <span className="text-xs text-[var(--muted)]">Saving...</span> : null}
-            {notesStatus === "saved" ? <span className="text-xs text-[#1ea868]">Saved</span> : null}
+            {notesStatus === "saved" ? <span className="text-xs text-[var(--success)]">Saved</span> : null}
             {notesStatus === "error" ? <span className="text-xs text-[var(--error)]">Save failed</span> : null}
           </div>
           <textarea
