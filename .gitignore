@@ -140,3 +140,5 @@ dist
 **/.DS_Store
 
 .claude/settings.local.json
+.env.bak
+.pi/
