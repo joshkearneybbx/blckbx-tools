@@ -1,14 +1,17 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { ToastProvider } from "./components/ToastProvider";
+import {
+  RECOMMENDATIONS_MANAGER_SUBTITLE,
+  RECOMMENDATIONS_MANAGER_TITLE,
+} from "./lib/brand";
 import "./research.css";
 
 const navItems = [
   { href: "/research", label: "Pool" },
+  { href: "/research/edit", label: "The Edit" },
   { href: "/research/add", label: "Add Item" },
-  { href: "/research/task-matcher", label: "Task Matcher" },
   { href: "/research/client-interests", label: "Client Interests" },
-  { href: "/research/lists", label: "Lists" },
 ];
 
 export function ResearchLayout({ children }: { children: ReactNode }) {
@@ -32,8 +35,8 @@ export function ResearchLayout({ children }: { children: ReactNode }) {
           <header className="research-hub__header">
             <div className="research-hub__brand">
               <div>
-                <div className="research-hub__brand-title">Blck Book</div>
-                <div className="research-hub__brand-subtitle">Recommendations Manager</div>
+                <div className="research-hub__brand-title">{RECOMMENDATIONS_MANAGER_TITLE}</div>
+                <div className="research-hub__brand-subtitle">{RECOMMENDATIONS_MANAGER_SUBTITLE}</div>
               </div>
             </div>
             <nav ref={tabsRef} className="research-hub-tabs" role="tablist">

@@ -1,0 +1,325 @@
+/**
+ * BlckBx internal tools — shared design tokens
+ * --------------------------------------------
+ * Source of truth for Recommendations Manager + Approval Catalogue.
+ * Spec: RECOMMENDATIONS_MANAGER_SPEC.md §6 · visual: blckbx-ui-refresh.html
+ *
+ * Change once here; both tools alias into these variables.
+ * Layout / breakpoints / aspect ratios are NOT defined here (unchanged).
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&family=Noto+Serif:ital@1&display=swap");
+
+:root {
+  /* ── Palette (§6.3 / HTML) ─────────────────────────────── */
+  --bb-near-black: #171717;
+  --bb-black: #000000;
+  --bb-body: #404040;
+  --bb-muted: #696969;
+  --bb-taupe: #898479;
+  --bb-brown: #756f65;
+  --bb-rule: #e4e2dd;
+  --bb-rule-soft: #efede9;
+  --bb-ground: #ffffff;
+  --bb-hover: #faf9f7;
+  --bb-img-placeholder: #f2f0ec;
+
+  /* ── Destructive (§6.4 — Reject / Remove only) ─────────── */
+  --bb-destructive: #8c3a32;
+
+  /* ── Functional colour — Option B (§6.4) ───────────────── */
+  --bb-warning-bg: #faeeda;
+  --bb-warning-text: #854f0b;
+  --bb-warning-rule: #efdcbb;
+  --bb-success: #3b6d11;
+  --bb-error: #a32d2d;
+
+  /* ── Type scale roles (§6.2) ───────────────────────────── */
+  --bb-type-page: 28px;
+  --bb-type-section: 18px;
+  --bb-type-card: 20px;
+  --bb-type-label: 11px;
+  --bb-type-body: 13px;
+  --bb-type-muted: 12px;
+  --bb-type-button: 13px;
+  --bb-type-source: 10px;
+
+  --bb-track-label: 3px;
+  --bb-track-source: 2px;
+
+  /* ── Fonts ─────────────────────────────────────────────── */
+  --bb-font-display: "Cormorant Garamond", Georgia, serif;
+  --bb-font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --bb-font-accent: "Noto Serif", Georgia, serif;
+
+  /* ── Spacing / chrome ──────────────────────────────────── */
+  --bb-radius: 0;
+  --bb-btn-pad-y: 9px;
+  --bb-btn-pad-x: 16px;
+  --bb-btn-pad-y-sm: 6px;
+  --bb-btn-pad-x-sm: 12px;
+  --bb-btn-pad-y-action: 8px;
+  --bb-btn-pad-x-action: 15px;
+
+  /* ── Diamond marker (stock / rationale) ────────────────── */
+  --bb-diamond-size: 6px;
+  --bb-diamond-size-sm: 5px;
+  --bb-diamond-size-lg: 7px;
+}
+
+/* ── Shared primitives (both tools may use) ──────────────── */
+
+.bb-type-page {
+  font-family: var(--bb-font-display);
+  font-size: var(--bb-type-page);
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--bb-near-black);
+}
+
+.bb-type-section {
+  font-family: var(--bb-font-display);
+  font-size: var(--bb-type-section);
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--bb-near-black);
+}
+
+.bb-type-card {
+  font-family: var(--bb-font-display);
+  font-size: var(--bb-type-card);
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--bb-near-black);
+}
+
+.bb-pre,
+.bb-label {
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-label);
+  font-weight: 500;
+  letter-spacing: var(--bb-track-label);
+  text-transform: uppercase;
+  color: var(--bb-taupe);
+}
+
+.bb-meta {
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-body);
+  color: var(--bb-body);
+}
+
+.bb-mut {
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-muted);
+  color: var(--bb-muted);
+}
+
+.bb-accent {
+  font-family: var(--bb-font-accent);
+  font-style: italic;
+  color: var(--bb-brown);
+}
+
+/* Primary — black only, no yellow variant (§6.5) */
+.bb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-button);
+  font-weight: 500;
+  padding: var(--bb-btn-pad-y) var(--bb-btn-pad-x);
+  border: 1px solid var(--bb-near-black);
+  border-radius: var(--bb-radius);
+  background: var(--bb-near-black);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.bb-btn:hover:enabled {
+  background: var(--bb-black);
+  border-color: var(--bb-black);
+}
+
+.bb-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Outline secondary */
+.bb-btn-o {
+  background: transparent;
+  color: var(--bb-near-black);
+  border-color: var(--bb-rule);
+}
+
+.bb-btn-o:hover:enabled {
+  border-color: var(--bb-near-black);
+  background: var(--bb-hover);
+}
+
+/* Destructive — outline → fill on hover (§6.4) */
+.bb-btn-danger {
+  background: transparent;
+  color: var(--bb-destructive);
+  border-color: var(--bb-destructive);
+}
+
+.bb-btn-danger:hover:enabled {
+  background: var(--bb-destructive);
+  color: #fff;
+}
+
+.bb-btn-sm {
+  padding: var(--bb-btn-pad-y-sm) var(--bb-btn-pad-x-sm);
+  font-size: var(--bb-type-muted);
+}
+
+/* Bordered tag / pill (replaces mint / sand fill pills) */
+.bb-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-label);
+  color: var(--bb-body);
+  border: 1px solid var(--bb-rule);
+  border-radius: var(--bb-radius);
+  padding: 2px 7px;
+  background: transparent;
+}
+
+/* Diamond marker */
+.bb-diamond {
+  display: inline-block;
+  width: var(--bb-diamond-size);
+  height: var(--bb-diamond-size);
+  flex: 0 0 var(--bb-diamond-size);
+  transform: rotate(45deg);
+  box-sizing: border-box;
+}
+
+.bb-diamond--outline {
+  border: 1px solid var(--bb-taupe);
+  background: transparent;
+}
+
+.bb-diamond--fill {
+  border: 0;
+  background: var(--bb-success);
+}
+
+.bb-diamond--current {
+  background: currentColor;
+  border: 0;
+  width: var(--bb-diamond-size-sm);
+  height: var(--bb-diamond-size-sm);
+  flex-basis: var(--bb-diamond-size-sm);
+}
+
+/* Needs-review bar (Option B chromatic) */
+.bb-review {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-label);
+  letter-spacing: var(--bb-track-source);
+  text-transform: uppercase;
+  padding: 7px 16px;
+}
+
+.bb-review--warn {
+  background: var(--bb-warning-bg);
+  color: var(--bb-warning-text);
+  border-bottom: 1px solid var(--bb-warning-rule);
+}
+
+/* Bound-action primitive (CSS only — Edit surface not wired this step) */
+.bb-ba {
+  position: relative;
+}
+
+.bb-ba-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.bb-ba-do {
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-muted);
+  font-weight: 500;
+  color: #fff;
+  background: var(--bb-near-black);
+  border: 0;
+  border-radius: var(--bb-radius);
+  padding: var(--bb-btn-pad-y-action) var(--bb-btn-pad-x-action);
+  cursor: pointer;
+}
+
+.bb-ba-do:hover {
+  background: var(--bb-black);
+}
+
+.bb-ba-change {
+  background: none;
+  border: 0;
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-muted);
+  color: var(--bb-taupe);
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.bb-ba-change:hover {
+  color: var(--bb-near-black);
+}
+
+.bb-ba-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  background: var(--bb-ground);
+  border: 1px solid var(--bb-near-black);
+  min-width: 130px;
+  display: none;
+  border-radius: var(--bb-radius);
+}
+
+.bb-ba-menu.open {
+  display: block;
+}
+
+.bb-ba-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-muted);
+  color: var(--bb-body);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.bb-ba-menu button:hover {
+  background: var(--bb-hover);
+  color: var(--bb-near-black);
+}
+
+.bb-ba-menu button.cur {
+  color: var(--bb-near-black);
+  font-weight: 500;
+}
+
+.bb-ba-div {
+  width: 1px;
+  height: 16px;
+  background: var(--bb-rule);
+  margin: 0 2px;
+}

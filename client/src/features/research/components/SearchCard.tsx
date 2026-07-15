@@ -98,9 +98,10 @@ export function SearchCard() {
         setTotal(data.pagination.total);
         setProcessingTimeMs(data.processingTimeMs ?? null);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (!active) return;
-        setError("Search is temporarily unavailable. Try again in a moment.");
+        const detail = err instanceof Error ? err.message : "Search is temporarily unavailable.";
+        setError(detail);
         if (!isLoadMore) {
           setResults([]);
           setTotal(0);

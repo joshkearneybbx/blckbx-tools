@@ -9,8 +9,8 @@ export function ResultCard({ item }: { item: Recommendation }) {
   const isGuide = item.content_type === "guide";
 
   return (
-    <article className="search-result-card panel overflow-hidden transition-colors duration-150 hover:border-[var(--black)]">
-      <div className="search-result-card__image-wrap relative w-full bg-[linear-gradient(135deg,#f5f1eb,#e2ddd4)]">
+    <article className="search-result-card overflow-hidden">
+      <div className="search-result-card__image-wrap relative w-full bg-[var(--bb-img-placeholder)]">
         {item.image_url ? (
           <img src={item.image_url} alt={item.name} className="search-result-card__image h-full w-full object-cover" />
         ) : (
@@ -28,13 +28,14 @@ export function ResultCard({ item }: { item: Recommendation }) {
         <div className="search-result-card__meta flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
           <span className="font-medium text-[var(--text)]">{formatPrice(item)}</span>
           {item.in_stock ? (
-            <span className="border border-[var(--approved-green)] bg-[var(--success-bg)] px-2.5 py-1 text-[12px] text-[#1b6e2d]">
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--bb-success)]">
+              <span className="bb-diamond bb-diamond--fill" aria-hidden />
               In stock
             </span>
           ) : null}
         </div>
         <EndorsementBadges endorsements={item.endorsements} />
-        <h3 className="search-result-card__title font-serif text-[20px] leading-tight text-[var(--text)]">{item.name}</h3>
+        <h3 className="search-result-card__title">{item.name}</h3>
         {isGuide ? (
           <div className="flex flex-wrap gap-3 text-sm text-[var(--muted)]">
             {item.destination ? <span>{item.destination}</span> : null}

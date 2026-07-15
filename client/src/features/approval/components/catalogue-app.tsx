@@ -33,6 +33,10 @@ import type {
   TrendCandidate
 } from "../lib/types";
 import { contentTabs } from "../lib/types";
+import {
+  APPROVAL_CATALOGUE_SUBTITLE,
+  APPROVAL_CATALOGUE_TITLE
+} from "../lib/brand";
 import { classNames, contentTabLabel, statusLabel } from "../lib/utils";
 import {
   CatalogueGrid,
@@ -722,10 +726,75 @@ export function CatalogueApp() {
     ]);
   }
 
+  /**
+   * §2 pool-yes: flip unique_request → general (drops requested_for edge), then approve/promote.
+   * §2 pool-no: keep client-bound without writing a rejection decision.
+   */
+  async function keepClientBoundNow(candidate: CatalogueItem) {
+    const id = candidateId(candidate);
+    setBusyApproveId(candidate._key);
+    try {
+      // Not a rejection — do not write curation_decisions decision:"rejected".
+      // §8 open item: kept_client_bound logging deferred; close pending only.
+      if (candidate.collection === "product_candidates") {
+        await updateCandidate(candidate._key, {
+          status: "approved",
+          reviewed_by: reviewer,
+          reviewed_at: new Date().toISOString(),
+          curation_reason: "kept_client_bound"
+        });
+      } else if (candidate.collection === "trend_candidates") {
+        await updateTrendCandidate(candidate._key, {
+          status: "approved",
+          reviewed_by: reviewer,
+          reviewed_at: new Date().toISOString(),
+          curation_reason: "kept_client_bound"
+        });
+      }
+      setExitingIds((current) => [...current, id]);
+      await sleep(180);
+      setSelectedIds((current) => current.filter((selectedId) => selectedId !== id));
+      setToast({
+        tone: "success",
+        message: `${candidate.name} kept client-only (not a rejection).`
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["catalogue"] }),
+        queryClient.invalidateQueries({ queryKey: ["catalogue-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["trend-catalogue"] }),
+        queryClient.invalidateQueries({ queryKey: ["trend-catalogue-stats"] })
+      ]);
+    } catch (error) {
+      setToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Could not keep client-only"
+      });
+    } finally {
+      setBusyApproveId(null);
+    }
+  }
+
   async function approveCandidateNow(candidate: CatalogueItem, approvalNote?: string) {
     const id = candidateId(candidate);
     setBusyApproveId(candidate._key);
     try {
+      // Pool-promotion from unique_request: clear client scope before promote.
+      if ((candidate.content_scope ?? "general") === "unique_request") {
+        if (candidate.collection === "product_candidates") {
+          await updateCandidate(candidate._key, {
+            content_scope: "general",
+            requested_by_client: null,
+            requested_for_profile: null
+          });
+        } else if (candidate.collection === "trend_candidates") {
+          await updateTrendCandidate(candidate._key, {
+            content_scope: "general",
+            requested_by_client: null,
+            requested_for_profile: null
+          });
+        }
+      }
+
       if (candidate.collection === "product_candidates") {
         const decision = await createCurationDecision({
           candidate_key: candidate._key,
@@ -737,13 +806,17 @@ export function CatalogueApp() {
         try {
           await promoteCandidates(reviewer, [candidate._key], decision._key);
         } catch (error) {
-          await updateCandidate(candidate._key, {
-            status: "pending",
-            reviewed_by: null,
-            reviewed_at: null,
-            curation_reason: null
-          });
-          throw error;
+          // Already live (client-bound auto-promote) is OK for pool-yes after scope flip.
+          const message = error instanceof Error ? error.message : String(error);
+          if (!/already been promoted|409/i.test(message)) {
+            await updateCandidate(candidate._key, {
+              status: "pending",
+              reviewed_by: null,
+              reviewed_at: null,
+              curation_reason: null
+            });
+            throw error;
+          }
         }
       } else if (candidate.collection === "trend_candidates") {
         const decision = await createCurationDecision({
@@ -756,13 +829,16 @@ export function CatalogueApp() {
         try {
           await promoteTrendCandidates(reviewer, [candidate._key], decision._key);
         } catch (error) {
-          await updateTrendCandidate(candidate._key, {
-            status: "pending",
-            reviewed_by: null,
-            reviewed_at: null,
-            curation_reason: null
-          });
-          throw error;
+          const message = error instanceof Error ? error.message : String(error);
+          if (!/already been promoted|409/i.test(message)) {
+            await updateTrendCandidate(candidate._key, {
+              status: "pending",
+              reviewed_by: null,
+              reviewed_at: null,
+              curation_reason: null
+            });
+            throw error;
+          }
         }
       } else {
         await updateRecommendation(candidate._key, {
@@ -776,7 +852,13 @@ export function CatalogueApp() {
       setExitingIds((current) => [...current, id]);
       await sleep(180);
       setSelectedIds((current) => current.filter((selectedId) => selectedId !== id));
-      setToast({ tone: "success", message: `${candidate.name} approved.` });
+      setToast({
+        tone: "success",
+        message:
+          approvalNote === "pool_promotion"
+            ? `${candidate.name} added to the pool.`
+            : `${candidate.name} approved.`
+      });
       await invalidateCatalogueData();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Approval failed.";
@@ -848,8 +930,8 @@ export function CatalogueApp() {
       <div className="approval-layout">
         <aside className="approval-sidebar hidden min-[900px]:flex">
           <div className="approval-sidebar__brand">
-            <p className="approval-sidebar__brand-title">Blck Book</p>
-            <p className="approval-sidebar__brand-subtitle">Approval catalogue</p>
+            <p className="approval-sidebar__brand-title">{APPROVAL_CATALOGUE_TITLE}</p>
+            <p className="approval-sidebar__brand-subtitle">{APPROVAL_CATALOGUE_SUBTITLE}</p>
           </div>
 
           <nav className="approval-sidebar__nav">
@@ -872,8 +954,8 @@ export function CatalogueApp() {
 
         <section className="approval-main">
           <div className="approval-mobile-header min-[900px]:hidden">
-            <p className="approval-sidebar__brand-title">Blck Book</p>
-            <p className="approval-sidebar__brand-subtitle">Approval catalogue</p>
+            <p className="approval-sidebar__brand-title">{APPROVAL_CATALOGUE_TITLE}</p>
+            <p className="approval-sidebar__brand-subtitle">{APPROVAL_CATALOGUE_SUBTITLE}</p>
             <div className="approval-mobile-nav">
               {contentTabs.map((tab) => (
                 <button
@@ -1074,6 +1156,9 @@ export function CatalogueApp() {
                           decidedBy: reviewer
                         })
                       }
+                      onKeepClientBound={(candidate) => {
+                        void keepClientBoundNow(candidate);
+                      }}
                       onEdit={(candidate, changes) =>
                         editMutation.mutateAsync({
                           candidate,

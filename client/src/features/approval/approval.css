@@ -1,59 +1,71 @@
+/**
+ * Approval Catalogue — feature styles
+ * Step 3 Option A: palette adoption via shared tokens; structure retained.
+ * Tokens: client/src/styles/blckbx-tools-tokens.css
+ * Component-level HTML parity (diamond, exact review bar, stock markers) = later pass.
+ */
 .approval-catalogue {
-  /* Design tokens */
-  --cat-bg: #f8f7f5;
-  --cat-bg-card: #ffffff;
-  --cat-bg-sidebar: #f4f3f0;
-  --cat-bg-sidebar-active: #eae8e4;
+  /* Shared-token aliases — local --cat-* names kept so existing classNames work */
+  --cat-bg: var(--bb-ground);
+  --cat-bg-card: var(--bb-ground);
+  --cat-bg-sidebar: var(--bb-hover);
+  --cat-bg-sidebar-active: var(--bb-rule-soft);
 
-  --cat-text-primary: #1a1a1a;
-  --cat-text-body: #3d3832;
-  --cat-text-secondary: #5a554f;
-  --cat-text-tertiary: #8a857e;
+  --cat-text-primary: var(--bb-near-black);
+  --cat-text-body: var(--bb-body);
+  --cat-text-secondary: var(--bb-muted);
+  --cat-text-tertiary: var(--bb-taupe);
 
-  --cat-border: #dddbd6;
-  --cat-border-hover: #1a1a1a;
+  --cat-border: var(--bb-rule);
+  --cat-border-hover: var(--bb-near-black);
 
-  --cat-amber: #b8860b;
-  --cat-amber-bg: #fdf6e8;
-  --cat-amber-border: #e8d9b0;
-  --cat-amber-pill-border: #d4c294;
+  /* Option B functional hues */
+  --cat-amber: var(--bb-warning-text);
+  --cat-amber-bg: var(--bb-warning-bg);
+  --cat-amber-border: var(--bb-warning-rule);
+  --cat-amber-pill-border: var(--bb-warning-rule);
 
-  --cat-green: #2d6a4f;
-  --cat-green-bg: #eef5f1;
+  --cat-green: var(--bb-success);
+  --cat-green-bg: color-mix(in srgb, var(--bb-success) 12%, white);
 
-  --cat-btn-secondary-bg: #eeedea;
-  --cat-btn-secondary-hover: #e3e1dd;
+  --cat-btn-secondary-bg: var(--bb-rule-soft);
+  --cat-btn-secondary-hover: var(--bb-rule);
 
-  /* Compatibility aliases for existing Tailwind arbitrary vars in Approval only */
+  /* Compatibility aliases for existing Tailwind arbitrary vars */
   --background: var(--cat-bg);
   --surface: var(--cat-bg-card);
   --text: var(--cat-text-primary);
-  --black: var(--cat-text-primary);
-  --white: #ffffff;
-  --sand-100: var(--cat-bg-sidebar);
-  --sand-200: var(--cat-bg-sidebar-active);
-  --sand-300: var(--cat-border);
-  --sand-400: var(--cat-text-tertiary);
-  --sand-500: var(--cat-text-tertiary);
-  --sand-700: var(--cat-text-secondary);
-  --sand-900: var(--cat-text-body);
-  --success: var(--cat-green);
-  --error: #b45f56;
-  --error-light: #f7ece9;
-  --approved-green: var(--cat-green);
-  --rejected-red: #b45f56;
+  --black: var(--bb-near-black);
+  --white: var(--bb-ground);
+  --sand-100: var(--bb-hover);
+  --sand-200: var(--bb-rule-soft);
+  --sand-300: var(--bb-rule);
+  --sand-400: var(--bb-taupe);
+  --sand-500: var(--bb-taupe);
+  --sand-700: var(--bb-muted);
+  --sand-900: var(--bb-body);
+  --success: var(--bb-success);
+  --error: var(--bb-destructive);
+  --error-light: color-mix(in srgb, var(--bb-destructive) 10%, white);
+  --approved-green: var(--bb-success);
+  --rejected-red: var(--bb-destructive);
   --approved-bg: var(--cat-green-bg);
-  --approved-text: var(--cat-green);
-  --rejected-bg: #f7ece9;
-  --rejected-text: #8f4e46;
+  --approved-text: var(--bb-success);
+  --rejected-bg: color-mix(in srgb, var(--bb-destructive) 10%, white);
+  --rejected-text: var(--bb-destructive);
   --list-background: var(--cat-bg-sidebar);
   --list-border: var(--cat-border);
   --list-text: var(--cat-text-primary);
+  --font-display: var(--bb-font-display);
+  --font-sans: var(--bb-font-sans);
 
   min-height: 100vh;
   background: var(--cat-bg);
   color: var(--cat-text-primary);
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: var(--bb-font-sans);
+  font-size: var(--bb-type-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 .approval-catalogue,
@@ -107,18 +119,18 @@
 }
 
 .approval-sidebar__brand-title {
-  font-family: var(--font-display), 'DM Sans', system-ui, sans-serif;
-  font-size: 22px;
-  font-weight: 500;
+  font-family: var(--bb-font-display);
+  font-size: var(--bb-type-page);
+  font-weight: 400;
   color: var(--cat-text-primary);
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .approval-sidebar__brand-subtitle {
   margin-top: 8px;
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.18em;
+  font-size: var(--bb-type-label);
+  font-weight: 500;
+  letter-spacing: var(--bb-track-label);
   text-transform: uppercase;
   color: var(--cat-text-tertiary);
 }
@@ -369,8 +381,9 @@
 }
 
 .approval-state-card--error {
-  border-color: #d8c0bc;
-  background: #fbf6f4;
+  border-color: var(--bb-destructive);
+  background: color-mix(in srgb, var(--bb-destructive) 10%, white);
+  color: var(--bb-destructive);
 }
 
 .approval-card-grid {
@@ -503,7 +516,7 @@
 }
 
 .approval-card__title {
-  font-family: var(--font-display), 'DM Sans', system-ui, sans-serif;
+  font-family: var(--bb-font-display);
   font-size: 20px;
   font-weight: 500;
   line-height: 1.25;
@@ -590,12 +603,26 @@
 }
 
 .approval-card__action--primary {
-  background: var(--cat-text-primary);
+  background: var(--bb-near-black);
   color: #fff;
+  border: 1px solid var(--bb-near-black);
 }
 
 .approval-card__action--primary:hover:not(:disabled) {
-  background: #333333;
+  background: var(--bb-black);
+  border-color: var(--bb-black);
+}
+
+/* Destructive reject — outline → fill (§6.4) */
+.approval-card__action--danger {
+  background: transparent;
+  color: var(--bb-destructive);
+  border: 1px solid var(--bb-destructive);
+}
+
+.approval-card__action--danger:hover:not(:disabled) {
+  background: var(--bb-destructive);
+  color: #fff;
 }
 
 .approval-bulk-bar {
@@ -687,9 +714,9 @@
 }
 
 .approval-toast.is-error {
-  border-color: #d0b1ab;
-  background: #fbf6f4;
-  color: #8f4e46;
+  border-color: var(--bb-destructive);
+  background: color-mix(in srgb, var(--bb-destructive) 10%, white);
+  color: var(--bb-destructive);
 }
 
 .approval-catalogue .modal-backdrop,

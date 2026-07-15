@@ -2,7 +2,10 @@
    BLCK BX DESIGN SYSTEM - Dark Sand + Yellow CTA
    ============================================================ */
 
-/* Project typography: Inter */
+/* Shared tools tokens first (Recommendations Manager + Approval Catalogue) — §6 */
+@import "./styles/blckbx-tools-tokens.css";
+
+/* Project typography: Inter (global shell; tools override via shared tokens) */
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400&family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
