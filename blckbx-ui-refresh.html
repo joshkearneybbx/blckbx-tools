@@ -1,0 +1,690 @@
+<meta charset="utf-8">
+<title>BlckBx — Internal Tools UI Refresh</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&family=Noto+Serif:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --near-black:#171717;
+    --black:#000;
+    --body:#404040;
+    --muted:#696969;
+    --taupe:#898479;
+    --brown:#756F65;
+    --rule:#E4E2DD;
+    --rule-soft:#EFEDE9;
+    --ground:#fff;
+    --hover:#FAF9F7;
+    --red:#8C3A32;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:Inter,sans-serif;
+    background:var(--ground);
+    color:var(--body);
+    font-size:13px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 80px;
+  }
+
+  /* ---- scale ---- */
+  .h-page{font-family:'Cormorant Garamond',serif;font-size:28px;line-height:1.15;color:var(--near-black);font-weight:400}
+  .h-sec{font-family:'Cormorant Garamond',serif;font-size:18px;line-height:1.2;color:var(--near-black);font-weight:500}
+  .h-card{font-family:'Cormorant Garamond',serif;font-size:20px;line-height:1.2;color:var(--near-black);font-weight:500}
+  .pre{font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:var(--taupe)}
+  .meta{font-size:13px;color:var(--body)}
+  .mut{font-size:12px;color:var(--muted)}
+  .accent{font-family:'Noto Serif',serif;font-style:italic;color:var(--brown)}
+
+  /* ---- chrome ---- */
+  .shell{max-width:1180px;margin:0 auto;padding:0 32px}
+  .band{border-bottom:1px solid var(--rule);padding:28px 0 0}
+  .band-head{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:20px}
+  .tabs{display:flex;gap:28px;margin-bottom:-1px}
+  .tab{font-size:13px;color:var(--muted);padding:0 0 14px;border-bottom:1px solid transparent;cursor:pointer}
+  .tab.on{color:var(--near-black);border-bottom-color:var(--near-black);font-weight:500}
+  .count{color:var(--taupe);font-size:11px;margin-left:5px}
+
+  /* ---- buttons ---- */
+  .btn{
+    font-family:Inter;font-size:13px;font-weight:500;
+    padding:9px 16px;border:1px solid var(--near-black);
+    background:var(--near-black);color:#fff;border-radius:0;cursor:pointer;
+  }
+  .btn:hover{background:#000;border-color:#000}
+  .btn-o{background:transparent;color:var(--near-black);border-color:var(--rule)}
+  .btn-o:hover{border-color:var(--near-black);background:var(--hover)}
+  .btn-danger{background:transparent;color:var(--red);border-color:var(--red)}
+  .btn-danger:hover{background:var(--red);color:#fff}
+  .btn-sm{padding:6px 12px;font-size:12px}
+  .btn-icon{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+
+  /* ---- cards ---- */
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft);margin:24px 0 0}
+  .card{background:#fff;padding:0;display:flex;flex-direction:column}
+  .card-img{aspect-ratio:3/4;background:#F2F0EC;position:relative;overflow:hidden}
+  .card-img.land{aspect-ratio:4/3}
+  .card-img svg{position:absolute;inset:0;width:100%;height:100%}
+  .card-body{padding:16px 16px 14px;flex:1;display:flex;flex-direction:column;gap:8px}
+  .card-src{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--taupe)}
+  .card-brand{font-size:12px;color:var(--muted)}
+  .card-desc{font-size:12px;color:var(--body);line-height:1.5}
+  .card-price{font-size:13px;color:var(--near-black);font-weight:500}
+  .tagrow{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+  .tag{font-size:11px;color:var(--body);border:1px solid var(--rule);padding:2px 7px}
+  .card-acts{display:flex;gap:6px;padding:0 16px 16px}
+  .card-acts .btn{flex:1;text-align:center}
+
+  /* review bar */
+  .review{
+    display:flex;align-items:center;gap:6px;
+    font-size:11px;letter-spacing:2px;text-transform:uppercase;
+    padding:7px 16px;
+  }
+  .review.mono{border-top:1px solid var(--taupe);border-bottom:1px solid var(--rule-soft);color:var(--taupe);background:#FBFAF8}
+  .review.chr{background:#FAEEDA;color:#854F0B;border-bottom:1px solid #EFDCBB}
+  .dot{width:5px;height:5px;background:currentColor;transform:rotate(45deg)}
+
+  /* stock */
+  .stock{display:inline-flex;align-items:center;gap:5px;font-size:11px}
+  .stock.mono{color:var(--muted)}
+  .stock.mono .dia{width:6px;height:6px;border:1px solid var(--muted);transform:rotate(45deg)}
+  .stock.chr{color:#3B6D11}
+  .stock.chr .dia{width:6px;height:6px;background:#3B6D11;transform:rotate(45deg)}
+
+  /* ---- edit ---- */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--rule);margin-top:24px}
+  .col{padding:0}
+  .col + .col{border-left:1px solid var(--rule)}
+  .col-head{padding:18px 20px 14px;border-bottom:1px solid var(--rule)}
+  .personas{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .persona{font-size:11px;border:1px solid var(--rule);padding:2px 7px;color:var(--body)}
+  .persona b{font-weight:500;color:var(--taupe);margin-left:4px}
+  .sec{padding:16px 20px;border-bottom:1px solid var(--rule-soft)}
+  .sec:last-child{border-bottom:0}
+  .sec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .ecard{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule-soft)}
+  .ecard:last-of-type{border-bottom:0}
+  .ethumb{width:64px;height:64px;flex:0 0 64px;background:#F2F0EC;position:relative;overflow:hidden}
+  .ethumb svg{position:absolute;inset:0;width:100%;height:100%}
+  .ebody{flex:1;min-width:0}
+  .rationale{display:flex;gap:7px;margin-top:7px;font-size:12px;color:var(--muted);line-height:1.45}
+  .rationale .dia{flex:0 0 7px;height:7px;border:1px solid var(--taupe);transform:rotate(45deg);margin-top:5px}
+  .eacts{display:flex;gap:8px;align-items:center;margin-top:9px}
+  .ba{position:relative}
+  .ba-wrap{display:inline-flex;align-items:center;gap:9px}
+  .ba-do{
+    font-family:Inter;font-size:12px;font-weight:500;color:#fff;
+    background:var(--near-black);border:0;border-radius:0;
+    padding:8px 15px;cursor:pointer;
+  }
+  .ba-do:hover{background:#000}
+  .ba-change{background:none;border:0;font-family:Inter;font-size:12px;color:var(--taupe);cursor:pointer;padding:4px 2px}
+  .ba-change:hover{color:var(--near-black)}
+  .ba-menu{
+    position:absolute;top:calc(100% + 4px);left:0;z-index:5;
+    background:#fff;border:1px solid var(--near-black);min-width:130px;
+    display:none;
+  }
+  .ba-menu.open{display:block}
+  .ba-menu button{
+    display:block;width:100%;text-align:left;background:none;border:0;
+    font-family:Inter;font-size:12px;color:var(--body);padding:8px 12px;cursor:pointer;
+  }
+  .ba-menu button:hover{background:var(--hover);color:var(--near-black)}
+  .ba-menu button.cur{color:var(--near-black);font-weight:500}
+  .ba-div{width:1px;height:16px;background:var(--rule);margin:0 2px}
+  .txt{background:none;border:0;font-family:Inter;font-size:12px;color:var(--muted);cursor:pointer;padding:5px 4px}
+  .txt:hover{color:var(--near-black)}
+  .txt.rm:hover{color:var(--red)}
+  .empty{padding:14px 0;font-size:12px;color:var(--muted);font-style:italic}
+
+  /* ---- annotation ---- */
+  .note{max-width:1180px;margin:0 auto;padding:56px 32px 0}
+  .note .pre{margin-bottom:12px}
+  .note h2{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:400;color:var(--near-black);line-height:1.2;margin-bottom:8px}
+  .note p{font-size:14px;color:var(--body);max-width:620px;line-height:1.65}
+  .rule{height:1px;background:var(--rule);margin:0}
+  .ab{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:24px}
+  .ab-h{display:flex;align-items:baseline;gap:10px;margin-bottom:2px}
+  .ab-h .pre{margin:0}
+  .ab p{font-size:13px;color:var(--muted);margin-bottom:14px}
+  .scale-tbl{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
+  .scale-tbl th{text-align:left;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--taupe);font-weight:500;padding:0 16px 10px 0;border-bottom:1px solid var(--rule)}
+  .scale-tbl td{padding:9px 16px 9px 0;border-bottom:1px solid var(--rule-soft);color:var(--body)}
+  .scale-tbl td:first-child{color:var(--near-black)}
+  .sw{display:flex;gap:0;margin-top:18px;border:1px solid var(--rule)}
+  .sw div{flex:1;height:56px;position:relative}
+  .sw span{position:absolute;bottom:-22px;left:0;font-size:10px;letter-spacing:1px;color:var(--muted)}
+</style>
+
+<div class="note">
+  <div class="pre">— Style guide</div>
+  <h2>Cormorant, Inter, taupe. <span class="accent">At tool density.</span></h2>
+  <p>Same fonts, same palette, same square corners as the marketing site — rescaled to roughly half. A 64px hero headline becomes a 28px page title; a 36px section head becomes 18px. The brand reads identically; Kath fits four times as many candidates on screen.</p>
+
+  <table class="scale-tbl">
+    <tr><th>Role</th><th>design.md</th><th>Tool scale</th></tr>
+    <tr><td>Page title</td><td>H1 · 64px Cormorant</td><td>28px Cormorant</td></tr>
+    <tr><td>Section head</td><td>H3 · 36px Cormorant</td><td>18px Cormorant</td></tr>
+    <tr><td>Item name</td><td>—</td><td>20px Cormorant</td></tr>
+    <tr><td>Label / column head</td><td>Pre-heading · 14px, 3px track</td><td>11px, 3px track · #898479</td></tr>
+    <tr><td>Body / metadata</td><td>16px Inter · #404040</td><td>13px Inter · #404040</td></tr>
+    <tr><td>Secondary</td><td>20px · #696969</td><td>12px · #696969</td></tr>
+    <tr><td>Button</td><td>20px · 35×21 padding</td><td>13px · 16×9 padding</td></tr>
+  </table>
+
+  <div class="sw">
+    <div style="background:#171717"><span style="color:#898479">171717</span></div>
+    <div style="background:#404040"><span style="color:#898479">404040</span></div>
+    <div style="background:#696969"><span style="color:#898479">696969</span></div>
+    <div style="background:#898479"><span>898479</span></div>
+    <div style="background:#756F65"><span>756F65</span></div>
+    <div style="background:#E4E2DD"><span>E4E2DD</span></div>
+    <div style="background:#fff;border-left:1px solid #E4E2DD"><span>FFFFFF</span></div>
+  </div>
+</div>
+
+<div style="height:56px"></div>
+<div class="rule"></div>
+
+<!-- ============ APPROVAL CATALOGUE ============ -->
+<div class="note">
+  <div class="pre">— Approval catalogue</div>
+  <h2>Option A <span class="accent">Monochrome</span></h2>
+  <p>No functional colour at all. Approve is black, reject is a bordered outline in a single restrained red — the one hue that earns its place, because a misclick here is destructive. Stock and needs-review are carried by the diamond marker and a taupe rule, not by hue.</p>
+</div>
+
+<div class="shell">
+  <div class="band">
+    <div class="band-head">
+      <div>
+        <div class="h-page">Approval catalogue</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-o btn-sm">Needs review · 4</button>
+        <button class="btn btn-sm">Send to pool · 12</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab on">Shopping <span class="count">57</span></div>
+      <div class="tab">Going out <span class="count">31</span></div>
+      <div class="tab">Staying in <span class="count">18</span></div>
+      <div class="tab">Gifting <span class="count">9</span></div>
+      <div class="tab">Requests <span class="count">3</span></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- 1 -->
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#EDE9E3"/><rect x="34" y="38" width="52" height="84" fill="#DAD4CA"/><rect x="34" y="38" width="52" height="26" fill="#C9C2B6"/><circle cx="60" cy="76" r="7" fill="#EDE9E3"/></svg>
+      </div>
+      <div class="card-body">
+        <div class="card-src">Vogue UK · Extract</div>
+        <div class="h-card">Cashmere Wrap Coat</div>
+        <div class="card-brand">Toteme</div>
+        <div class="card-desc">Double-faced wool in a soft camel, cut long and belted.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">£1,290</span>
+          <span class="stock mono"><i class="dia"></i>In stock</span>
+        </div>
+        <div class="tagrow"><span class="tag">outerwear</span><span class="tag">quiet-luxury</span><span class="tag">autumn</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Approve</button>
+        <button class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    </div>
+
+    <!-- 2 — needs review -->
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#E8E4DE"/><ellipse cx="60" cy="88" rx="30" ry="34" fill="#D5CEC3"/><ellipse cx="60" cy="70" rx="18" ry="12" fill="#C4BBAE"/><rect x="56" y="42" width="8" height="26" fill="#C4BBAE"/></svg>
+      </div>
+      <div class="review mono"><i class="dot"></i>Image needs review</div>
+      <div class="card-body">
+        <div class="card-src">Harper's · Enrich</div>
+        <div class="h-card">Hand-Thrown Vase</div>
+        <div class="card-brand">1882 Ltd</div>
+        <div class="card-desc">Matte stoneware, thrown in Stoke. Each piece varies.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">£185</span>
+          <span class="stock mono"><i class="dia"></i>In stock</span>
+        </div>
+        <div class="tagrow"><span class="tag">homeware</span><span class="tag">craft</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Approve</button>
+        <button class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    </div>
+
+    <!-- 3 — client attached -->
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#EAE7E1"/><rect x="26" y="56" width="68" height="48" fill="#D8D2C7"/><rect x="26" y="56" width="68" height="10" fill="#C6BEB1"/><rect x="52" y="76" width="16" height="12" fill="#EAE7E1"/></svg>
+      </div>
+      <div class="review mono"><i class="dot"></i>Attached · Emma Hartley</div>
+      <div class="card-body">
+        <div class="card-src">Assistant · Manual</div>
+        <div class="h-card">The Ledbury</div>
+        <div class="card-brand">Notting Hill</div>
+        <div class="card-desc">Two Michelin stars. She mentioned it on Tuesday's call.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">££££</span>
+          <span class="mut">Live for Emma</span>
+        </div>
+        <div class="tagrow"><span class="tag">dining</span><span class="tag">fine-dining</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Add to pool</button>
+        <button class="btn btn-o btn-sm">Keep private</button>
+      </div>
+    </div>
+
+    <!-- 4 — out of stock -->
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#EDEAE5"/><path d="M40 118 L60 46 L80 118 Z" fill="#D6D0C5"/><rect x="52" y="100" width="16" height="18" fill="#C3BCAF"/></svg>
+      </div>
+      <div class="card-body">
+        <div class="card-src">Net-a-Porter · Extract</div>
+        <div class="h-card">Silk Column Dress</div>
+        <div class="card-brand">The Row</div>
+        <div class="card-desc">Bias-cut silk charmeuse, floor length, in ink.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">£2,450</span>
+          <span class="stock mono" style="text-decoration:line-through"><i class="dia"></i>Out of stock</span>
+        </div>
+        <div class="tagrow"><span class="tag">eveningwear</span><span class="tag">silk</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Approve</button>
+        <button class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="height:56px"></div>
+
+<div class="note">
+  <h2>Option B <span class="accent">Functional colour</span></h2>
+  <p>Three additional hues — amber for needs-review, green for in-stock, red for reject — desaturated and warmed to sit beside the taupes. Faster to scan across a 57-card grid. But it's the first thing on the page that isn't in <span style="font-family:'Cormorant Garamond',serif;font-size:15px">design.md</span>.</p>
+</div>
+
+<div class="shell">
+  <div class="grid">
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#EDE9E3"/><rect x="34" y="38" width="52" height="84" fill="#DAD4CA"/><rect x="34" y="38" width="52" height="26" fill="#C9C2B6"/><circle cx="60" cy="76" r="7" fill="#EDE9E3"/></svg>
+      </div>
+      <div class="card-body">
+        <div class="card-src">Vogue UK · Extract</div>
+        <div class="h-card">Cashmere Wrap Coat</div>
+        <div class="card-brand">Toteme</div>
+        <div class="card-desc">Double-faced wool in a soft camel, cut long and belted.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">£1,290</span>
+          <span class="stock chr"><i class="dia"></i>In stock</span>
+        </div>
+        <div class="tagrow"><span class="tag">outerwear</span><span class="tag">quiet-luxury</span><span class="tag">autumn</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Approve</button>
+        <button class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#E8E4DE"/><ellipse cx="60" cy="88" rx="30" ry="34" fill="#D5CEC3"/><ellipse cx="60" cy="70" rx="18" ry="12" fill="#C4BBAE"/><rect x="56" y="42" width="8" height="26" fill="#C4BBAE"/></svg>
+      </div>
+      <div class="review chr"><i class="dot"></i>Image needs review</div>
+      <div class="card-body">
+        <div class="card-src">Harper's · Enrich</div>
+        <div class="h-card">Hand-Thrown Vase</div>
+        <div class="card-brand">1882 Ltd</div>
+        <div class="card-desc">Matte stoneware, thrown in Stoke. Each piece varies.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">£185</span>
+          <span class="stock chr"><i class="dia"></i>In stock</span>
+        </div>
+        <div class="tagrow"><span class="tag">homeware</span><span class="tag">craft</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Approve</button>
+        <button class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#EAE7E1"/><rect x="26" y="56" width="68" height="48" fill="#D8D2C7"/><rect x="26" y="56" width="68" height="10" fill="#C6BEB1"/><rect x="52" y="76" width="16" height="12" fill="#EAE7E1"/></svg>
+      </div>
+      <div class="review mono"><i class="dot"></i>Attached · Emma Hartley</div>
+      <div class="card-body">
+        <div class="card-src">Assistant · Manual</div>
+        <div class="h-card">The Ledbury</div>
+        <div class="card-brand">Notting Hill</div>
+        <div class="card-desc">Two Michelin stars. She mentioned it on Tuesday's call.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">££££</span>
+          <span class="mut">Live for Emma</span>
+        </div>
+        <div class="tagrow"><span class="tag">dining</span><span class="tag">fine-dining</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Add to pool</button>
+        <button class="btn btn-o btn-sm">Keep private</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img">
+        <svg viewBox="0 0 120 160"><rect width="120" height="160" fill="#EDEAE5"/><path d="M40 118 L60 46 L80 118 Z" fill="#D6D0C5"/><rect x="52" y="100" width="16" height="18" fill="#C3BCAF"/></svg>
+      </div>
+      <div class="card-body">
+        <div class="card-src">Net-a-Porter · Extract</div>
+        <div class="h-card">Silk Column Dress</div>
+        <div class="card-brand">The Row</div>
+        <div class="card-desc">Bias-cut silk charmeuse, floor length, in ink.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px">
+          <span class="card-price">£2,450</span>
+          <span class="stock" style="color:#A32D2D"><i class="dia" style="width:6px;height:6px;background:#A32D2D;transform:rotate(45deg)"></i>Out of stock</span>
+        </div>
+        <div class="tagrow"><span class="tag">eveningwear</span><span class="tag">silk</span></div>
+      </div>
+      <div class="card-acts">
+        <button class="btn btn-sm">Approve</button>
+        <button class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="height:64px"></div>
+<div class="rule"></div>
+
+<!-- ============ THE EDIT ============ -->
+<div class="note">
+  <div class="pre">— Recommendations manager</div>
+  <h2>The Edit <span class="accent">Hartley household</span></h2>
+  <p>Both adults side by side, because composition is a household operation and the assistant needs to see the split. Cormorant carries the item names; the diamond marker carries the rationale. Two per section, four sections, eight items — the whole Edit fits on one screen without scrolling.</p>
+</div>
+
+<div class="shell">
+  <div class="band">
+    <div class="band-head">
+      <div>
+        <div class="pre" style="margin-bottom:6px">— Week of 20 July</div>
+        <div class="h-page">Hartley</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-o btn-sm">Regenerate</button>
+        <button class="btn btn-sm">Ship both</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab">Pool</div>
+      <div class="tab on">The Edit <span class="count">6</span></div>
+      <div class="tab">Clients</div>
+      <div class="tab">Add item</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <!-- EMMA -->
+    <div class="col">
+      <div class="col-head">
+        <div class="h-sec">Emma Hartley</div>
+        <div class="mut" style="margin-top:2px">Black tier · James' birthday in 9 days</div>
+        <div class="personas">
+          <span class="persona">connected-to-teen<b>0.7</b></span>
+          <span class="persona">quiet-luxury home cook<b>0.9</b></span>
+          <span class="persona">primary carer<b>1.0</b></span>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <div class="pre">Going out</div>
+          <button class="txt">+ Add from pool</button>
+        </div>
+
+        <div class="ecard">
+          <div class="ethumb"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#EAE7E1"/><rect x="14" y="24" width="36" height="26" fill="#D8D2C7"/><rect x="14" y="24" width="36" height="6" fill="#C6BEB1"/></svg></div>
+          <div class="ebody">
+            <div class="h-card">The Ledbury</div>
+            <div class="mut">Restaurant · Notting Hill · ££££</div>
+            <div class="rationale"><i class="dia"></i><span>She saved two similar bookings; James' birthday is in nine days.</span></div>
+            <div class="eacts">
+              <div class="ba">
+                <div class="ba-wrap">
+                  <button class="ba-do">Book</button>
+                  <button class="ba-change" onclick="tog(this)">Change</button>
+                </div>
+                <div class="ba-menu"><button class="cur">Book</button><button>Ask assistant</button><button>Save</button></div>
+              </div>
+              <span class="ba-div"></span>
+              <button class="txt">Swap</button>
+              <button class="txt">Move to James</button>
+              <button class="txt rm">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ecard">
+          <div class="ethumb"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#EDE9E3"/><circle cx="32" cy="32" r="16" fill="#D5CEC3"/><circle cx="32" cy="32" r="6" fill="#EDE9E3"/></svg></div>
+          <div class="ebody">
+            <div class="h-card">Wigmore Hall — Schubert</div>
+            <div class="mut">Concert · Marylebone · Sat 25th</div>
+            <div class="rationale"><i class="dia"></i><span>Tapped classical at onboarding; she has never been booked here.</span></div>
+            <div class="eacts">
+              <div class="ba">
+                <div class="ba-wrap">
+                  <button class="ba-do">Book</button>
+                  <button class="ba-change" onclick="tog(this)">Change</button>
+                </div>
+                <div class="ba-menu"><button class="cur">Book</button><button>Ask assistant</button><button>Save</button></div>
+              </div>
+              <span class="ba-div"></span>
+              <button class="txt">Swap</button>
+              <button class="txt">Move to James</button>
+              <button class="txt rm">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <div class="pre">Gifting</div>
+          <button class="txt">+ Add from pool</button>
+        </div>
+
+        <div class="ecard">
+          <div class="ethumb"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#E8E4DE"/><rect x="18" y="22" width="28" height="24" fill="#D5CEC3"/><rect x="30" y="16" width="4" height="30" fill="#C4BBAE"/></svg></div>
+          <div class="ebody">
+            <div class="h-card">Smythson Panama Diary</div>
+            <div class="mut">Stationery · £195</div>
+            <div class="rationale"><i class="dia"></i><span>For James. She bought Smythson twice; his birthday is the 29th.</span></div>
+            <div class="eacts">
+              <div class="ba">
+                <div class="ba-wrap">
+                  <button class="ba-do">Buy</button>
+                  <button class="ba-change" onclick="tog(this)">Change</button>
+                </div>
+                <div class="ba-menu"><button class="cur">Buy</button><button>Ask assistant</button><button>Save</button></div>
+              </div>
+              <span class="ba-div"></span>
+              <button class="txt">Swap</button>
+              <button class="txt">Move to James</button>
+              <button class="txt rm">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ecard">
+          <div class="ethumb"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#EDEAE5"/><rect x="16" y="20" width="32" height="28" fill="#D8D2C7"/><rect x="16" y="20" width="32" height="7" fill="#C3BCAF"/></svg></div>
+          <div class="ebody">
+            <div class="h-card">Holiday Club — Ravenscourt</div>
+            <div class="mut">Activity · Noah, 9 · £280/wk</div>
+            <div class="rationale"><i class="dia"></i><span>Half-term is in three weeks. Noah did tennis camp last summer.</span></div>
+            <div class="eacts">
+              <div class="ba">
+                <div class="ba-wrap">
+                  <button class="ba-do">Book</button>
+                  <button class="ba-change" onclick="tog(this)">Change</button>
+                </div>
+                <div class="ba-menu"><button class="cur">Book</button><button>Ask assistant</button><button>Save</button></div>
+              </div>
+              <span class="ba-div"></span>
+              <button class="txt">Swap</button>
+              <button class="txt">Move to James</button>
+              <button class="txt rm">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <div class="pre">Staying in</div>
+          <button class="txt">+ Add from pool</button>
+        </div>
+        <div class="empty">Nothing strong enough this week. Regenerate, or leave it out.</div>
+      </div>
+    </div>
+
+    <!-- JAMES -->
+    <div class="col">
+      <div class="col-head">
+        <div class="h-sec">James Hartley</div>
+        <div class="mut" style="margin-top:2px">Black tier · Birthday 29 July</div>
+        <div class="personas">
+          <span class="persona">connected-to-teen<b>0.7</b></span>
+          <span class="persona">endurance cyclist<b>0.8</b></span>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <div class="pre">Going out</div>
+          <button class="txt">+ Add from pool</button>
+        </div>
+
+        <div class="ecard">
+          <div class="ethumb"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#EDEAE5"/><path d="M16 48 L32 18 L48 48 Z" fill="#D6D0C5"/></svg></div>
+          <div class="ebody">
+            <div class="h-card">Rapha Cycle Club</div>
+            <div class="mut">Ride · Soho · Sun 26th, 7am</div>
+            <div class="rationale"><i class="dia"></i><span>Rides most Sundays. This one is a new route out to the Chilterns.</span></div>
+            <div class="eacts">
+              <div class="ba">
+                <div class="ba-wrap">
+                  <button class="ba-do">Book</button>
+                  <button class="ba-change" onclick="tog(this)">Change</button>
+                </div>
+                <div class="ba-menu"><button class="cur">Book</button><button>Ask assistant</button><button>Save</button></div>
+              </div>
+              <span class="ba-div"></span>
+              <button class="txt">Swap</button>
+              <button class="txt">Move to Emma</button>
+              <button class="txt rm">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ecard">
+          <div class="ethumb"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#E8E4DE"/><rect x="14" y="28" width="36" height="18" fill="#D5CEC3"/><circle cx="24" cy="24" r="5" fill="#C4BBAE"/><circle cx="40" cy="24" r="5" fill="#C4BBAE"/></svg></div>
+          <div class="ebody">
+            <div class="h-card">Kiln</div>
+            <div class="mut">Restaurant · Soho · ££</div>
+            <div class="rationale"><i class="dia"></i><span>Counter seating, no booking — fits the Thursday he works late.</span></div>
+            <div class="eacts">
+              <div class="ba">
+                <div class="ba-wrap">
+                  <button class="ba-do">Ask assistant</button>
+                  <button class="ba-change" onclick="tog(this)">Change</button>
+                </div>
+                <div class="ba-menu"><button class="cur">Ask assistant</button><button>Book</button><button>Save</button></div>
+              </div>
+              <span class="ba-div"></span>
+              <button class="txt">Swap</button>
+              <button class="txt">Move to Emma</button>
+              <button class="txt rm">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <div class="pre">Shopping</div>
+          <button class="txt">+ Add from pool</button>
+        </div>
+
+        <div class="ecard">
+          <div class="ethumb"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="#EDE9E3"/><rect x="20" y="18" width="24" height="32" fill="#DAD4CA"/><rect x="20" y="18" width="24" height="9" fill="#C9C2B6"/></svg></div>
+          <div class="ebody">
+            <div class="h-card">Assos Mille GTO Jacket</div>
+            <div class="mut">Cycling · £340</div>
+            <div class="rationale"><i class="dia"></i><span>Winter kit. He bought Assos bibs in March.</span></div>
+            <div class="eacts">
+              <div class="ba">
+                <div class="ba-wrap">
+                  <button class="ba-do">Buy</button>
+                  <button class="ba-change" onclick="tog(this)">Change</button>
+                </div>
+                <div class="ba-menu"><button class="cur">Buy</button><button>Ask assistant</button><button>Save</button></div>
+              </div>
+              <span class="ba-div"></span>
+              <button class="txt">Swap</button>
+              <button class="txt">Move to Emma</button>
+              <button class="txt rm">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <div class="pre">Gifting</div>
+          <button class="txt">+ Add from pool</button>
+        </div>
+        <div class="empty">Held back — Noah's holiday club went to Emma this week.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function tog(btn){
+    var menu = btn.closest('.ba').querySelector('.ba-menu');
+    var isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.ba-menu.open').forEach(function(m){m.classList.remove('open')});
+    if(!isOpen) menu.classList.add('open');
+  }
+  document.addEventListener('click', function(e){
+    if(e.target.closest('.ba-menu')){
+      var menu = e.target.closest('.ba-menu');
+      var ba = menu.closest('.ba');
+      var pick = e.target.textContent;
+      ba.querySelector('.ba-do').textContent = pick;
+      menu.querySelectorAll('button').forEach(function(b){b.classList.toggle('cur', b.textContent===pick)});
+      menu.classList.remove('open');
+      return;
+    }
+    if(!e.target.closest('.ba-change')){
+      document.querySelectorAll('.ba-menu.open').forEach(function(m){m.classList.remove('open')});
+    }
+  });
+</script>
+
+<div class="note">
+  <div class="pre">— Signature</div>
+  <h2>The diamond does the work</h2>
+  <p>One motif, borrowed straight from the bullet marker in <span style="font-family:'Cormorant Garamond',serif;font-size:15px">design.md</span>, carries three jobs across both tools: it marks the LLM's rationale on every Edit card, it flags stock status in the catalogue, and it opens the needs-review rule. It's the only ornament on either screen — everything else is type, rule, and whitespace.</p>
+</div>
