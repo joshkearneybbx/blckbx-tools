@@ -83,6 +83,11 @@ export async function fetchRecommendations(params: {
   category?: string;
   subcategory?: string;
   content_type?: string;
+  /** Pool §1 */
+  provenance?: string;
+  persona?: string;
+  season?: string;
+  freshness?: string;
   is_blckbx_approved?: boolean;
   limit?: number;
   offset?: number;
@@ -95,9 +100,13 @@ export async function fetchRecommendations(params: {
   if (params.content_type) {
     searchParams.set("content_type", params.content_type);
   } else {
-    // Research Hub search excludes lists (they have their own tab)
+    // Pool excludes lists (they have their own tab)
     searchParams.set("content_type_exclude", "list");
   }
+  if (params.provenance) searchParams.set("provenance", params.provenance);
+  if (params.persona) searchParams.set("persona", params.persona);
+  if (params.season) searchParams.set("season", params.season);
+  if (params.freshness) searchParams.set("freshness", params.freshness);
   if (params.is_blckbx_approved) searchParams.set("is_blckbx_approved", "true");
   searchParams.set("limit", String(params.limit ?? 24));
   searchParams.set("offset", String(params.offset ?? 0));
@@ -451,12 +460,35 @@ export async function checkCandidateDedup(payload: {
 }
 
 export async function createCandidate(payload: AddItemSubmission) {
+  const content_scope =
+    payload.content_scope ??
+    (payload.routing === "for_pool" ? "general" : "unique_request");
+
+  const body: Record<string, unknown> = {
+    name: payload.name,
+    description: payload.description,
+    url: payload.url,
+    image_url: payload.image_url,
+    category: payload.category,
+    subcategory: payload.subcategory,
+    content_scope,
+    submitted_by: CURRENT_USER_KEY,
+    brand: payload.brand ?? "",
+    gender_target: payload.gender_target || null,
+    reviewer_notes: payload.reviewer_notes || null,
+    price_pence: payload.price_pence ?? null,
+  };
+
+  if (content_scope === "unique_request") {
+    body.requested_for_profile = payload.requested_for_profile;
+    if (payload.client_account_key) {
+      body.client_account_key = payload.client_account_key;
+    }
+  }
+
   const response = await gatewayFetch("/candidates", {
     method: "POST",
-    body: JSON.stringify({
-      ...payload,
-      submitted_by: CURRENT_USER_KEY,
-    }),
+    body: JSON.stringify(body),
   });
 
   const data = await response.json();

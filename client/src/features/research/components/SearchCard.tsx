@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FilterChips } from "./FilterChips";
+import { EMPTY_POOL_FILTERS, PoolFilters, type PoolFilterState } from "./PoolFilters";
 import { ResultCard } from "./ResultCard";
 import { fetchRecommendations } from "../lib/api";
 import { Category, Recommendation } from "../lib/types";
@@ -43,6 +44,7 @@ export function SearchCard() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [category, setCategory] = useState<Category>("all");
   const [subcategory, setSubcategory] = useState("all");
+  const [poolFilters, setPoolFilters] = useState<PoolFilterState>(EMPTY_POOL_FILTERS);
   const [blckbxApprovedOnly, setBlckbxApprovedOnly] = useState(false);
   const [results, setResults] = useState<Recommendation[]>([]);
   const [offset, setOffset] = useState(0);
@@ -65,7 +67,7 @@ export function SearchCard() {
 
   useEffect(() => {
     setOffset(0);
-  }, [debouncedQuery, subcategory]);
+  }, [debouncedQuery, subcategory, poolFilters]);
 
   useEffect(() => {
     let active = true;
@@ -81,6 +83,11 @@ export function SearchCard() {
       q: debouncedQuery,
       category: category === "all" ? undefined : category,
       subcategory: category === "all" || subcategory === "all" ? undefined : subcategory,
+      content_type: poolFilters.content_type || undefined,
+      provenance: poolFilters.provenance || undefined,
+      persona: poolFilters.persona || undefined,
+      season: poolFilters.season || undefined,
+      freshness: poolFilters.freshness || undefined,
       is_blckbx_approved: blckbxApprovedOnly || undefined,
       limit: PAGE_SIZE,
       offset,
@@ -109,7 +116,7 @@ export function SearchCard() {
     return () => {
       active = false;
     };
-  }, [debouncedQuery, category, subcategory, blckbxApprovedOnly, offset, refreshKey]);
+  }, [debouncedQuery, category, subcategory, poolFilters, blckbxApprovedOnly, offset, refreshKey]);
 
   const hasSearch = debouncedQuery.trim().length > 0;
   const canLoadMore = results.length < total;
@@ -122,8 +129,10 @@ export function SearchCard() {
   return (
     <section className="panel p-6 md:p-8">
       <div className="max-w-3xl">
-        <h2 className="font-serif text-[30px] italic">Quick Search</h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">Find approved products, venues, and experiences.</p>
+        <h2 className="page-title">Pool</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Approved inventory — search and filter. Swap source for The Edit.
+        </p>
       </div>
 
       <div className="relative mt-6">
@@ -146,7 +155,7 @@ export function SearchCard() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="field search-field"
-          placeholder="Search by name, brand, tag..."
+          placeholder="Search pool by name, brand, tag..."
         />
         {query ? (
           <button
@@ -202,6 +211,8 @@ export function SearchCard() {
           ))}
         </div>
       ) : null}
+
+      <PoolFilters value={poolFilters} onChange={setPoolFilters} />
 
       <div className="mt-5 text-sm text-[var(--muted)]">
         {resultLabel}

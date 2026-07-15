@@ -4,7 +4,7 @@ import { ToastProvider } from "./components/ToastProvider";
 import "./research.css";
 
 const navItems = [
-  { href: "/research", label: "Search" },
+  { href: "/research", label: "Pool" },
   { href: "/research/add", label: "Add Item" },
   { href: "/research/task-matcher", label: "Task Matcher" },
   { href: "/research/client-interests", label: "Client Interests" },
@@ -27,12 +27,14 @@ export function ResearchLayout({ children }: { children: ReactNode }) {
 
   return (
     <ToastProvider>
-      <div className="research-hub min-h-screen bg-[var(--page-bg)]">
-        <main className="research-hub__main px-4 py-4 md:px-6 md:py-6">
+      <div className="research-hub min-h-screen">
+        <main className="research-hub__main px-4 py-4 md:px-8 md:py-6">
           <header className="research-hub__header">
-            <div>
-              <div className="font-serif text-[31px] italic leading-none text-[var(--text)]">Blck Book</div>
-              <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">Research Hub</div>
+            <div className="research-hub__brand">
+              <div>
+                <div className="research-hub__brand-title">Blck Book</div>
+                <div className="research-hub__brand-subtitle">Recommendations Manager</div>
+              </div>
             </div>
             <nav ref={tabsRef} className="research-hub-tabs" role="tablist">
               {navItems.map((item) => {
@@ -52,7 +54,7 @@ export function ResearchLayout({ children }: { children: ReactNode }) {
               })}
             </nav>
           </header>
-          {children}
+          <div className="pt-6">{children}</div>
         </main>
       </div>
     </ToastProvider>
