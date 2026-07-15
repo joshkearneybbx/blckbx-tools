@@ -488,6 +488,7 @@ export function CatalogueGrid({
   onToggleSelect,
   onApprove,
   onReject,
+  onKeepClientBound,
   onEdit,
   onTagsChange,
   onListsChange,
@@ -507,6 +508,7 @@ export function CatalogueGrid({
     candidate: CatalogueItem,
     payload: { reason?: string; rejectionPreset: string }
   ) => void;
+  onKeepClientBound?: (candidate: CatalogueItem) => void;
   onEdit: (candidate: CatalogueItem, changes: Record<string, unknown>) => Promise<unknown>;
   onTagsChange: (candidate: CatalogueItem, tags: string[]) => void;
   onListsChange: (candidate: CatalogueItem, assignedLists: string[]) => void;
@@ -536,6 +538,7 @@ export function CatalogueGrid({
           onToggleSelect={() => onToggleSelect?.(candidate)}
           onApprove={(reason) => onApprove(candidate, reason)}
           onReject={(reason) => onReject(candidate, reason)}
+          onKeepClientBound={onKeepClientBound ? () => onKeepClientBound(candidate) : undefined}
           onEdit={(changes) => onEdit(candidate, changes)}
           onTagsChange={(tags) => onTagsChange(candidate, tags)}
           onListsChange={(assignedLists) => onListsChange(candidate, assignedLists)}
@@ -724,6 +727,7 @@ function CatalogueCard({
   onToggleSelect,
   onApprove,
   onReject,
+  onKeepClientBound,
   onEdit,
   onTagsChange,
   onListsChange,
@@ -739,6 +743,8 @@ function CatalogueCard({
   onToggleSelect?: () => void;
   onApprove: (reason?: string) => void;
   onReject: (payload: { reason?: string; rejectionPreset: string }) => void;
+  /** §2: "no" on pool-promotion — not a rejection */
+  onKeepClientBound?: () => void;
   onEdit: (changes: Record<string, unknown>) => Promise<unknown>;
   onTagsChange: (tags: string[]) => void;
   onListsChange: (assignedLists: string[]) => void;
@@ -1002,7 +1008,42 @@ function CatalogueCard({
         </div>
 
         <div className="mt-auto">
-          {approvePrompt ? (
+          {(candidate.content_scope ?? "general") === "unique_request" &&
+          candidate.status === "pending" ? (
+            <div className="space-y-3">
+              <div className="bb-review bb-review--warn">
+                <span className="bb-diamond bb-diamond--current" aria-hidden />
+                <span>
+                  Attached to:{" "}
+                  {candidate.requested_for_profile_name ||
+                    candidate.requested_by_client_name ||
+                    "client profile"}{" "}
+                  — also add to pool?
+                </span>
+              </div>
+              <p className="text-xs text-[var(--bb-muted)]">
+                Default is no. A no is not a rejection — the item stays live for the client only.
+              </p>
+              <div className="approval-card__actions grid grid-cols-2 gap-[2px]">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onKeepClientBound?.()}
+                  className="approval-card__action approval-card__action--secondary"
+                >
+                  Keep client-only
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || (candidate.content_tab === "shopping" && !!candidate.already_in_catalogue)}
+                  onClick={() => onApprove("pool_promotion")}
+                  className="approval-card__action approval-card__action--primary"
+                >
+                  Add to pool
+                </button>
+              </div>
+            </div>
+          ) : approvePrompt ? (
             <DecisionPrompt
               tone="approve"
               value={approveReason}
@@ -1058,7 +1099,7 @@ function CatalogueCard({
                 type="button"
                 disabled={busy}
                 onClick={() => setIsRejecting(true)}
-                className="approval-card__action approval-card__action--secondary"
+                className="approval-card__action approval-card__action--danger"
               >
                 Reject
               </button>

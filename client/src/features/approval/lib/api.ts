@@ -64,6 +64,8 @@ type ProductApiCandidate = {
   is_blckbx_approved?: boolean | null;
   requested_by_client?: string | null;
   requested_by_client_name?: string | null;
+  requested_for_profile?: string | null;
+  requested_for_profile_name?: string | null;
   content_scope?: ContentScope | null;
   priority?: CandidatePriority | null;
   themes?: string[] | null;
@@ -365,6 +367,8 @@ function mapCandidate(candidate: ProductApiCandidate): ProductCandidate {
     is_blckbx_approved: candidate.is_blckbx_approved ?? false,
     requested_by_client: candidate.requested_by_client ?? null,
     requested_by_client_name: candidate.requested_by_client_name ?? null,
+    requested_for_profile: candidate.requested_for_profile ?? null,
+    requested_for_profile_name: candidate.requested_for_profile_name?.trim() || null,
     content_scope: candidate.content_scope ?? "general",
     priority: candidate.priority ?? "normal",
     audit_log: (candidate.audit_log ?? []).map((entry) => ({

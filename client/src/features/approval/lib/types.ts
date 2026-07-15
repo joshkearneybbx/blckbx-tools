@@ -59,6 +59,9 @@ type CandidateBase = {
   image_needs_review?: boolean | null;
   requested_by_client?: string | null;
   requested_by_client_name?: string | null;
+  /** v2.8 §5.2 — profile key for client-bound items */
+  requested_for_profile?: string | null;
+  requested_for_profile_name?: string | null;
   content_scope?: ContentScope;
   priority?: CandidatePriority;
   subcategory?: string | null;
