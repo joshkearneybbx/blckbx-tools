@@ -42,6 +42,8 @@ export type Recommendation = {
   poi_count?: number | null;
 };
 
+export type AddItemRouting = "for_client" | "for_pool";
+
 export type AddItemSubmission = {
   _key?: string;
   name: string;
@@ -50,7 +52,11 @@ export type AddItemSubmission = {
   image_url: string;
   category: Exclude<Category, "all">;
   subcategory: string;
-  client_account_key: string;
+  /** §2 routing — maps to content_scope unique_request | general */
+  routing?: AddItemRouting;
+  content_scope?: "unique_request" | "general";
+  client_account_key?: string;
+  requested_for_profile?: string;
   price_pence?: number | null;
   brand?: string;
   gender_target?: "for_her" | "for_him" | "gender_neutral" | "";
@@ -66,31 +72,12 @@ export type DedupCheckResult = {
   key?: string;
 };
 
-export type Suggestion = {
-  recommendation_key: string;
-  reason: string;
-  match_tags: string[];
-  confidence: "high" | "medium" | "low";
-};
-
-export type TaskMatchResponse = {
-  intro: string;
-  suggestions: Suggestion[];
-  candidates: Recommendation[];
-};
-
 export type ClientAccount = {
   _key: string;
   account_name: string;
   primary_contact?: string | null;
   primary_contact_name?: string | null;
   membership_tier?: "standard" | "premium" | "luxury" | "ultra" | string | null;
-};
-
-export type Recipient = {
-  _key: string;
-  name: string;
-  client_account_key: string;
 };
 
 export type ClientProfile = {

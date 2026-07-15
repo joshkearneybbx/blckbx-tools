@@ -22,10 +22,8 @@ import MealCraftPage from "@/pages/meals/MealCraftPage";
 import { ResearchLayout } from "@/features/research/ResearchLayout";
 import ResearchAddItem from "@/features/research/pages/ResearchAddItem";
 import ResearchSearch from "@/features/research/pages/ResearchSearch";
-import ResearchTaskMatcher from "@/features/research/pages/ResearchTaskMatcher";
+import ResearchEdit from "@/features/research/pages/ResearchEdit";
 import ClientInterests from "@/features/research/pages/ClientInterests";
-import ResearchLists from "@/features/research/pages/ResearchLists";
-import ResearchListDetail from "@/features/research/pages/ResearchListDetail";
 import ApprovalPage from "@/features/approval/ApprovalPage";
 import ContentHubBlogComposerPage from "@/features/content-hub/pages/ContentHubBlogComposerPage";
 import ContentHubIGComposerPage from "@/features/content-hub/pages/ContentHubIGComposerPage";
@@ -214,20 +212,11 @@ function Router() {
             </ToolGuard>
           )}
         </Route>
-        <Route path="/research/lists/:key">
+        <Route path="/research/edit">
           {() => (
             <ToolGuard slug="research">
               <ResearchLayout>
-                <ResearchListDetail />
-              </ResearchLayout>
-            </ToolGuard>
-          )}
-        </Route>
-        <Route path="/research/lists">
-          {() => (
-            <ToolGuard slug="research">
-              <ResearchLayout>
-                <ResearchLists />
+                <ResearchEdit />
               </ResearchLayout>
             </ToolGuard>
           )}
@@ -237,15 +226,6 @@ function Router() {
             <ToolGuard slug="research">
               <ResearchLayout>
                 <ResearchAddItem />
-              </ResearchLayout>
-            </ToolGuard>
-          )}
-        </Route>
-        <Route path="/research/task-matcher">
-          {() => (
-            <ToolGuard slug="research">
-              <ResearchLayout>
-                <ResearchTaskMatcher />
               </ResearchLayout>
             </ToolGuard>
           )}

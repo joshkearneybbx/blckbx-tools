@@ -8,14 +8,11 @@ import type {
   ProfileAffinity,
   ProfileInterest,
   Recommendation,
-  Recipient,
-  TaskMatchResponse,
 } from "./types";
-import { mockClientAccounts, mockRecipients } from "./mock-clients";
-import { mockTaskMatch } from "./mock-data";
+import type { EditQueueHousehold, HouseholdEditsResponse } from "./edit-types";
+import { mockClientAccounts } from "./mock-clients";
 
 const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || "http://localhost:3002";
-const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_RESEARCH_WEBHOOK_URL || "";
 
 export const CURRENT_USER_KEY = "research_hub_local";
 
@@ -28,16 +25,6 @@ export interface SearchResponse<T> {
   };
   query: string;
   processingTimeMs?: number;
-}
-
-export interface PaginatedGatewayResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
 }
 
 async function gatewayFetch(path: string, options?: RequestInit) {
@@ -100,7 +87,7 @@ export async function fetchRecommendations(params: {
   if (params.content_type) {
     searchParams.set("content_type", params.content_type);
   } else {
-    // Pool excludes lists (they have their own tab)
+    // Lists are not a Recommendations Manager surface — keep them out of Pool.
     searchParams.set("content_type_exclude", "list");
   }
   if (params.provenance) searchParams.set("provenance", params.provenance);
@@ -112,12 +99,17 @@ export async function fetchRecommendations(params: {
   searchParams.set("offset", String(params.offset ?? 0));
 
   const response = await gatewayFetch(`/search?${searchParams.toString()}`);
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(`Search error: ${response.status}`);
+    const detail =
+      typeof data?.message === "string"
+        ? data.message
+        : typeof data?.error === "string"
+          ? data.error
+          : `HTTP ${response.status}`;
+    throw new Error(`Search error (${response.status}): ${detail}`);
   }
-
-  const data = await response.json();
   return {
     data: (data.hits ?? []).map((hit: Record<string, unknown>) => ({
       ...hit,
@@ -131,62 +123,6 @@ export async function fetchRecommendations(params: {
     query: data.query ?? params.q ?? "",
     processingTimeMs: data.processingTimeMs,
   };
-}
-
-export async function fetchGatewayRecommendations(params: {
-  search?: string;
-  category?: string;
-  content_type?: string;
-  sort?: string;
-  order?: string;
-  page?: number;
-  limit?: number;
-}): Promise<PaginatedGatewayResponse<Recommendation>> {
-  const response = await gatewayFetch(`/recommendations?${toSearchParams(params).toString()}`);
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  return response.json() as Promise<PaginatedGatewayResponse<Recommendation>>;
-}
-
-export async function fetchGatewayRecommendation(key: string): Promise<Recommendation> {
-  const response = await gatewayFetch(`/recommendations/${encodeURIComponent(key)}`);
-
-  if (response.status === 404) {
-    throw new Error("NOT_FOUND");
-  }
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  return response.json() as Promise<Recommendation>;
-}
-
-export async function submitLink(payload: {
-  url: string;
-  source_name: string;
-  content_focus: string;
-  article_title: string;
-  is_direct_article: boolean;
-}) {
-  if (!N8N_WEBHOOK_URL) {
-    return { ok: true, mocked: true, payload };
-  }
-
-  const response = await fetch(N8N_WEBHOOK_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error("Webhook submission failed.");
-  }
-
-  return { ok: true };
 }
 
 export async function searchClientAccounts(query: string): Promise<ClientAccount[]> {
@@ -422,27 +358,6 @@ export async function updateProfileNotes(profileKey: string, notes: string) {
   return response.json();
 }
 
-export async function searchRecipients(query: string, clientAccountKey: string): Promise<Recipient[]> {
-  const normalizedQuery = query.trim().toLowerCase();
-
-  return mockRecipients.filter((recipient) => {
-    const matchesClient = recipient.client_account_key === clientAccountKey;
-    const matchesQuery = normalizedQuery ? recipient.name.toLowerCase().includes(normalizedQuery) : true;
-    return matchesClient && matchesQuery;
-  });
-}
-
-export async function findTaskMatches(_payload: {
-  client_account_key: string;
-  recipient_key: string;
-  task_name: string;
-  description: string;
-  additional_context: string;
-}): Promise<TaskMatchResponse> {
-  await new Promise((resolve) => window.setTimeout(resolve, 450));
-  return mockTaskMatch;
-}
-
 export async function checkCandidateDedup(payload: {
   name: string;
   brand?: string;
@@ -508,4 +423,156 @@ export async function fetchMyCandidateSubmissions() {
 
   const data = await response.json();
   return data.data as AddItemSubmission[];
+}
+
+// ── The Edit (read-only queue + household drafts) ─────────────────
+
+/** Canonical Monday YYYY-MM-DD (UTC) — same rule as gateway week-of.ts */
+export function canonicalWeekOf(input: Date = new Date()): string {
+  const utc = new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
+  const day = utc.getUTCDay(); // 0=Sun … 6=Sat
+  const daysSinceMonday = (day + 6) % 7;
+  utc.setUTCDate(utc.getUTCDate() - daysSinceMonday);
+  const y = utc.getUTCFullYear();
+  const m = String(utc.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(utc.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export async function fetchEditQueue(weekOf?: string): Promise<{
+  week_of: string;
+  households: EditQueueHousehold[];
+}> {
+  const week = weekOf || canonicalWeekOf();
+  const qs = `?week_of=${encodeURIComponent(week)}`;
+  const response = await gatewayFetch(`/weekly-edits/queue${qs}`);
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to load Edit queue (${response.status})${body ? `: ${body.slice(0, 160)}` : ""} — is gateway local with /weekly-edits routes?`
+    );
+  }
+  return response.json();
+}
+
+export async function fetchHouseholdEdits(
+  householdKey: string,
+  weekOf?: string
+): Promise<HouseholdEditsResponse> {
+  const week = weekOf || canonicalWeekOf();
+  const qs = `?week_of=${encodeURIComponent(week)}`;
+  const response = await gatewayFetch(
+    `/weekly-edits/household/${encodeURIComponent(householdKey)}${qs}`
+  );
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to load household drafts (${response.status})${body ? `: ${body.slice(0, 160)}` : ""}`
+    );
+  }
+  return response.json();
+}
+
+export type SwapEditPayload = {
+  recommendation_key_out: string;
+  recommendation_key_in: string;
+  section: string;
+  reason_preset: string;
+  reason_text?: string;
+  decided_by: string;
+  rationale?: string;
+};
+
+async function postEditAction(path: string, payload: Record<string, unknown>, label: string) {
+  const response = await gatewayFetch(path, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const err = new Error(
+      typeof data?.message === "string" ? data.message : `${label} failed (${response.status})`
+    ) as Error & { code?: string; status?: number; body?: unknown };
+    err.code = typeof data?.code === "string" ? data.code : undefined;
+    err.status = response.status;
+    err.body = data;
+    throw err;
+  }
+  return data;
+}
+
+export async function swapEditItem(editKey: string, payload: SwapEditPayload) {
+  return postEditAction(
+    `/weekly-edits/${encodeURIComponent(editKey)}/swap`,
+    payload,
+    "Swap"
+  ) as Promise<{
+    edit: HouseholdEditsResponse["drafts"][number];
+    decision: Record<string, unknown>;
+    llm_proposed_untouched: boolean;
+  }>;
+}
+
+export async function removeEditItem(
+  editKey: string,
+  payload: {
+    recommendation_key_out: string;
+    section: string;
+    reason_preset: string;
+    reason_text?: string;
+    decided_by: string;
+  }
+) {
+  return postEditAction(`/weekly-edits/${encodeURIComponent(editKey)}/remove`, payload, "Remove");
+}
+
+export async function moveEditItem(
+  editKey: string,
+  payload: {
+    recommendation_key_out: string;
+    section: string;
+    moved_to_profile_key: string;
+    decided_by: string;
+    reason_text?: string;
+  }
+) {
+  return postEditAction(`/weekly-edits/${encodeURIComponent(editKey)}/move`, payload, "Move");
+}
+
+export async function addEditItem(
+  editKey: string,
+  payload: {
+    recommendation_key_in: string;
+    section: string;
+    decided_by: string;
+    bound_action?: string;
+    rationale?: string;
+  }
+) {
+  return postEditAction(`/weekly-edits/${encodeURIComponent(editKey)}/add`, payload, "Add");
+}
+
+export async function regenerateEdit(
+  editKey: string,
+  payload: {
+    scope: "section" | "edit";
+    section?: string;
+    reason_preset: string;
+    reason_text?: string;
+    decided_by: string;
+  }
+) {
+  return postEditAction(
+    `/weekly-edits/${encodeURIComponent(editKey)}/regenerate`,
+    payload,
+    "Regenerate"
+  );
+}
+
+export async function shipEdit(editKey: string, decided_by: string) {
+  return postEditAction(`/weekly-edits/${encodeURIComponent(editKey)}/ship`, { decided_by }, "Ship");
+}
+
+export async function undoShipEdit(editKey: string) {
+  return postEditAction(`/weekly-edits/${encodeURIComponent(editKey)}/undo-ship`, {}, "Undo ship");
 }
