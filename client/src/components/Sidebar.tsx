@@ -109,7 +109,7 @@ export function Sidebar() {
           <SidebarLink
             to="/research"
             icon={Search}
-            label="Research Hub"
+            label="Recommendations"
             active={location.startsWith("/research")}
           />
         )}

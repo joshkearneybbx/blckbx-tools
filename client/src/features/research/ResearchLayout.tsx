@@ -9,6 +9,7 @@ import "./research.css";
 
 const navItems = [
   { href: "/research", label: "Pool" },
+  { href: "/research/calendar", label: "Calendar" },
   { href: "/research/edit", label: "The Edit" },
   { href: "/research/add", label: "Add Item" },
   { href: "/research/client-interests", label: "Client Interests" },

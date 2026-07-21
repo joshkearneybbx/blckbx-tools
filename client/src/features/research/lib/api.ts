@@ -125,6 +125,104 @@ export async function fetchRecommendations(params: {
   };
 }
 
+export interface DatedRecommendationsResponse {
+  data: Recommendation[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+/**
+ * Calendar (step 9d): dated pool items only, plotted by event_start.
+ * Uses Arango list endpoint (not Meili) so is_dated + event_start range filter correctly.
+ * Paginates until all pages for the visible month are loaded.
+ */
+export async function fetchDatedRecommendations(params: {
+  event_start_from: string;
+  event_start_to: string;
+  limit?: number;
+}): Promise<DatedRecommendationsResponse> {
+  const pageLimit = Math.min(params.limit ?? 500, 500);
+  const all: Recommendation[] = [];
+  let page = 1;
+  let total = 0;
+  let pages = 1;
+
+  // Prefer sort by event_start (gateway v2.9+). Fall back if the running gateway is older.
+  let sortBy: "event_start" | "created_at" = "event_start";
+
+  while (page <= pages) {
+    const searchParams = toSearchParams({
+      is_dated: true,
+      event_start_from: params.event_start_from,
+      event_start_to: params.event_start_to,
+      sort: sortBy,
+      order: sortBy === "event_start" ? "asc" : "desc",
+      page,
+      limit: pageLimit,
+    });
+
+    const response = await gatewayFetch(`/recommendations?${searchParams.toString()}`);
+    const payload = (await response.json().catch(() => ({}))) as {
+      data?: Recommendation[];
+      pagination?: { page?: number; limit?: number; total?: number; pages?: number };
+      message?: string;
+      error?: string;
+    };
+
+    if (!response.ok) {
+      const detail =
+        typeof payload?.message === "string"
+          ? payload.message
+          : typeof payload?.error === "string"
+            ? payload.error
+            : `HTTP ${response.status}`;
+      // Older gateways reject sort=event_start — retry once with created_at.
+      if (sortBy === "event_start" && /Invalid sort field/i.test(detail)) {
+        sortBy = "created_at";
+        page = 1;
+        pages = 1;
+        all.length = 0;
+        continue;
+      }
+      throw new Error(`Dated events error (${response.status}): ${detail}`);
+    }
+
+    const batch = Array.isArray(payload.data) ? payload.data : [];
+    all.push(
+      ...batch.map((item) => ({
+        ...item,
+        _key: String(item._key ?? ""),
+      }))
+    );
+
+    total = payload.pagination?.total ?? all.length;
+    pages = Math.max(1, payload.pagination?.pages ?? 1);
+    if (batch.length === 0) break;
+    page += 1;
+    // Safety: avoid infinite loop if server misreports pages
+    if (page > 20) break;
+  }
+
+  // Client-side belt: only is_dated with a usable event_start
+  const dated = all.filter(
+    (item) => item.is_dated === true && typeof item.event_start === "string" && item.event_start.trim()
+  );
+
+  return {
+    data: dated,
+    pagination: {
+      page: 1,
+      limit: pageLimit,
+      total: dated.length || total,
+      pages: 1,
+    },
+  };
+}
+
 export async function searchClientAccounts(query: string): Promise<ClientAccount[]> {
   const searchParams = toSearchParams({ q: query.trim() });
 

@@ -70,8 +70,10 @@ const PILLARS: Pillar[] = [
     slug: "research-hub",
     toolSlug: "research",
     route: "/research",
-    label: "Research\nHub",
-    displayName: "Research\nHub",
+    label: "Recommendations",
+    // Two lines — same pattern as Content Hub / Approval Catalogue.
+    // Single-line 56–64px Cormorant truncates mid-word on the card.
+    displayName: "Recommendations\nManager",
     description: "Search the database for items, find partners, log client interests",
     eyebrow: "Discovery",
     Icon: Search,

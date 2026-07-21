@@ -40,6 +40,12 @@ export type Recommendation = {
   in_stock?: boolean;
   destination?: string | null;
   poi_count?: number | null;
+  /** v2.9 — ISO 8601 or date-only YYYY-MM-DD; null if not an event / unknown */
+  event_start?: string | null;
+  /** v2.9 — null = single occurrence; set = listings coverage window (not a closing date claim) */
+  event_end?: string | null;
+  /** v2.9 — calendar filter flag; default false */
+  is_dated?: boolean;
 };
 
 export type AddItemRouting = "for_client" | "for_pool";

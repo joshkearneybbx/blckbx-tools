@@ -23,6 +23,7 @@ import { ResearchLayout } from "@/features/research/ResearchLayout";
 import ResearchAddItem from "@/features/research/pages/ResearchAddItem";
 import ResearchSearch from "@/features/research/pages/ResearchSearch";
 import ResearchEdit from "@/features/research/pages/ResearchEdit";
+import ResearchCalendar from "@/features/research/pages/ResearchCalendar";
 import ClientInterests from "@/features/research/pages/ClientInterests";
 import ApprovalPage from "@/features/approval/ApprovalPage";
 import ContentHubBlogComposerPage from "@/features/content-hub/pages/ContentHubBlogComposerPage";
@@ -209,6 +210,15 @@ function Router() {
           {() => (
             <ToolGuard slug="approval">
               <Redirect to="/approval" replace />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/research/calendar">
+          {() => (
+            <ToolGuard slug="research">
+              <ResearchLayout>
+                <ResearchCalendar />
+              </ResearchLayout>
             </ToolGuard>
           )}
         </Route>

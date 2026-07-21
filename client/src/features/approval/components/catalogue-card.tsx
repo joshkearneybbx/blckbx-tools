@@ -2720,7 +2720,7 @@ export function EmptyState({
   const content = {
     requests: {
       title: "No client requests found",
-      description: "Fast-track requests from Research Hub will appear here."
+      description: "Fast-track requests from Recommendations Manager will appear here."
     },
     shopping: {
       title: `No ${status} candidates for Shopping`,

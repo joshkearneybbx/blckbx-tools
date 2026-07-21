@@ -60,7 +60,7 @@ const TOOL_ITEMS: DockItemConfig[] = [
   },
   {
     key: "research-hub",
-    label: "Research Hub",
+    label: "Recommendations",
     route: "/research",
     Icon: Search,
     toolSlug: "research",
