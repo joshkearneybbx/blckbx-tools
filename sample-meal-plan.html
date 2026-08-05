@@ -941,7 +941,9 @@
   }
 
   var persistTimer = null;
+  var hydrating = false;
   function persistShop(){
+    if (hydrating) return;
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(doPersistShop, 800);
   }
@@ -966,6 +968,7 @@
   function hydrateShop(){
     var uuid = getDocUuid();
     if (!uuid) { renderShop(); return; } // preview/local: render empty as today
+    hydrating = true;
     fetch(STATE_BASE + uuid + '/state', { credentials: 'omit' })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(data){
@@ -978,7 +981,7 @@
         }
       })
       .catch(function(){ /* fail soft — keep defaults */ })
-      .finally(function(){ renderShop(); });
+      .finally(function(){ renderShop(); hydrating = false; });
   }
 
   /* Dynamic shopping list (in-memory for the session). data-shop = the realistic,
