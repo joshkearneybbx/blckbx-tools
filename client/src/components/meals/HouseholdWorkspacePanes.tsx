@@ -165,9 +165,11 @@ interface MealHistoryPaneProps {
   favourites: WorkspaceFavourite[];
   selectedMealId: string | null;
   onSelectMeal: (meal: PastMealRecipe) => void;
+  onToggleFavourite: (recipeId: string, active: boolean) => void;
+  isFavouritePending: boolean;
 }
 
-export function MealHistoryPane({ clientId, favourites, selectedMealId, onSelectMeal }: MealHistoryPaneProps) {
+export function MealHistoryPane({ clientId, favourites, selectedMealId, onSelectMeal, onToggleFavourite, isFavouritePending }: MealHistoryPaneProps) {
   const [filter, setFilter] = useState<MealFilter>("all");
   const { data: meals = [], isLoading, isError } = usePastMeals(clientId, true);
   const favouriteIds = useMemo(() => new Set(favourites.map((favourite) => favourite.recipeId)), [favourites]);
@@ -193,34 +195,62 @@ export function MealHistoryPane({ clientId, favourites, selectedMealId, onSelect
         {isLoading ? <p className="px-5 py-10 bb-meta">Loading past meals…</p> : null}
         {isError ? <p className="px-5 py-10 bb-meta">Past meals could not be loaded.</p> : null}
         {!isLoading && !isError && visibleMeals.length === 0 ? <p className="px-5 py-10 bb-meta">No meals in this view yet.</p> : null}
-        {visibleMeals.map((meal) => (
-          <button key={meal.recipeId} type="button" onClick={() => onSelectMeal(meal)} className={["block w-full border-b border-[#E4E2DD] px-5 py-4 text-left transition-colors hover:bg-[#FAF9F7]", selectedMealId === meal.recipeId ? "border-l-4 border-l-[#171717] bg-[#FAF9F7] pl-4" : ""].join(" ")}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="bb-type-card text-[18px]">{meal.title}</p>
-                <p className="mt-1 bb-mut">{formatSource(meal.source)}</p>
+        {visibleMeals.map((meal) => {
+            const isFavourite = favouriteIds.has(meal.recipeId);
+            return (
+              <div
+                key={meal.recipeId}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectMeal(meal)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelectMeal(meal);
+                  }
+                }}
+                className={["block w-full border-b border-[#E4E2DD] px-5 py-4 text-left transition-colors hover:bg-[#FAF9F7]", selectedMealId === meal.recipeId ? "border-l-4 border-l-[#171717] bg-[#FAF9F7] pl-4" : ""].join(" ")}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="bb-type-card text-[18px]">{meal.title}</p>
+                    <p className="mt-1 bb-mut">{formatSource(meal.source)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={isFavourite ? `Remove ${meal.title} from favourites` : `Save ${meal.title} as a favourite`}
+                    disabled={isFavouritePending}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleFavourite(meal.recipeId, !isFavourite);
+                    }}
+                    className={["shrink-0 border px-2 py-1 font-[var(--bb-font-sans)] text-[11px] uppercase tracking-[1px] transition-colors disabled:cursor-not-allowed disabled:opacity-50", isFavourite ? "border-[#171717] bg-[#171717] text-white" : "border-[#E4E2DD] text-[#696969] hover:border-[#171717] hover:text-[#171717]"].join(" ")}
+                  >
+                    {isFavourite ? "Saved ◇" : "Save ♢"}
+                  </button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 bb-mut">
+                  <span>Last planned {formatDate(meal.latestPlannedAt)}</span>
+                  <span>Used {meal.totalCount}×</span>
+                  {meal.feedback === "liked" ? <ThumbsUp className="h-4 w-4" /> : null}
+                  {meal.feedback === "disliked" ? <ThumbsDown className="h-4 w-4" /> : null}
+                </div>
               </div>
-              {favouriteIds.has(meal.recipeId) ? <span className="text-[#171717]" aria-label="Favourite">◇</span> : null}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 bb-mut">
-              <span>Last planned {formatDate(meal.latestPlannedAt)}</span>
-              <span>Used {meal.totalCount}×</span>
-              {meal.feedback === "liked" ? <ThumbsUp className="h-4 w-4" /> : null}
-              {meal.feedback === "disliked" ? <ThumbsDown className="h-4 w-4" /> : null}
-            </div>
-          </button>
-        ))}
+            );
+          })}
       </div>
     </section>
   );
 }
 
-export function MealDetailPane({ meal, favourites, recentPlans, onNewPlan, onContinuePlan }: {
+export function MealDetailPane({ meal, favourites, recentPlans, onNewPlan, onContinuePlan, onToggleFavourite, isFavouritePending }: {
   meal: PastMealRecipe | null;
   favourites: WorkspaceFavourite[];
   recentPlans: WorkspacePlanSummary[];
   onNewPlan: () => void;
   onContinuePlan: (planId: string) => void;
+  onToggleFavourite: (recipeId: string, active: boolean) => void;
+  isFavouritePending: boolean;
 }) {
   const favouriteIds = new Set(favourites.map((favourite) => favourite.recipeId));
 
@@ -242,7 +272,17 @@ export function MealDetailPane({ meal, favourites, recentPlans, onNewPlan, onCon
               <p className="bb-label">Planned on</p>
               <div className="mt-2 space-y-2">{meal.plannedDates.map((date) => <p key={date} className="bb-meta">{formatDate(date)}</p>)}</div>
             </div>
-            <button type="button" onClick={onNewPlan} className="w-full border border-[#171717] px-3 py-3 font-[var(--bb-font-sans)] text-[13px] font-medium text-[#171717] hover:bg-[#FAF9F7]">Reuse this context in a new plan →</button>
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={isFavouritePending}
+                onClick={() => onToggleFavourite(meal.recipeId, !favouriteIds.has(meal.recipeId))}
+                className={["w-full border px-3 py-3 font-[var(--bb-font-sans)] text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50", favouriteIds.has(meal.recipeId) ? "border-[#171717] bg-[#171717] text-white" : "border-[#171717] text-[#171717] hover:bg-[#FAF9F7]"].join(" ")}
+              >
+                {favouriteIds.has(meal.recipeId) ? "Remove favourite" : "Save favourite"}
+              </button>
+              <button type="button" onClick={onNewPlan} className="w-full border border-[#E4E2DD] px-3 py-3 font-[var(--bb-font-sans)] text-[13px] font-medium text-[#171717] hover:bg-[#FAF9F7]">Reuse this context in a new plan →</button>
+            </div>
           </div>
         ) : (
           <div className="space-y-5">

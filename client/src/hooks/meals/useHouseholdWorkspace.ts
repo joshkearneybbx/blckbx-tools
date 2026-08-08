@@ -91,10 +91,10 @@ async function getAllPages(collection: string, options: Record<string, unknown>)
 }
 
 function mapFavourite(record: RecordModel): WorkspaceFavourite {
-  const recipe = record.expand?.recipe;
+  const recipe = record.expand?.recipes;
   return {
     id: String(record.id),
-    recipeId: String(record.recipe ?? recipe?.id ?? ""),
+    recipeId: String(record.recipes ?? recipe?.id ?? ""),
     title: String(recipe?.title ?? record.title ?? "Untitled recipe"),
     source: recipe?.source ? String(recipe.source) : undefined,
     note: record.note ? String(record.note) : undefined,
@@ -134,8 +134,8 @@ export function useHouseholdWorkspace(clientId: string | null) {
         getAllPages("meal_favourites", {
           filter: `client = "${clientId}" && active = true`,
           sort: "sort_order,created",
-          expand: "recipe",
-          fields: "id,recipe,note,sort_order,created",
+          expand: "recipes",
+          fields: "id,recipes,note,sort_order,created",
         }),
       ]);
 

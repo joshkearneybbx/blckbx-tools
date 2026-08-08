@@ -5,6 +5,7 @@ import { HouseholdProfilePane, MealDetailPane, MealHistoryPane } from "@/compone
 import type { PastMealRecipe } from "@/hooks/meals/usePastMeals";
 import MealPlanWizard from "./MealPlanWizard";
 import { useHouseholdWorkspace } from "@/hooks/meals/useHouseholdWorkspace";
+import { useMealFavourite } from "@/hooks/meals/useMealFavourite";
 
 interface HouseholdWorkspacePageProps {
   clientId: string;
@@ -16,6 +17,7 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
   const [isPlanning, setIsPlanning] = useState(false);
   const [planToLoad, setPlanToLoad] = useState<string | null>(null);
   const { data, isLoading, isError } = useHouseholdWorkspace(clientId);
+  const favouriteMutation = useMealFavourite();
 
   if (isLoading) {
     return <div className="min-h-screen bg-[#FAF9F7] px-6 py-12 text-center bb-meta">Loading household…</div>;
@@ -65,6 +67,10 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
               favourites={data.favourites}
               selectedMealId={selectedMeal?.recipeId ?? null}
               onSelectMeal={setSelectedMeal}
+              onToggleFavourite={(recipeId, active) => {
+                void favouriteMutation.mutateAsync({ clientId, recipeId, active });
+              }}
+              isFavouritePending={favouriteMutation.isPending}
             />
           </div>
 
@@ -85,6 +91,10 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
                 favourites={data.favourites}
                 recentPlans={data.recentPlans}
                 onNewPlan={startNewPlan}
+                onToggleFavourite={(recipeId, active) => {
+                  void favouriteMutation.mutateAsync({ clientId, recipeId, active });
+                }}
+                isFavouritePending={favouriteMutation.isPending}
                 onContinuePlan={(planId) => {
                   setPlanToLoad(planId);
                   setIsPlanning(true);
