@@ -4,7 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, ShoppingList } from "@/lib/meals/api";
 import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey } from "@/lib/meals/api";
 import { StepIndicator } from "@/components/meals/StepIndicator";
-import { ClientSelect } from "@/components/meals/ClientSelect";
+import { HouseholdDashboard } from "@/components/meals/HouseholdDashboard";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
 import { GeneratingLoader } from "@/components/meals/GeneratingLoader";
 import { PlanReview } from "@/components/meals/PlanReview";
@@ -16,7 +16,6 @@ import { useSwapMeal } from "@/hooks/meals/useSwapMeal";
 import { useMealFeedback } from "@/hooks/meals/useMealFeedback";
 import { MealPlanPDF } from "@/components/meals/pdf/MealPlanPDF";
 import { pb } from "@/lib/pocketbase";
-import { useRecentPlans } from "@/hooks/meals/useClientPlans";
 import { fetchRecipeImages } from "@/lib/meals/pdfImages";
 
 const INITIAL_CRITERIA: PlanCriteriaValues = {
@@ -53,13 +52,6 @@ function formatDate(value: string): string {
     month: "short",
     year: "numeric",
   });
-}
-
-function statusClasses(status: string): string {
-  if (status === "active") return "bg-[#E8F5E9] text-[#1EA86B]";
-  if (status === "completed") return "bg-[#F8F8F8] text-[#6B6B68]";
-  if (status === "archived") return "bg-[#F8F8F8] text-[#9B9797]";
-  return "bg-[#E6E5E0] text-[#424242]";
 }
 
 function asStringArray(value: unknown): string[] {
@@ -173,8 +165,6 @@ export default function MealCraftPage() {
   const generateMutation = useGeneratePlan();
   const swapMutation = useSwapMeal();
   const feedbackMutation = useMealFeedback();
-  const { data: recentPlans = [] } = useRecentPlans(currentStep === 1);
-
   const isGenerating = generateMutation.isPending;
   const showLoading = isGenerating;
 
@@ -591,12 +581,10 @@ export default function MealCraftPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#E6E5E0]">
+    <div className="min-h-screen bg-[#FAF9F7]">
       <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8">
-        <div className="mb-6 flex items-center justify-between rounded-[10px] border border-[#E6E5E0] bg-white px-5 py-3 shadow-sm">
-          <div className="flex items-center gap-2">
-            <h1 className="text-[15px] font-bold text-[#1a1a1a]">MealCraft</h1>
-          </div>
+        <div className="mb-6 flex items-center justify-between border-b border-[#E4E2DD] bg-white px-5 py-4">
+          <h1 className="bb-type-card">MealCraft</h1>
         </div>
 
         <StepIndicator
@@ -612,56 +600,16 @@ export default function MealCraftPage() {
         {stepToRender === 0 ? <GeneratingLoader /> : null}
 
         {stepToRender === 1 ? (
-          <div className="space-y-4">
-            {recentPlans.length > 0 ? (
-              <div className="rounded-[14px] border border-[#E6E5E0] bg-white p-4 shadow-sm">
-                <h3 className="mb-2 text-sm font-bold text-[#1a1a1a]">Recent Plans</h3>
-                <div className="space-y-2">
-                  {recentPlans.map((plan) => (
-                    <div key={plan.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#E6E5E0] bg-[#FAF9F8] px-3 py-2">
-                      <div>
-                        <p className="text-xs font-semibold text-[#1a1a1a]">{plan.client_name} • {plan.title}</p>
-                        <p className="text-xs text-[#6B6B68]">
-                          {formatDate(plan.created)} • {plan.num_days} days • {plan.meals_per_day} meals/day
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={["rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", statusClasses(plan.status)].join(" ")}>
-                          {plan.status}
-                        </span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-7 bg-[#E7C51C] px-3 text-xs text-black hover:bg-[#d4b419]"
-                          disabled={isLoadingPlan}
-                          onClick={() => {
-                            const client: MealCraftClient = {
-                              id: plan.client_id,
-                              name: plan.client_name,
-                            };
-                            void loadExistingPlan(plan.id, client);
-                          }}
-                        >
-                          {isLoadingPlan ? "Loading..." : "Load"}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <ClientSelect
-              selectedClient={selectedClient}
-              onSelectClient={(client) => setSelectedClient(client)}
-              onContinue={() => {
-                setCurrentStep(2);
-                setMaxCompletedStep(Math.max(maxCompletedStep, 2));
-              }}
-              onLoadPlan={loadExistingPlan}
-              isLoadingPlan={isLoadingPlan}
-            />
-          </div>
+          <HouseholdDashboard
+            selectedClient={selectedClient}
+            onSelectClient={setSelectedClient}
+            onContinue={() => {
+              setCurrentStep(2);
+              setMaxCompletedStep(Math.max(maxCompletedStep, 2));
+            }}
+            onLoadPlan={loadExistingPlan}
+            isLoadingPlan={isLoadingPlan}
+          />
         ) : null}
 
         {stepToRender === 2 && selectedClient ? (
