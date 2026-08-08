@@ -5,7 +5,6 @@ import { HouseholdDashboard } from "@/components/meals/HouseholdDashboard";
 export default function MealCraftPage() {
   const [, navigate] = useLocation();
   const openWorkspace = (client: MealCraftClient) => {
-    setSelectedClient(client);
     navigate(`/meals/household/${client.id}`);
   };
 
