@@ -67,6 +67,29 @@ export function PlanCriteria({
   recentPlans,
 }: PlanCriteriaProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [specificPickerOpen, setSpecificPickerOpen] = useState(false);
+  const [specificMealSearch, setSpecificMealSearch] = useState("");
+  const [specificMealDate, setSpecificMealDate] = useState("");
+
+  const sortedPastMeals = [...pastMeals].sort((a, b) => {
+    const aTime = new Date(a.latestPlannedAt).getTime();
+    const bTime = new Date(b.latestPlannedAt).getTime();
+    return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+  });
+  const quickPickMeals = sortedPastMeals.slice(0, 3);
+  const quickPickIds = new Set(quickPickMeals.map((meal) => meal.recipeId));
+  const selectedRecipeIds = values.reuse.specific_recipe_ids ?? [];
+  const selectedOutsideQuickPick = selectedRecipeIds.filter((recipeId) => !quickPickIds.has(recipeId));
+  const searchTerm = specificMealSearch.trim().toLowerCase();
+  const filteredPastMeals = sortedPastMeals.filter((meal) => {
+    const matchesSearch = !searchTerm || meal.title.toLowerCase().includes(searchTerm);
+    const matchesDate = !specificMealDate || meal.plannedDates.some((plannedDate) => {
+      const date = new Date(plannedDate);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === specificMealDate;
+    });
+    return matchesSearch && matchesDate;
+  });
+  const renderedPastMeals = filteredPastMeals.slice(0, 50);
 
   const setField = <K extends keyof PlanCriteriaValues>(key: K, value: PlanCriteriaValues[K]) => {
     onChange({ ...values, [key]: value });
@@ -89,6 +112,24 @@ export function PlanCriteria({
       include_favourites: false,
       avoid_recent: false,
     });
+  };
+
+  const renderMealCheckbox = (meal: PastMealRecipe) => {
+    const selected = selectedRecipeIds.includes(meal.recipeId);
+    return (
+      <label key={meal.recipeId} className="flex cursor-pointer items-start gap-2 border-t border-[#F5F3F0] pt-2 text-sm text-[#0A0A0A]">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => toggleSpecificRecipe(meal.recipeId)}
+          className="mt-0.5 accent-[#0A0A0A]"
+        />
+        <span>
+          {meal.title}
+          <span className="ml-1 text-xs text-[#0A0A0A]/60">({meal.totalCount}× used)</span>
+        </span>
+      </label>
+    );
   };
 
   return (
@@ -220,29 +261,83 @@ export function PlanCriteria({
 
             <div className="border border-[#D4D0CB] px-3 py-3">
               <p className="text-sm font-medium text-[#0A0A0A]">Choose specific previous meals</p>
-              <p className="mt-1 text-xs text-[#696969]">Select any meals to reuse directly.</p>
-              <div className="mt-3 space-y-2">
-                {pastMealsLoading ? <p className="text-xs text-[#696969]">Loading past meals…</p> : null}
-                {pastMealsError ? <p className="text-xs text-[#696969]">Past meals could not be loaded.</p> : null}
-                {!pastMealsLoading && !pastMealsError && pastMeals.length === 0 ? <p className="text-xs text-[#696969]">No past meals available.</p> : null}
-                {!pastMealsLoading && !pastMealsError ? pastMeals.map((meal) => {
-                  const selected = (values.reuse.specific_recipe_ids ?? []).includes(meal.recipeId);
-                  return (
-                    <label key={meal.recipeId} className="flex cursor-pointer items-start gap-2 border-t border-[#F0EEEB] pt-2 text-sm text-[#0A0A0A]">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={() => toggleSpecificRecipe(meal.recipeId)}
-                        className="mt-0.5 accent-[#0A0A0A]"
-                      />
-                      <span>
-                        {meal.title}
-                        <span className="ml-1 text-xs text-[#696969]">({meal.totalCount}× used)</span>
-                      </span>
-                    </label>
-                  );
-                }) : null}
-              </div>
+              <p className="mt-1 text-xs text-[#0A0A0A]/60">Select any meals to reuse directly.</p>
+
+              {selectedOutsideQuickPick.length > 0 ? (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-[1px] text-[#0A0A0A]">Selected outside quick picks</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedOutsideQuickPick.map((recipeId) => {
+                      const meal = pastMeals.find((candidate) => candidate.recipeId === recipeId);
+                      return (
+                        <button
+                          key={recipeId}
+                          type="button"
+                          onClick={() => toggleSpecificRecipe(recipeId)}
+                          className="rounded-full border border-[#0A0A0A] bg-[#F5F3F0] px-2.5 py-1 text-xs text-[#0A0A0A]"
+                          aria-label={`Remove ${meal?.title ?? recipeId} from selected meals`}
+                        >
+                          {meal?.title ?? recipeId} ×
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {pastMealsLoading ? <p className="mt-3 text-xs text-[#0A0A0A]/60">Loading past meals…</p> : null}
+              {pastMealsError ? <p className="mt-3 text-xs text-[#0A0A0A]/60">Past meals could not be loaded.</p> : null}
+
+              {!pastMealsLoading && !pastMealsError && pastMeals.length === 0 ? (
+                <p className="mt-3 text-xs text-[#0A0A0A]/60">No past meals available for reuse yet.</p>
+              ) : null}
+
+              {!pastMealsLoading && !pastMealsError && pastMeals.length > 0 ? (
+                <>
+                  <div className="mt-3 space-y-2">
+                    {quickPickMeals.map(renderMealCheckbox)}
+                  </div>
+                  <button
+                    type="button"
+                    aria-expanded={specificPickerOpen}
+                    onClick={() => setSpecificPickerOpen((open) => !open)}
+                    className="mt-3 border border-[#D4D0CB] px-3 py-2 text-xs font-medium text-[#0A0A0A] hover:border-[#0A0A0A]"
+                  >
+                    {specificPickerOpen ? "Hide all meals" : "Browse all"}
+                  </button>
+
+                  {specificPickerOpen ? (
+                    <div className="mt-3 border-t border-[#D4D0CB] pt-3">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                        <Input
+                          value={specificMealSearch}
+                          onChange={(event) => setSpecificMealSearch(event.target.value)}
+                          placeholder="Search meal name"
+                          aria-label="Search previous meals by name"
+                          className="h-9 border-[#D4D0CB] text-sm"
+                        />
+                        <Input
+                          type="date"
+                          value={specificMealDate}
+                          onChange={(event) => setSpecificMealDate(event.target.value)}
+                          aria-label="Filter previous meals by planned date"
+                          className="h-9 border-[#D4D0CB] text-sm"
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-[#0A0A0A]/60">
+                        Showing {Math.min(renderedPastMeals.length, 50)} of {filteredPastMeals.length}
+                      </p>
+                      {filteredPastMeals.length === 0 ? (
+                        <p className="mt-3 text-xs text-[#0A0A0A]/60">No past meals match those filters.</p>
+                      ) : (
+                        <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+                          {renderedPastMeals.map(renderMealCheckbox)}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
             </div>
 
             <div className="border border-[#D4D0CB] px-3 py-3">

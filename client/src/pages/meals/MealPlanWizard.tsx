@@ -688,6 +688,23 @@ export default function MealPlanWizard({
           />
         ) : null}
 
+        {stepToRender === 2 && planResult?.meal_plan_id ? (
+          <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#D4D0CB] pb-3">
+            <p className="bb-meta">
+              {planResult.status === "active" ? "Plan marked as sent" : "Saved as draft"} · {planResult.title || planResult.meal_plan_id}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleMarkAsSent()}
+              disabled={isMarkingAsSent || planResult.status === "active"}
+              className="shrink-0 border-[#D4D0CB]"
+            >
+              {isMarkingAsSent ? "Updating..." : "Mark as Sent"}
+            </Button>
+          </div>
+        ) : null}
+
         {stepToRender === 2 && planResult?.idempotent_replay ? (
           <p className="mb-3 border border-[#D4D0CB] bg-[#F5F3F0] px-3 py-2 text-xs text-[#0A0A0A]">
             An existing plan was recovered for this generation.
