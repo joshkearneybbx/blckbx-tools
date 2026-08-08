@@ -94,16 +94,16 @@ export function PastPlansModal({
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button
+                  <button
                     type="button"
-                    className="h-8 bg-[#171717] px-3 text-xs font-medium text-white hover:bg-black"
+                    className="bb-btn bb-btn-sm"
                     disabled={isLoadingPlan}
                     onClick={() => {
                       void onLoadPlan(plan.id);
                     }}
                   >
-                    {isLoadingPlan ? "Loading..." : "Load Plan"}
-                  </Button>
+                    {isLoadingPlan ? "Loading..." : "Load Plan →"}
+                  </button>
 
                   <Button
                     type="button"

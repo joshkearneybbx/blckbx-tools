@@ -81,13 +81,9 @@ export function ImportRecipeModal({ open, onClose, onImported }: ImportRecipeMod
                 <p className="mt-0.5 text-xs text-[#9B9797]">{result.source_name || "Unknown source"}</p>
               </div>
 
-              <Button
-                type="button"
-                onClick={onClose}
-                className="h-10 w-full bg-[#171717] text-white hover:bg-black"
-              >
-                Done
-              </Button>
+              <button type="button" onClick={onClose} className="bb-btn w-full px-4 py-3 text-[14px] leading-none">
+                Done →
+              </button>
             </div>
           ) : (
             <>
@@ -123,19 +119,14 @@ export function ImportRecipeModal({ open, onClose, onImported }: ImportRecipeMod
               ) : null}
 
               {showErrorView ? (
-                <Button type="button" onClick={reset} className="h-10 w-full bg-[#171717] text-white hover:bg-black">
-                  Try Again
-                </Button>
+                <button type="button" onClick={reset} className="bb-btn w-full px-4 py-3 text-[14px] leading-none">
+                  Try Again →
+                </button>
               ) : (
-                <Button
-                  type="button"
-                  onClick={() => void handleImport()}
-                  disabled={!canImport}
-                  className="h-10 w-full bg-[#171717] text-white hover:bg-black"
-                >
+                <button type="button" onClick={() => void handleImport()} disabled={!canImport} className="bb-btn w-full px-4 py-3 text-[14px] leading-none disabled:cursor-not-allowed disabled:opacity-50">
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {isLoading ? "Importing..." : "Import"}
-                </Button>
+                  {isLoading ? "Importing..." : "Import →"}
+                </button>
               )}
             </>
           )}

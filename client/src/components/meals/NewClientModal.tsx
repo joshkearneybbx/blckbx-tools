@@ -203,10 +203,10 @@ export function NewClientModal({ open, onOpenChange, onCreated }: NewClientModal
           <Button type="button" variant="outline" onClick={close} disabled={isSaving} className="border-[#E6E5E0]">
             Cancel
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isSaving} className="bg-[#171717] text-white hover:bg-black">
+          <button type="button" onClick={handleSubmit} disabled={isSaving} className="bb-btn px-4 py-3 text-[14px] leading-none disabled:cursor-not-allowed disabled:opacity-50">
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {isSaving ? "Creating..." : "Create Client"}
-          </Button>
+            {isSaving ? "Creating..." : "Create Client →"}
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
