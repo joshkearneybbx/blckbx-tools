@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { HouseholdOverview } from "@/components/meals/HouseholdOverview";
+import { HouseholdFavourites, HouseholdMealHistory } from "@/components/meals/HouseholdActivity";
 import MealPlanWizard from "./MealPlanWizard";
 import { useHouseholdWorkspace } from "@/hooks/meals/useHouseholdWorkspace";
 
@@ -14,9 +15,9 @@ type WorkspaceTab = "overview" | "favourites" | "plans" | "meals";
 
 const TABS: Array<{ id: WorkspaceTab; label: string; available: boolean }> = [
   { id: "overview", label: "Overview", available: true },
-  { id: "favourites", label: "Favourites", available: false },
+  { id: "favourites", label: "Favourites", available: true },
   { id: "plans", label: "Plan history", available: false },
-  { id: "meals", label: "Meal history", available: false },
+  { id: "meals", label: "Meal history", available: true },
 ];
 
 export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspacePageProps) {
@@ -115,6 +116,8 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
               }}
             />
           ) : null}
+          {activeTab === "favourites" ? <HouseholdFavourites favourites={data.favourites} /> : null}
+          {activeTab === "meals" ? <HouseholdMealHistory clientId={clientId} /> : null}
         </main>
       </div>
     </div>

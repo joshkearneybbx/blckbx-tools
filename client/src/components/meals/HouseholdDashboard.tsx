@@ -69,18 +69,11 @@ function matchesFilter(household: HouseholdSummary, filter: HouseholdFilter): bo
   return true;
 }
 
-function HouseholdRow({
-  household,
-  onOpenWorkspace,
-}: {
-  household: HouseholdSummary;
-  onOpenWorkspace: (client: MealCraftClient) => void;
-}) {
+function HouseholdRow({ household }: { household: HouseholdSummary }) {
   return (
-    <button
-      type="button"
-      onClick={() => onOpenWorkspace(household)}
-      className="w-full border-b border-[#E4E2DD] bg-white px-5 py-5 text-left transition-colors last:border-b-0 hover:bg-[#FAF9F7] hover:shadow-[inset_4px_0_0_#171717]"
+    <a
+      href={`/meals/household/${household.id}`}
+      className="block w-full border-b border-[#E4E2DD] bg-white px-5 py-5 text-left transition-colors last:border-b-0 hover:bg-[#FAF9F7] hover:shadow-[inset_4px_0_0_#171717]"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
@@ -127,7 +120,7 @@ function HouseholdRow({
           </span>
         </div>
       </div>
-    </button>
+    </a>
   );
 }
 
@@ -215,11 +208,7 @@ export function HouseholdDashboard({ onOpenWorkspace }: HouseholdDashboardProps)
       ) : (
         <div>
           {visibleHouseholds.map((household) => (
-            <HouseholdRow
-              key={household.id}
-              household={household}
-              onOpenWorkspace={onOpenWorkspace}
-            />
+            <HouseholdRow key={household.id} household={household} />
           ))}
         </div>
       )}

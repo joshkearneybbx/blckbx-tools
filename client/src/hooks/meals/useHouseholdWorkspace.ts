@@ -16,6 +16,14 @@ export interface WorkspacePlanSummary {
   recipePreview: string[];
 }
 
+export interface WorkspaceFavourite {
+  id: string;
+  recipeId: string;
+  title: string;
+  source?: string;
+  note?: string;
+}
+
 export interface HouseholdWorkspaceData {
   client: MealCraftClient;
   planCount: number;
@@ -23,6 +31,7 @@ export interface HouseholdWorkspaceData {
   lastSentAt: string | null;
   currentStatus: MealPlanStatus | null;
   favouriteCount: number;
+  favourites: WorkspaceFavourite[];
   recentPlans: WorkspacePlanSummary[];
 }
 
@@ -81,6 +90,17 @@ async function getAllPages(collection: string, options: Record<string, unknown>)
   return records;
 }
 
+function mapFavourite(record: RecordModel): WorkspaceFavourite {
+  const recipe = record.expand?.recipe;
+  return {
+    id: String(record.id),
+    recipeId: String(record.recipe ?? recipe?.id ?? ""),
+    title: String(recipe?.title ?? record.title ?? "Untitled recipe"),
+    source: recipe?.source ? String(recipe.source) : undefined,
+    note: record.note ? String(record.note) : undefined,
+  };
+}
+
 function mapPlan(record: RecordModel): WorkspacePlanSummary {
   return {
     id: String(record.id),
@@ -102,7 +122,7 @@ export function useHouseholdWorkspace(clientId: string | null) {
     queryFn: async () => {
       if (!clientId) throw new Error("Household id is required.");
 
-      const [clientRecord, plans, favouriteResult] = await Promise.all([
+      const [clientRecord, plans, favouriteRecords] = await Promise.all([
         pb.collection("clients").getOne(clientId, {
           fields: "id,name,household_size,dietary,dislikes,notes,updated",
         }),
@@ -111,9 +131,11 @@ export function useHouseholdWorkspace(clientId: string | null) {
           sort: "-created",
           fields: "id,title,created,status,generated_at,sent_at,num_days,meals_per_day",
         }),
-        pb.collection("meal_favourites").getList(1, 1, {
+        getAllPages("meal_favourites", {
           filter: `client = "${clientId}" && active = true`,
-          fields: "id",
+          sort: "sort_order,created",
+          expand: "recipe",
+          fields: "id,recipe,note,sort_order,created",
         }),
       ]);
 
@@ -135,7 +157,8 @@ export function useHouseholdWorkspace(clientId: string | null) {
           : null,
         lastSentAt: sortedBySent[0]?.date.toISOString() ?? null,
         currentStatus: sortedByGenerated[0] ? asStatus(sortedByGenerated[0].status) : null,
-        favouriteCount: favouriteResult.totalItems,
+        favouriteCount: favouriteRecords.length,
+        favourites: favouriteRecords.map(mapFavourite),
         recentPlans: plans.slice(0, 5).map(mapPlan),
       } satisfies HouseholdWorkspaceData;
     },
