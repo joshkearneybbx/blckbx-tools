@@ -17,7 +17,8 @@ interface HouseholdDashboardProps {
   selectedClient: MealCraftClient | null;
   onSelectClient: (client: MealCraftClient) => void;
   onContinue: () => void;
-  onLoadPlan: (planId: string, client: MealCraftClient) => Promise<void>;
+  onOpenWorkspace: (client: MealCraftClient) => void;
+  onLoadPlan?: (planId: string, client: MealCraftClient) => Promise<void>;
   isLoadingPlan?: boolean;
 }
 
@@ -97,7 +98,9 @@ function HouseholdRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h3 className="bb-type-card truncate">{household.name}</h3>
-            <span className="bb-mut">Household of {household.household_size ?? 1}</span>
+            {household.household_size && household.household_size > 0 ? (
+              <span className="bb-mut">Household of {household.household_size}</span>
+            ) : null}
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -144,6 +147,7 @@ export function HouseholdDashboard({
   selectedClient,
   onSelectClient,
   onContinue,
+  onOpenWorkspace,
   onLoadPlan,
   isLoadingPlan = false,
 }: HouseholdDashboardProps) {
@@ -163,13 +167,13 @@ export function HouseholdDashboard({
       <header className="border-b border-[#E4E2DD] px-5 py-6 md:px-7">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="bb-pre mb-2">MealCraft / Step one</p>
+            <p className="bb-pre mb-2">MealCraft / Directory</p>
             <h2 className="bb-type-page">Households</h2>
             <p className="mt-2 max-w-2xl bb-meta">
               Select a household to start a new plan or continue with its meal history.
             </p>
           </div>
-          <Button type="button" className="bb-btn w-fit" onClick={() => setNewClientOpen(true)}>
+          <Button type="button" className="bb-btn w-fit px-[35px] py-[21px] text-[20px] leading-none" onClick={() => setNewClientOpen(true)}>
             <UserPlus className="h-4 w-4" />
             New household
             <ArrowRight className="h-4 w-4" />
@@ -263,17 +267,28 @@ export function HouseholdDashboard({
                   <span className={["rounded-full border px-2.5 py-1 font-[var(--bb-font-sans)] text-[11px] font-medium uppercase tracking-[1px]", statusClass(plan.status)].join(" ")}>
                     {statusLabel(plan.status)}
                   </span>
-                  <Button
-                    type="button"
-                    className="bb-btn-o bb-btn-sm"
-                    disabled={isLoadingPlan}
-                    onClick={() => {
-                      void onLoadPlan(plan.id, { id: plan.client_id, name: plan.client_name });
-                    }}
-                  >
-                    {isLoadingPlan ? "Loading…" : "Open"}
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
+                  {onLoadPlan ? (
+                    <Button
+                      type="button"
+                      className="bb-btn-o bb-btn-sm"
+                      disabled={isLoadingPlan}
+                      onClick={() => {
+                        void onLoadPlan(plan.id, { id: plan.client_id, name: plan.client_name });
+                      }}
+                    >
+                      {isLoadingPlan ? "Loading…" : "Open"}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="bb-btn-o bb-btn-sm"
+                      onClick={() => onOpenWorkspace({ id: plan.client_id, name: plan.client_name })}
+                    >
+                      Open household
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -283,10 +298,10 @@ export function HouseholdDashboard({
 
       <footer className="flex flex-col gap-3 border-t border-[#E4E2DD] px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7">
         <p className="bb-mut">
-          {selectedClient ? `Selected: ${selectedClient.name}` : "Select a household to continue."}
+          {selectedClient ? `Selected: ${selectedClient.name}` : "Select a household to open its workspace."}
         </p>
-        <Button type="button" className="bb-btn w-fit" onClick={onContinue} disabled={!selectedClient}>
-          Continue to criteria
+        <Button type="button" className="bb-btn w-fit px-[35px] py-[21px] text-[20px] leading-none" onClick={onContinue} disabled={!selectedClient}>
+          Open workspace
           <ArrowRight className="h-4 w-4" />
         </Button>
       </footer>
@@ -296,6 +311,7 @@ export function HouseholdDashboard({
         onOpenChange={setNewClientOpen}
         onCreated={(client) => {
           onSelectClient(client);
+          onOpenWorkspace(client);
           setNewClientOpen(false);
         }}
       />

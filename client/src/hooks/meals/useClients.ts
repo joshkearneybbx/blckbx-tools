@@ -16,7 +16,9 @@ function mapClient(item: RecordModel): MealCraftClient {
     name: String(item.name ?? "Unnamed client"),
     dietary: Array.isArray(item.dietary) ? item.dietary.map(String) : [],
     dislikes: Array.isArray(item.dislikes) ? item.dislikes.map(String) : [],
-    household_size: typeof item.household_size === "number" ? item.household_size : undefined,
+    household_size: typeof item.household_size === "number" && item.household_size > 0
+      ? item.household_size
+      : undefined,
     notes: item.notes ? String(item.notes) : undefined,
   };
 }

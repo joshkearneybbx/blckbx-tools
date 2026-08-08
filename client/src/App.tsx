@@ -19,6 +19,7 @@ import { ComingSoon } from "@/components/ComingSoon";
 import { useAuth } from "@/hooks/useAuth";
 import TopDock from "@/components/layout/TopDock";
 import MealCraftPage from "@/pages/meals/MealCraftPage";
+import HouseholdWorkspacePage from "@/pages/meals/HouseholdWorkspacePage";
 import { ResearchLayout } from "@/features/research/ResearchLayout";
 import ResearchAddItem from "@/features/research/pages/ResearchAddItem";
 import ResearchSearch from "@/features/research/pages/ResearchSearch";
@@ -162,6 +163,13 @@ function Router() {
         </Route>
 
         {/* Meals Tool */}
+        <Route path="/meals/household/:clientId">
+          {(params) => (
+            <ToolGuard slug="meals">
+              <HouseholdWorkspacePage clientId={params.clientId} />
+            </ToolGuard>
+          )}
+        </Route>
         <Route path="/meals">
           {() => (
             <ToolGuard slug="meals">

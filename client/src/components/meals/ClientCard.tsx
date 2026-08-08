@@ -19,9 +19,11 @@ export function ClientCard({ client, selected, onSelect, onOpenPastPlans }: Clie
     >
       <button type="button" onClick={onSelect} className="w-full text-left">
         <h4 className="text-sm font-bold text-[#1a1a1a]">{client.name}</h4>
-        <p className="mb-3 text-xs text-[#6B6B68]">
-          Household of {client.household_size ?? 1}
-        </p>
+        {client.household_size && client.household_size > 0 ? (
+          <p className="mb-3 text-xs text-[#6B6B68]">
+            Household of {client.household_size}
+          </p>
+        ) : null}
 
         <div className="mb-2 flex flex-wrap gap-1.5">
           {(client.dietary ?? []).slice(0, 4).map((tag) => (

@@ -5,16 +5,15 @@ interface StepIndicatorProps {
 }
 
 const STEPS = [
-  { id: 1, label: "Select Client" },
-  { id: 2, label: "Set Criteria" },
-  { id: 3, label: "Plan Review" },
-  { id: 4, label: "Shopping List" },
+  { id: 1, label: "Criteria" },
+  { id: 2, label: "Review" },
+  { id: 3, label: "Shopping list" },
 ];
 
 export function StepIndicator({ currentStep, maxCompletedStep, onStepClick }: StepIndicatorProps) {
   return (
     <div className="mb-6 rounded-[10px] border border-[#E6E5E0] bg-white p-1 shadow-sm">
-      <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
+      <div className="grid grid-cols-3 gap-1">
         {STEPS.map((step) => {
           const isActive = currentStep === step.id;
           const isCompleted = maxCompletedStep >= step.id;

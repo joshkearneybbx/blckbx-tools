@@ -48,7 +48,9 @@ function mapClient(record: RecordModel): MealCraftClient {
     name: String(record.name ?? "Unnamed household"),
     dietary: asStringArray(record.dietary),
     dislikes: asStringArray(record.dislikes),
-    household_size: typeof record.household_size === "number" ? record.household_size : undefined,
+    household_size: typeof record.household_size === "number" && record.household_size > 0
+      ? record.household_size
+      : undefined,
     notes: record.notes ? String(record.notes) : undefined,
   };
 }

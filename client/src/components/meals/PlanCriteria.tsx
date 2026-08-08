@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -168,9 +168,10 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
             type="button"
             onClick={onGenerate}
             disabled={isGenerating || values.meal_types.length === 0}
-            className="h-9 rounded-none bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black"
+            className="bb-btn px-[35px] py-[21px] text-[20px] leading-none"
           >
             {isGenerating ? "Generating..." : "Generate Plan"}
+            <ArrowRight className="h-5 w-5" />
           </Button>
         </div>
       </div>
