@@ -70,7 +70,7 @@ export function RecipeCard({
             <>
               <Link src={sourceUrl} style={pdfStyles.recipeTitle}>{title}</Link>
               <View style={pdfStyles.recipeTitleIcon}>
-                <LinkIcon size={9} color="#E7C51C" />
+                <LinkIcon size={9} color="#898479" />
               </View>
             </>
           ) : (

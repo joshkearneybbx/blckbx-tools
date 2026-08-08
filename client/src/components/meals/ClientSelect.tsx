@@ -83,7 +83,7 @@ export function ClientSelect({
             type="button"
             onClick={onContinue}
             disabled={!selectedClient}
-            className="h-9 rounded-md bg-[#E7C51C] px-5 text-sm font-semibold text-black hover:bg-[#d4b419]"
+            className="h-9 rounded-none bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black"
           >
             Continue
           </Button>

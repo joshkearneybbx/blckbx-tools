@@ -113,7 +113,7 @@ export function SwapModal({ open, onOpenChange, onConfirm, isSwapping }: SwapMod
               type="button"
               onClick={submit}
               disabled={!canSubmit || isSwapping}
-              className="bg-[#E7C51C] text-black hover:bg-[#d4b419]"
+              className="bg-[#171717] text-white hover:bg-black"
             >
               {isSwapping ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {isSwapping ? "Swapping..." : "Confirm Swap"}

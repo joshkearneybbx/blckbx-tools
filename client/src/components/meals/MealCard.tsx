@@ -14,10 +14,10 @@ interface MealCardProps {
 }
 
 const MEAL_TYPE_STYLES: Record<string, string> = {
-  dinner: "bg-[#F3E8FF] text-[#7C3AED]",
-  lunch: "bg-[#FFF8E1] text-[#B8860B]",
-  breakfast: "bg-[#FFF0E6] text-[#C4653A]",
-  snack: "bg-[#E8F5E9] text-[#1EA86B]",
+  dinner: "bg-[#FAF9F7] text-[#171717]",
+  lunch: "bg-white text-[#404040]",
+  breakfast: "bg-[#F2F0EC] text-[#404040]",
+  snack: "bg-[#EFede9] text-[#696969]",
 };
 
 function toInputValue(value?: number): string {
@@ -129,7 +129,7 @@ export function MealCard({
                   type="text"
                   value={titleDraft}
                   onChange={(event) => setTitleDraft(event.target.value)}
-                  className="h-7 w-full min-w-[180px] rounded-md border border-[#E6E5E0] bg-white px-2 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+                  className="h-7 w-full min-w-[180px] rounded-md border border-[#E6E5E0] bg-white px-2 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#898479]"
                 />
                 <button
                   type="button"
@@ -159,7 +159,7 @@ export function MealCard({
                       setIsSavingTitle(false);
                     }
                   }}
-                  className="rounded-md bg-[#E7C51C] px-2 py-1 text-[11px] font-semibold text-black disabled:opacity-60"
+                  className="rounded-md bg-[#171717] px-2 py-1 text-[11px] font-medium text-white disabled:opacity-60"
                 >
                   Save
                 </button>
@@ -259,7 +259,7 @@ export function MealCard({
                 step="1"
                 value={macroDraft.calories}
                 onChange={(event) => setMacroDraft((prev) => ({ ...prev, calories: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#898479]"
               />
             </label>
             <label className="text-[11px] text-[#6B6B68]">
@@ -270,7 +270,7 @@ export function MealCard({
                 step="1"
                 value={macroDraft.protein}
                 onChange={(event) => setMacroDraft((prev) => ({ ...prev, protein: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#898479]"
               />
             </label>
             <label className="text-[11px] text-[#6B6B68]">
@@ -281,7 +281,7 @@ export function MealCard({
                 step="1"
                 value={macroDraft.carbs}
                 onChange={(event) => setMacroDraft((prev) => ({ ...prev, carbs: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#898479]"
               />
             </label>
             <label className="text-[11px] text-[#6B6B68]">
@@ -292,7 +292,7 @@ export function MealCard({
                 step="1"
                 value={macroDraft.fat}
                 onChange={(event) => setMacroDraft((prev) => ({ ...prev, fat: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+                className="mt-1 w-full rounded-md border border-[#E6E5E0] bg-white px-2 py-1.5 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#898479]"
               />
             </label>
           </div>
@@ -323,7 +323,7 @@ export function MealCard({
                 });
                 setIsEditingMacros(false);
               }}
-              className="rounded-md bg-[#E7C51C] px-2.5 py-1 text-xs font-semibold text-black hover:bg-[#d4b419]"
+              className="rounded-md bg-[#171717] px-2.5 py-1 text-xs font-medium text-white hover:bg-black"
             >
               Save
             </button>
@@ -341,7 +341,7 @@ export function MealCard({
             onChange={(event) => setNoteDraft(event.target.value)}
             rows={3}
             placeholder="Add a note for the client (e.g. serving suggestions, substitutions, tips)..."
-            className="w-full rounded-md border border-[#E6E5E0] bg-white px-2.5 py-2 text-xs text-[#1a1a1a] resize-y focus:outline-none focus:ring-2 focus:ring-[#E7C51C]"
+            className="w-full rounded-md border border-[#E6E5E0] bg-white px-2.5 py-2 text-xs text-[#1a1a1a] resize-y focus:outline-none focus:ring-2 focus:ring-[#898479]"
           />
           <div className="mt-3 flex justify-end gap-2">
             <button
@@ -360,7 +360,7 @@ export function MealCard({
                 onSaveNote(noteDraft);
                 setIsEditingNote(false);
               }}
-              className="rounded-md bg-[#E7C51C] px-2.5 py-1 text-xs font-semibold text-black hover:bg-[#d4b419]"
+              className="rounded-md bg-[#171717] px-2.5 py-1 text-xs font-medium text-white hover:bg-black"
             >
               Save
             </button>

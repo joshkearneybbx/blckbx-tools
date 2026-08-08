@@ -31,7 +31,7 @@ function formatDate(value: string): string {
 }
 
 function statusClasses(status: string): string {
-  if (status === "active") return "bg-[#E8F5E9] text-[#1EA86B]";
+  if (status === "active") return "bg-[#FAF9F7] text-[#171717]";
   if (status === "completed") return "bg-[#F8F8F8] text-[#6B6B68]";
   if (status === "archived") return "bg-[#F8F8F8] text-[#9B9797]";
   return "bg-[#E6E5E0] text-[#424242]";
@@ -96,7 +96,7 @@ export function PastPlansModal({
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
-                    className="h-8 bg-[#E7C51C] px-3 text-xs font-semibold text-black hover:bg-[#d4b419]"
+                    className="h-8 bg-[#171717] px-3 text-xs font-medium text-white hover:bg-black"
                     disabled={isLoadingPlan}
                     onClick={() => {
                       void onLoadPlan(plan.id);

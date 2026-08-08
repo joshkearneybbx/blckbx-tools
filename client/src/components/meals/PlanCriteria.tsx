@@ -168,7 +168,7 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
             type="button"
             onClick={onGenerate}
             disabled={isGenerating || values.meal_types.length === 0}
-            className="h-9 rounded-md bg-[#E7C51C] px-5 text-sm font-semibold text-black hover:bg-[#d4b419]"
+            className="h-9 rounded-none bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black"
           >
             {isGenerating ? "Generating..." : "Generate Plan"}
           </Button>

@@ -42,7 +42,7 @@ export function ShoppingList({
               {isMarkingAsSent ? "Updating..." : "Mark as Sent"}
             </Button>
           ) : null}
-          <Button type="button" onClick={onExportPdf} disabled={isExportingPdf} className="bg-[#E7C51C] text-black hover:bg-[#d4b419]">
+          <Button type="button" onClick={onExportPdf} disabled={isExportingPdf} className="bg-[#171717] text-white hover:bg-black">
             {isExportingPdf ? "Preparing PDF..." : "Export PDF"}
           </Button>
         </div>
@@ -54,7 +54,7 @@ export function ShoppingList({
         ))}
       </div>
 
-      <div className="rounded-md border-l-4 border-[#E7C51C] bg-white p-4 text-xs text-[#424242]">
+      <div className="border-l-4 border-[#898479] bg-white p-4 text-xs text-[#404040]">
         <p className="font-semibold text-[#1a1a1a]">Shopping tips</p>
         <p>Check your cupboards first and buy produce last to keep it fresh. Batch-cook proteins to save time.</p>
       </div>

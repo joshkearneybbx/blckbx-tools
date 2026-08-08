@@ -52,9 +52,9 @@ function statusLabel(status: MealPlanStatus | null): string {
 }
 
 function statusClass(status: MealPlanStatus | null): string {
-  if (status === "active") return "border-[#3B6D11] text-[#3B6D11]";
-  if (status === "draft") return "border-[#854F0B] text-[#854F0B]";
-  if (status === "completed") return "border-[#696969] text-[#696969]";
+  if (status === "active") return "border-[#171717] text-[#171717]";
+  if (status === "draft") return "border-[#696969] text-[#696969]";
+  if (status === "completed") return "border-[#898479] text-[#898479]";
   if (status === "archived") return "border-[#898479] text-[#898479]";
   return "border-[#E4E2DD] text-[#898479]";
 }
@@ -107,7 +107,7 @@ function HouseholdRow({
               </span>
             ))}
             {(household.dislikes ?? []).slice(0, 3).map((tag) => (
-              <span key={tag} className="rounded-full border border-[#EFDCBB] bg-[#FAEEDA] px-2.5 py-1 font-[var(--bb-font-sans)] text-[11px] text-[#854F0B]">
+              <span key={tag} className="rounded-full border border-[#E4E2DD] px-2.5 py-1 font-[var(--bb-font-sans)] text-[11px] text-[#696969]">
                 Avoids {tag}
               </span>
             ))}

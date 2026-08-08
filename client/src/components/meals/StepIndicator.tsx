@@ -28,15 +28,15 @@ export function StepIndicator({ currentStep, maxCompletedStep, onStepClick }: St
               className={[
                 "flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors",
                 isActive ? "bg-[#1a1a1a] text-white" : "text-[#9B9797]",
-                isCompleted && !isActive ? "text-[#1EA86B]" : "",
+                isCompleted && !isActive ? "text-[#404040]" : "",
                 isClickable ? "cursor-pointer" : "cursor-default",
               ].join(" ")}
             >
               <span
                 className={[
                   "flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold",
-                  isActive ? "bg-[#E7C51C] text-black" : "bg-[#E6E5E0] text-[#6B6B68]",
-                  isCompleted && !isActive ? "bg-[#1EA86B] text-white" : "",
+                  isActive ? "bg-white text-[#171717]" : "bg-[#E4E2DD] text-[#696969]",
+                  isCompleted && !isActive ? "bg-[#898479] text-white" : "",
                 ].join(" ")}
               >
                 {step.id}

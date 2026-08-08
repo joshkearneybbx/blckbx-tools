@@ -39,7 +39,7 @@ export function DaySection({
     <section className="rounded-[14px] border border-[#E6E5E0] bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-[#E7C51C] px-2 py-0.5 text-[11px] font-bold text-black">Day {day.day_number}</span>
+          <span className="rounded-full bg-[#171717] px-2 py-0.5 text-[11px] font-medium text-white">Day {day.day_number}</span>
           <h3 className="text-sm font-bold text-[#1a1a1a]">{day.label ?? `Day ${day.day_number}`}</h3>
         </div>
         {summaryParts.length > 0 ? (

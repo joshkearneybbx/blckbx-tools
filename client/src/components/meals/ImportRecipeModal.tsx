@@ -84,7 +84,7 @@ export function ImportRecipeModal({ open, onClose, onImported }: ImportRecipeMod
               <Button
                 type="button"
                 onClick={onClose}
-                className="h-10 w-full bg-[#E7C51C] text-black hover:bg-[#d4b419]"
+                className="h-10 w-full bg-[#171717] text-white hover:bg-black"
               >
                 Done
               </Button>
@@ -123,7 +123,7 @@ export function ImportRecipeModal({ open, onClose, onImported }: ImportRecipeMod
               ) : null}
 
               {showErrorView ? (
-                <Button type="button" onClick={reset} className="h-10 w-full bg-[#E7C51C] text-black hover:bg-[#d4b419]">
+                <Button type="button" onClick={reset} className="h-10 w-full bg-[#171717] text-white hover:bg-black">
                   Try Again
                 </Button>
               ) : (
@@ -131,7 +131,7 @@ export function ImportRecipeModal({ open, onClose, onImported }: ImportRecipeMod
                   type="button"
                   onClick={() => void handleImport()}
                   disabled={!canImport}
-                  className="h-10 w-full bg-[#E7C51C] text-black hover:bg-[#d4b419]"
+                  className="h-10 w-full bg-[#171717] text-white hover:bg-black"
                 >
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   {isLoading ? "Importing..." : "Import"}

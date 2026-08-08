@@ -4,7 +4,7 @@ export const pdfColors = {
   white: "#FFFFFF",
   black: "#000000",
   dark: "#1a1a1a",
-  ctaYellow: "#E7C51C",
+  ctaYellow: "#898479",
   sand100: "#FAF9F8",
   sand300: "#E6E5E0",
   sand500: "#D0D6D0",

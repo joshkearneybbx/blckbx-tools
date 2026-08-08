@@ -13,8 +13,8 @@ export function ClientCard({ client, selected, onSelect, onOpenPastPlans }: Clie
       className={[
         "w-full rounded-[14px] border bg-white p-4 text-left shadow-sm transition-colors",
         selected
-          ? "border-[#E7C51C] bg-[#FFFBE8]"
-          : "border-[#E6E5E0] hover:border-[#D0D6D0]",
+          ? "border-[#171717] bg-[#FAF9F7]"
+          : "border-[#E4E2DD] hover:border-[#898479]",
       ].join(" ")}
     >
       <button type="button" onClick={onSelect} className="w-full text-left">
@@ -33,7 +33,7 @@ export function ClientCard({ client, selected, onSelect, onOpenPastPlans }: Clie
 
         <div className="flex flex-wrap gap-1.5">
           {(client.dislikes ?? []).slice(0, 4).map((tag) => (
-            <span key={tag} className="rounded-full bg-[#FDECEC] px-2 py-0.5 text-[11px] text-[#E33737]">
+            <span key={tag} className="rounded-full border border-[#E4E2DD] px-2 py-0.5 text-[11px] text-[#696969]">
               {tag}
             </span>
           ))}

@@ -17,7 +17,7 @@ export function PlanSummaryStats({ stats }: PlanSummaryStatsProps) {
       {entries.map((entry) => (
         <div key={entry.label} className="rounded-lg bg-[#1a1a1a] px-4 py-3">
           <p className="text-[10px] uppercase tracking-[0.5px] text-[#D0D6D0]">{entry.label}</p>
-          <p className="text-[22px] font-extrabold text-[#E7C51C]">{entry.value}</p>
+          <p className="text-[22px] font-semibold text-white">{entry.value}</p>
         </div>
       ))}
     </div>

@@ -203,7 +203,7 @@ export function NewClientModal({ open, onOpenChange, onCreated }: NewClientModal
           <Button type="button" variant="outline" onClick={close} disabled={isSaving} className="border-[#E6E5E0]">
             Cancel
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isSaving} className="bg-[#E7C51C] text-black hover:bg-[#d4b419]">
+          <Button type="button" onClick={handleSubmit} disabled={isSaving} className="bg-[#171717] text-white hover:bg-black">
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {isSaving ? "Creating..." : "Create Client"}
           </Button>

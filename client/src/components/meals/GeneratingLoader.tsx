@@ -36,13 +36,13 @@ export function GeneratingLoader() {
               <div
                 className={[
                   "h-2.5 w-2.5 rounded-full transition-colors",
-                  done ? "bg-[#1EA86B]" : active ? "bg-[#E7C51C]" : "bg-[#D0D6D0]",
+                  done ? "bg-[#898479]" : active ? "bg-[#171717]" : "bg-[#E4E2DD]",
                 ].join(" ")}
               />
               <span
                 className={[
                   "text-xs",
-                  done ? "text-[#1EA86B]" : active ? "text-[#1a1a1a]" : "text-[#9B9797]",
+                  done ? "text-[#898479]" : active ? "text-[#171717]" : "text-[#898479]",
                 ].join(" ")}
               >
                 {step}
