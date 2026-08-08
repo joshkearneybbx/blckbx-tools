@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { useLocation } from "wouter";
 import type { MealCraftClient } from "@/lib/meals/api";
 import { HouseholdDashboard } from "@/components/meals/HouseholdDashboard";
 
 export default function MealCraftPage() {
   const [, navigate] = useLocation();
-  const [selectedClient, setSelectedClient] = useState<MealCraftClient | null>(null);
-
   const openWorkspace = (client: MealCraftClient) => {
     setSelectedClient(client);
     navigate(`/meals/household/${client.id}`);
@@ -18,14 +15,7 @@ export default function MealCraftPage() {
         <div className="mb-6 border-b border-[#E4E2DD] bg-white px-5 py-4">
           <h1 className="bb-type-card">MealCraft</h1>
         </div>
-        <HouseholdDashboard
-          selectedClient={selectedClient}
-          onSelectClient={setSelectedClient}
-          onContinue={() => {
-            if (selectedClient) openWorkspace(selectedClient);
-          }}
-          onOpenWorkspace={openWorkspace}
-        />
+        <HouseholdDashboard onOpenWorkspace={openWorkspace} />
       </div>
     </div>
   );

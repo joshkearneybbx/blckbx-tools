@@ -1,6 +1,5 @@
 import { ArrowRight, Search, UserPlus } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MealCraftClient } from "@/lib/meals/api";
 import {
@@ -14,12 +13,7 @@ import { NewClientModal } from "./NewClientModal";
 type HouseholdFilter = "all" | "never_planned" | "has_draft" | "recently_sent" | "needs_new_plan" | "has_favourites";
 
 interface HouseholdDashboardProps {
-  selectedClient: MealCraftClient | null;
-  onSelectClient: (client: MealCraftClient) => void;
-  onContinue: () => void;
   onOpenWorkspace: (client: MealCraftClient) => void;
-  onLoadPlan?: (planId: string, client: MealCraftClient) => Promise<void>;
-  isLoadingPlan?: boolean;
 }
 
 const FILTERS: Array<{ value: HouseholdFilter; label: string }> = [
@@ -77,22 +71,16 @@ function matchesFilter(household: HouseholdSummary, filter: HouseholdFilter): bo
 
 function HouseholdRow({
   household,
-  selected,
-  onSelect,
+  onOpenWorkspace,
 }: {
   household: HouseholdSummary;
-  selected: boolean;
-  onSelect: () => void;
+  onOpenWorkspace: (client: MealCraftClient) => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onSelect}
-      className={[
-        "w-full border-b border-[#E4E2DD] px-5 py-5 text-left transition-colors last:border-b-0",
-        selected ? "bg-[#FAF9F7]" : "bg-white hover:bg-[#FAF9F7]",
-      ].join(" ")}
-      aria-pressed={selected}
+      onClick={() => onOpenWorkspace(household)}
+      className="w-full border-b border-[#E4E2DD] bg-white px-5 py-5 text-left transition-colors last:border-b-0 hover:bg-[#FAF9F7] hover:shadow-[inset_4px_0_0_#171717]"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
@@ -143,14 +131,7 @@ function HouseholdRow({
   );
 }
 
-export function HouseholdDashboard({
-  selectedClient,
-  onSelectClient,
-  onContinue,
-  onOpenWorkspace,
-  onLoadPlan,
-  isLoadingPlan = false,
-}: HouseholdDashboardProps) {
+export function HouseholdDashboard({ onOpenWorkspace }: HouseholdDashboardProps) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<HouseholdFilter>("all");
   const [newClientOpen, setNewClientOpen] = useState(false);
@@ -173,11 +154,11 @@ export function HouseholdDashboard({
               Select a household to start a new plan or continue with its meal history.
             </p>
           </div>
-          <Button type="button" className="bb-btn w-fit px-[35px] py-[21px] text-[20px] leading-none" onClick={() => setNewClientOpen(true)}>
+          <button type="button" className="bb-btn w-fit px-[35px] py-[21px] text-[20px] leading-none" onClick={() => setNewClientOpen(true)}>
             <UserPlus className="h-4 w-4" />
             New household
             <ArrowRight className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
 
         <div className="mt-6 flex flex-col gap-4">
@@ -237,8 +218,7 @@ export function HouseholdDashboard({
             <HouseholdRow
               key={household.id}
               household={household}
-              selected={selectedClient?.id === household.id}
-              onSelect={() => onSelectClient(household)}
+              onOpenWorkspace={onOpenWorkspace}
             />
           ))}
         </div>
@@ -267,28 +247,14 @@ export function HouseholdDashboard({
                   <span className={["rounded-full border px-2.5 py-1 font-[var(--bb-font-sans)] text-[11px] font-medium uppercase tracking-[1px]", statusClass(plan.status)].join(" ")}>
                     {statusLabel(plan.status)}
                   </span>
-                  {onLoadPlan ? (
-                    <Button
-                      type="button"
-                      className="bb-btn-o bb-btn-sm"
-                      disabled={isLoadingPlan}
-                      onClick={() => {
-                        void onLoadPlan(plan.id, { id: plan.client_id, name: plan.client_name });
-                      }}
-                    >
-                      {isLoadingPlan ? "Loading…" : "Open"}
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      className="bb-btn-o bb-btn-sm"
-                      onClick={() => onOpenWorkspace({ id: plan.client_id, name: plan.client_name })}
-                    >
-                      Open household
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  <button
+                    type="button"
+                    className="bb-btn-o bb-btn-sm"
+                    onClick={() => onOpenWorkspace({ id: plan.client_id, name: plan.client_name })}
+                  >
+                    Open household
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -296,21 +262,10 @@ export function HouseholdDashboard({
         </section>
       ) : null}
 
-      <footer className="flex flex-col gap-3 border-t border-[#E4E2DD] px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7">
-        <p className="bb-mut">
-          {selectedClient ? `Selected: ${selectedClient.name}` : "Select a household to open its workspace."}
-        </p>
-        <Button type="button" className="bb-btn w-fit px-[35px] py-[21px] text-[20px] leading-none" onClick={onContinue} disabled={!selectedClient}>
-          Open workspace
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </footer>
-
       <NewClientModal
         open={newClientOpen}
         onOpenChange={setNewClientOpen}
         onCreated={(client) => {
-          onSelectClient(client);
           onOpenWorkspace(client);
           setNewClientOpen(false);
         }}
