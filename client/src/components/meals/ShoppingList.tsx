@@ -42,9 +42,9 @@ export function ShoppingList({
               {isMarkingAsSent ? "Updating..." : "Mark as Sent"}
             </Button>
           ) : null}
-          <Button type="button" onClick={onExportPdf} disabled={isExportingPdf} className="bg-[#171717] text-white hover:bg-black">
-            {isExportingPdf ? "Preparing PDF..." : "Export PDF"}
-          </Button>
+          <button type="button" onClick={() => void onExportPdf()} disabled={isExportingPdf} className="bb-btn px-4 py-3 text-[14px] leading-none disabled:cursor-not-allowed disabled:opacity-50">
+            {isExportingPdf ? "Preparing PDF..." : "Export PDF →"}
+          </button>
         </div>
       </div>
 

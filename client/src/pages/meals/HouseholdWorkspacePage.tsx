@@ -1,9 +1,8 @@
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { HouseholdOverview } from "@/components/meals/HouseholdOverview";
-import { HouseholdFavourites, HouseholdMealHistory } from "@/components/meals/HouseholdActivity";
+import { HouseholdProfilePane, MealDetailPane, MealHistoryPane } from "@/components/meals/HouseholdWorkspacePanes";
+import type { PastMealRecipe } from "@/hooks/meals/usePastMeals";
 import MealPlanWizard from "./MealPlanWizard";
 import { useHouseholdWorkspace } from "@/hooks/meals/useHouseholdWorkspace";
 
@@ -11,18 +10,9 @@ interface HouseholdWorkspacePageProps {
   clientId: string;
 }
 
-type WorkspaceTab = "overview" | "favourites" | "plans" | "meals";
-
-const TABS: Array<{ id: WorkspaceTab; label: string; available: boolean }> = [
-  { id: "overview", label: "Overview", available: true },
-  { id: "favourites", label: "Favourites", available: true },
-  { id: "plans", label: "Plan history", available: false },
-  { id: "meals", label: "Meal history", available: true },
-];
-
 export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspacePageProps) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
+  const [selectedMeal, setSelectedMeal] = useState<PastMealRecipe | null>(null);
   const [isPlanning, setIsPlanning] = useState(false);
   const [planToLoad, setPlanToLoad] = useState<string | null>(null);
   const { data, isLoading, isError } = useHouseholdWorkspace(clientId);
@@ -42,82 +32,66 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
     );
   }
 
-  if (isPlanning) {
-    return (
-      <MealPlanWizard
-        client={data.client}
-        initialPlanId={planToLoad}
-        onExit={() => {
-          setPlanToLoad(null);
-          setIsPlanning(false);
-        }}
-      />
-    );
-  }
+  const startNewPlan = () => {
+    setSelectedMeal(null);
+    setPlanToLoad(null);
+    setIsPlanning(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#FAF9F7]">
-      <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8">
+      <div className="mx-auto w-full max-w-[1440px] px-4 py-5 md:px-7">
         <header className="border-b border-[#E4E2DD] bg-white px-5 py-5 md:px-7">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <button
-                type="button"
-                onClick={() => navigate("/meals")}
-                className="mb-3 inline-flex items-center gap-2 bb-mut underline underline-offset-4 hover:text-[#171717]"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Households
-              </button>
-              <p className="bb-pre">Household workspace</p>
-              <h1 className="mt-1 bb-type-page">{data.client.name}</h1>
-            </div>
-            <Button type="button" className="bb-btn w-fit px-[35px] py-[21px] text-[20px] leading-none" onClick={() => setIsPlanning(true)}>
-              New meal plan
-              <span aria-hidden="true">→</span>
-            </Button>
-          </div>
-
-          <nav className="mt-6 flex flex-wrap gap-2" aria-label="Household workspace sections">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                disabled={!tab.available}
-                aria-current={activeTab === tab.id ? "page" : undefined}
-                className={[
-                  "border-b-2 px-1 pb-2 font-[var(--bb-font-sans)] text-[13px] transition-colors",
-                  activeTab === tab.id
-                    ? "border-[#171717] text-[#171717]"
-                    : tab.available
-                      ? "border-transparent text-[#696969] hover:border-[#898479] hover:text-[#171717]"
-                      : "border-transparent text-[#B3B0AA]",
-                ].join(" ")}
-                onClick={() => tab.available && setActiveTab(tab.id)}
-              >
-                {tab.label}
-                {!tab.available ? <span className="ml-1 text-[10px] uppercase tracking-[1px]">Soon</span> : null}
-              </button>
-            ))}
-          </nav>
+          <button
+            type="button"
+            onClick={() => navigate("/meals")}
+            className="mb-3 inline-flex items-center gap-2 bb-mut underline underline-offset-4 hover:text-[#171717]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Households
+          </button>
+          <p className="bb-pre">Household workspace</p>
+          <h1 className="mt-1 bb-type-page">{data.client.name}</h1>
         </header>
 
-        <main className="mt-6">
-          {activeTab === "overview" ? (
-            <HouseholdOverview
-              data={data}
-              onNewPlan={() => {
-                setPlanToLoad(null);
-                setIsPlanning(true);
-              }}
-              onOpenPlan={(planId) => {
-                setPlanToLoad(planId);
-                setIsPlanning(true);
-              }}
+        <main className="mt-5 grid min-h-[calc(100vh-175px)] overflow-hidden border border-[#E4E2DD] bg-white lg:grid-cols-[minmax(270px,0.8fr)_minmax(380px,1.2fr)_minmax(360px,1fr)]">
+          <div className="min-h-[620px] min-w-0 border-b border-[#E4E2DD] lg:border-b-0 lg:border-r">
+            <HouseholdProfilePane data={data} onNewPlan={startNewPlan} />
+          </div>
+
+          <div className="min-h-[620px] min-w-0 border-b border-[#E4E2DD] lg:border-b-0 lg:border-r">
+            <MealHistoryPane
+              clientId={clientId}
+              favourites={data.favourites}
+              selectedMealId={selectedMeal?.recipeId ?? null}
+              onSelectMeal={setSelectedMeal}
             />
-          ) : null}
-          {activeTab === "favourites" ? <HouseholdFavourites favourites={data.favourites} /> : null}
-          {activeTab === "meals" ? <HouseholdMealHistory clientId={clientId} /> : null}
+          </div>
+
+          <div className="min-h-[620px] min-w-0 overflow-hidden">
+            {isPlanning ? (
+              <MealPlanWizard
+                client={data.client}
+                initialPlanId={planToLoad}
+                embedded
+                onExit={() => {
+                  setPlanToLoad(null);
+                  setIsPlanning(false);
+                }}
+              />
+            ) : (
+              <MealDetailPane
+                meal={selectedMeal}
+                favourites={data.favourites}
+                recentPlans={data.recentPlans}
+                onNewPlan={startNewPlan}
+                onContinuePlan={(planId) => {
+                  setPlanToLoad(planId);
+                  setIsPlanning(true);
+                }}
+              />
+            )}
+          </div>
         </main>
       </div>
     </div>

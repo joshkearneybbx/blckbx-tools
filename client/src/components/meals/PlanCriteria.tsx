@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -164,15 +163,15 @@ export function PlanCriteria({ client, values, onChange, onGenerate, isGeneratin
         </Collapsible>
 
         <div className="flex justify-end">
-          <Button
+          <button
             type="button"
             onClick={onGenerate}
             disabled={isGenerating || values.meal_types.length === 0}
-            className="bb-btn px-[35px] py-[21px] text-[20px] leading-none"
+            className="bb-btn w-full px-4 py-4 text-[16px] leading-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isGenerating ? "Generating..." : "Generate Plan"}
             <ArrowRight className="h-5 w-5" />
-          </Button>
+          </button>
         </div>
       </div>
     </div>

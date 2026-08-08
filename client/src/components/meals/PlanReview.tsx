@@ -60,9 +60,9 @@ export function PlanReview({
         <Button type="button" variant="outline" onClick={onRegenerate} className="border-[#E6E5E0]">
           Regenerate
         </Button>
-        <Button type="button" onClick={onNext} className="bg-[#171717] text-white hover:bg-black">
-          View Shopping List
-        </Button>
+        <button type="button" onClick={onNext} className="bb-btn px-4 py-3 text-[14px] leading-none">
+          View Shopping List →
+        </button>
       </div>
 
       <SwapModal

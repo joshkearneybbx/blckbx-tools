@@ -6,6 +6,7 @@ export interface PastMealRecipe {
   title: string;
   source?: string;
   latestPlannedAt: string;
+  plannedDates: string[];
   totalCount: number;
   feedback: "liked" | "disliked" | null;
 }
@@ -55,6 +56,7 @@ export function usePastMeals(clientId: string | null, enabled = false) {
             title,
             source,
             latestPlannedAt: plannedAt,
+            plannedDates: [plannedAt],
             totalCount: 1,
             feedback,
           });
@@ -67,6 +69,7 @@ export function usePastMeals(clientId: string | null, enabled = false) {
         grouped.set(recipeId, {
           ...existing,
           latestPlannedAt,
+          plannedDates: Array.from(new Set([...existing.plannedDates, plannedAt])).sort((a, b) => b.localeCompare(a)),
           totalCount: existing.totalCount + 1,
           feedback: bestFeedback,
         });

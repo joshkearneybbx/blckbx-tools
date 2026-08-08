@@ -153,10 +153,11 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
 interface MealPlanWizardProps {
   client: MealCraftClient;
   initialPlanId?: string | null;
+  embedded?: boolean;
   onExit: () => void;
 }
 
-export default function MealPlanWizard({ client: initialClient, initialPlanId = null, onExit }: MealPlanWizardProps) {
+export default function MealPlanWizard({ client: initialClient, initialPlanId = null, embedded = false, onExit }: MealPlanWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [maxCompletedStep, setMaxCompletedStep] = useState(1);
   const [selectedClient, setSelectedClient] = useState<MealCraftClient | null>(initialClient);
@@ -594,12 +595,12 @@ export default function MealPlanWizard({ client: initialClient, initialPlanId = 
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF9F7]">
-      <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8">
-        <div className="mb-6 flex items-center justify-between border-b border-[#E4E2DD] bg-white px-5 py-4">
-          <div className="flex items-center gap-4">
+    <div className={embedded ? "h-full overflow-y-auto bg-white" : "min-h-screen bg-[#FAF9F7]"}>
+      <div className={embedded ? "min-h-full p-4" : "mx-auto w-full max-w-5xl px-4 py-6 md:px-8"}>
+        <div className="mb-5 flex items-center justify-between border-b border-[#E4E2DD] bg-white px-1 py-3">
+          <div className="flex items-center gap-3">
             <button type="button" onClick={onExit} className="bb-mut underline underline-offset-4 hover:text-[#171717]">
-              ← Back to household
+              {embedded ? "Close" : "← Back to household"}
             </button>
             <span className="h-4 w-px bg-[#E4E2DD]" />
             <h1 className="bb-type-card">New meal plan</h1>

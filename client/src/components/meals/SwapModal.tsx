@@ -109,15 +109,15 @@ export function SwapModal({ open, onOpenChange, onConfirm, isSwapping }: SwapMod
             >
               Cancel
             </Button>
-            <Button
+            <button
               type="button"
               onClick={submit}
               disabled={!canSubmit || isSwapping}
-              className="bg-[#171717] text-white hover:bg-black"
+              className="bb-btn px-4 py-3 text-[14px] leading-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSwapping ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {isSwapping ? "Swapping..." : "Confirm Swap"}
-            </Button>
+              {isSwapping ? "Swapping..." : "Confirm Swap →"}
+            </button>
           </div>
         </div>
       </DialogContent>
