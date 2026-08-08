@@ -1,5 +1,16 @@
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
+export const MEAL_TYPE_ORDER: Record<MealType, number> = {
+  breakfast: 0,
+  lunch: 1,
+  dinner: 2,
+  snack: 3,
+};
+
+export function sortMealsByType(meals: MealPlanItem[]): MealPlanItem[] {
+  return [...meals].sort((a, b) => (MEAL_TYPE_ORDER[a.meal_type] ?? 99) - (MEAL_TYPE_ORDER[b.meal_type] ?? 99));
+}
+
 export interface MealCraftClient {
   id: string;
   name: string;
@@ -75,6 +86,10 @@ export interface MacroOverride {
 
 export interface MealPlanResult {
   meal_plan_id: string;
+  generation_id?: string;
+  idempotent_replay?: boolean;
+  reused_recipe_ids?: string[];
+  favourite_recipe_ids_used?: string[];
   title?: string;
   status?: "draft" | "active" | "completed" | "archived";
   num_days?: number;
@@ -89,8 +104,18 @@ export interface MealPlanResult {
   noteOverrides?: Record<string, string>;
 }
 
+export interface PlanReuseConfig {
+  include_favourites: boolean;
+  avoid_recent: boolean;
+  recent_window_days?: number;
+  specific_recipe_ids?: string[];
+  source_plan_id?: string;
+}
+
 export interface GenerateMealPlanPayload {
   client_id: string;
+  generation_id: string;
+  reuse?: PlanReuseConfig;
   num_days: number;
   meals_per_day: number;
   meal_types: MealType[];
@@ -302,9 +327,9 @@ function normalizePlanResponse(raw: any): MealPlanResult {
       label: rawDay.label ? String(rawDay.label) : `Day ${dayNumber}`,
       calories: toNumber(rawDay.calories),
       protein: toNumber(rawDay.protein),
-      meals: rawMeals.map((meal: any) => normalizeMeal(meal, dayNumber)),
+      meals: sortMealsByType(rawMeals.map((meal: any) => normalizeMeal(meal, dayNumber))),
     } satisfies MealPlanDay;
-  });
+  }).sort((a: MealPlanDay, b: MealPlanDay) => a.day_number - b.day_number);
 
   const dailySummary = Array.isArray(raw?.daily_summary)
     ? raw.daily_summary.map((s: any) => ({
@@ -323,6 +348,10 @@ function normalizePlanResponse(raw: any): MealPlanResult {
 
   return {
     meal_plan_id: String(raw?.meal_plan_id ?? ""),
+    generation_id: typeof raw?.generation_id === "string" && raw.generation_id ? String(raw.generation_id) : undefined,
+    idempotent_replay: typeof raw?.idempotent_replay === "boolean" ? raw.idempotent_replay : undefined,
+    reused_recipe_ids: asArrayString(raw?.reused_recipe_ids),
+    favourite_recipe_ids_used: asArrayString(raw?.favourite_recipe_ids_used),
     plan,
     daily_summary: dailySummary,
     shopping_list: shoppingList,

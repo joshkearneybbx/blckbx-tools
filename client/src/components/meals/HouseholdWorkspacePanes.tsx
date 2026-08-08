@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChipSelect } from "./ChipSelect";
-import { usePastMeals, type PastMealRecipe } from "@/hooks/meals/usePastMeals";
+import type { PastMealRecipe } from "@/hooks/meals/usePastMeals";
 import {
   useUpdateHousehold,
   type HouseholdPatch,
@@ -161,17 +161,27 @@ export function HouseholdProfilePane({ data, onNewPlan }: HouseholdProfilePanePr
 }
 
 interface MealHistoryPaneProps {
-  clientId: string;
   favourites: WorkspaceFavourite[];
+  pastMeals: PastMealRecipe[];
+  pastMealsLoading: boolean;
+  pastMealsError: boolean;
   selectedMealId: string | null;
   onSelectMeal: (meal: PastMealRecipe) => void;
   onToggleFavourite: (recipeId: string, active: boolean) => void;
   isFavouritePending: boolean;
 }
 
-export function MealHistoryPane({ clientId, favourites, selectedMealId, onSelectMeal, onToggleFavourite, isFavouritePending }: MealHistoryPaneProps) {
+export function MealHistoryPane({
+  favourites,
+  pastMeals: meals,
+  pastMealsLoading: isLoading,
+  pastMealsError: isError,
+  selectedMealId,
+  onSelectMeal,
+  onToggleFavourite,
+  isFavouritePending,
+}: MealHistoryPaneProps) {
   const [filter, setFilter] = useState<MealFilter>("all");
-  const { data: meals = [], isLoading, isError } = usePastMeals(clientId, true);
   const favouriteIds = useMemo(() => new Set(favourites.map((favourite) => favourite.recipeId)), [favourites]);
   const visibleMeals = filter === "favourites" ? meals.filter((meal) => favouriteIds.has(meal.recipeId)) : meals;
 

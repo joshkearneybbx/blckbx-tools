@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { HouseholdProfilePane, MealDetailPane, MealHistoryPane } from "@/components/meals/HouseholdWorkspacePanes";
 import type { PastMealRecipe } from "@/hooks/meals/usePastMeals";
+import { usePastMeals } from "@/hooks/meals/usePastMeals";
 import MealPlanWizard from "./MealPlanWizard";
 import { useHouseholdWorkspace } from "@/hooks/meals/useHouseholdWorkspace";
 import { useMealFavourite } from "@/hooks/meals/useMealFavourite";
@@ -16,7 +17,9 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
   const [selectedMeal, setSelectedMeal] = useState<PastMealRecipe | null>(null);
   const [isPlanning, setIsPlanning] = useState(false);
   const [planToLoad, setPlanToLoad] = useState<string | null>(null);
+  const [planSession, setPlanSession] = useState(0);
   const { data, isLoading, isError } = useHouseholdWorkspace(clientId);
+  const pastMealsQuery = usePastMeals(clientId, Boolean(data));
   const favouriteMutation = useMealFavourite();
 
   if (isLoading) {
@@ -35,6 +38,7 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
   }
 
   const startNewPlan = () => {
+    setPlanSession((current) => current + 1);
     setSelectedMeal(null);
     setPlanToLoad(null);
     setIsPlanning(true);
@@ -63,8 +67,10 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
 
           <div className="min-h-[620px] min-w-0 border-b border-[#E4E2DD] lg:border-b-0 lg:border-r">
             <MealHistoryPane
-              clientId={clientId}
               favourites={data.favourites}
+              pastMeals={pastMealsQuery.data ?? []}
+              pastMealsLoading={pastMealsQuery.isLoading}
+              pastMealsError={pastMealsQuery.isError}
               selectedMealId={selectedMeal?.recipeId ?? null}
               onSelectMeal={setSelectedMeal}
               onToggleFavourite={(recipeId, active) => {
@@ -77,7 +83,13 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
           <div className="min-h-[620px] min-w-0 overflow-hidden">
             {isPlanning ? (
               <MealPlanWizard
+                key={`${planSession}-${planToLoad ?? "new"}`}
                 client={data.client}
+                favourites={data.favourites}
+                pastMeals={pastMealsQuery.data ?? []}
+                pastMealsLoading={pastMealsQuery.isLoading}
+                pastMealsError={pastMealsQuery.isError}
+                recentPlans={data.recentPlans}
                 initialPlanId={planToLoad}
                 embedded
                 onExit={() => {

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { toast } from "@/hooks/use-toast";
-import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, ShoppingList } from "@/lib/meals/api";
-import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey } from "@/lib/meals/api";
+import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, PlanReuseConfig, ShoppingList } from "@/lib/meals/api";
+import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, sortMealsByType } from "@/lib/meals/api";
 import { StepIndicator } from "@/components/meals/StepIndicator";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
 import { GeneratingLoader } from "@/components/meals/GeneratingLoader";
@@ -16,6 +16,8 @@ import { useMealFeedback } from "@/hooks/meals/useMealFeedback";
 import { MealPlanPDF } from "@/components/meals/pdf/MealPlanPDF";
 import { pb } from "@/lib/pocketbase";
 import { fetchRecipeImages } from "@/lib/meals/pdfImages";
+import type { PastMealRecipe } from "@/hooks/meals/usePastMeals";
+import type { WorkspaceFavourite, WorkspacePlanSummary } from "@/hooks/meals/useHouseholdWorkspace";
 
 const INITIAL_CRITERIA: PlanCriteriaValues = {
   free_prompt: "",
@@ -23,6 +25,11 @@ const INITIAL_CRITERIA: PlanCriteriaValues = {
   meals_per_day: 2,
   meal_types: ["lunch", "dinner"],
   focus_tags: [],
+  reuse: {
+    include_favourites: true,
+    avoid_recent: true,
+    recent_window_days: 28,
+  },
   advanced: {},
 };
 
@@ -133,7 +140,7 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
     .map(([dayNumber, meals]) => ({
       day_number: dayNumber,
       label: `Day ${dayNumber}`,
-      meals,
+      meals: sortMealsByType(meals),
     }));
 
   return {
@@ -152,12 +159,27 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
 
 interface MealPlanWizardProps {
   client: MealCraftClient;
+  favourites: WorkspaceFavourite[];
+  pastMeals: PastMealRecipe[];
+  pastMealsLoading: boolean;
+  pastMealsError: boolean;
+  recentPlans: WorkspacePlanSummary[];
   initialPlanId?: string | null;
   embedded?: boolean;
   onExit: () => void;
 }
 
-export default function MealPlanWizard({ client: initialClient, initialPlanId = null, embedded = false, onExit }: MealPlanWizardProps) {
+export default function MealPlanWizard({
+  client: initialClient,
+  favourites,
+  pastMeals,
+  pastMealsLoading,
+  pastMealsError,
+  recentPlans,
+  initialPlanId = null,
+  embedded = false,
+  onExit,
+}: MealPlanWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [maxCompletedStep, setMaxCompletedStep] = useState(1);
   const [selectedClient, setSelectedClient] = useState<MealCraftClient | null>(initialClient);
@@ -167,6 +189,7 @@ export default function MealPlanWizard({ client: initialClient, initialPlanId = 
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
   const [isMarkingAsSent, setIsMarkingAsSent] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const generationIdRef = useRef<string | null>(null);
 
   const generateMutation = useGeneratePlan();
   const swapMutation = useSwapMeal();
@@ -180,6 +203,7 @@ export default function MealPlanWizard({ client: initialClient, initialPlanId = 
   }, [currentStep, showLoading]);
 
   const loadExistingPlan = async (planId: string, fallbackClient?: MealCraftClient) => {
+    generationIdRef.current = null;
     setIsLoadingPlan(true);
 
     try {
@@ -219,6 +243,25 @@ export default function MealPlanWizard({ client: initialClient, initialPlanId = 
       const planCriteria = (planRecord.criteria && typeof planRecord.criteria === "object")
         ? planRecord.criteria as any
         : {};
+      const persistedReuse = planCriteria.reuse && typeof planCriteria.reuse === "object"
+        ? planCriteria.reuse as Partial<PlanReuseConfig>
+        : {};
+      const persistedRecentWindow = Number(persistedReuse.recent_window_days);
+      const persistedSpecificRecipeIds = Array.isArray(persistedReuse.specific_recipe_ids)
+        ? persistedReuse.specific_recipe_ids.map(String).filter(Boolean)
+        : undefined;
+      const persistedSourcePlanId = typeof persistedReuse.source_plan_id === "string" && persistedReuse.source_plan_id
+        ? persistedReuse.source_plan_id
+        : undefined;
+      const reuse: PlanReuseConfig = {
+        include_favourites: persistedReuse.include_favourites !== false,
+        avoid_recent: persistedReuse.avoid_recent !== false,
+        recent_window_days: Number.isFinite(persistedRecentWindow) && persistedRecentWindow > 0
+          ? persistedRecentWindow
+          : INITIAL_CRITERIA.reuse.recent_window_days,
+        ...(persistedSpecificRecipeIds?.length ? { specific_recipe_ids: persistedSpecificRecipeIds } : {}),
+        ...(persistedSourcePlanId ? { source_plan_id: persistedSourcePlanId } : {}),
+      };
 
       setCriteria((current) => ({
         ...current,
@@ -227,6 +270,7 @@ export default function MealPlanWizard({ client: initialClient, initialPlanId = 
         free_prompt: typeof planCriteria.free_prompt === "string" ? planCriteria.free_prompt : current.free_prompt,
         meal_types: Array.isArray(planCriteria.meal_types) ? planCriteria.meal_types : current.meal_types,
         focus_tags: Array.isArray(planCriteria.focus_tags) ? planCriteria.focus_tags : current.focus_tags,
+        reuse,
       }));
 
       setCurrentStep(2);
@@ -249,12 +293,22 @@ export default function MealPlanWizard({ client: initialClient, initialPlanId = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPlanId]);
 
+  const handleCriteriaChange = (next: PlanCriteriaValues) => {
+    generationIdRef.current = null;
+    setCriteria(next);
+  };
+
   const handleGenerate = async () => {
     if (!selectedClient) return;
+
+    const generationId = generationIdRef.current ?? crypto.randomUUID();
+    generationIdRef.current = generationId;
 
     try {
       const generated = await generateMutation.mutateAsync({
         client_id: selectedClient.id,
+        generation_id: generationId,
+        reuse: criteria.reuse,
         num_days: criteria.num_days,
         meals_per_day: criteria.meals_per_day,
         meal_types: criteria.meal_types,
@@ -623,10 +677,21 @@ export default function MealPlanWizard({ client: initialClient, initialPlanId = 
           <PlanCriteria
             client={selectedClient}
             values={criteria}
-            onChange={setCriteria}
+            onChange={handleCriteriaChange}
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
+            favourites={favourites}
+            pastMeals={pastMeals}
+            pastMealsLoading={pastMealsLoading}
+            pastMealsError={pastMealsError}
+            recentPlans={recentPlans}
           />
+        ) : null}
+
+        {stepToRender === 2 && planResult?.idempotent_replay ? (
+          <p className="mb-3 border border-[#D4D0CB] bg-[#F5F3F0] px-3 py-2 text-xs text-[#0A0A0A]">
+            An existing plan was recovered for this generation.
+          </p>
         ) : null}
 
         {stepToRender === 2 && planResult ? (
