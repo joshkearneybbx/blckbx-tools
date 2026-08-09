@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, MessageSquare, Pencil, RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
-import { enhanceImageUrl, getMealMacros, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
+import { enhanceImageUrl, getMealMacros, mealRecipeId, type MacroOverride, type MealPlanItem } from "@/lib/meals/api";
+import type { MealReviewLookups } from "./PlanReview";
 
 interface MealCardProps {
   item: MealPlanItem;
+  lookups: MealReviewLookups;
   macroOverride?: MacroOverride;
   noteOverride?: string;
   onSwap: () => void;
@@ -11,6 +13,16 @@ interface MealCardProps {
   onSaveMacros: (macros: MacroOverride) => void;
   onSaveNote: (note: string) => Promise<void> | void;
   onSaveTitle: (title: string) => Promise<void> | void;
+}
+
+function formatLastUsed(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 const MEAL_TYPE_STYLES: Record<string, string> = {
@@ -33,6 +45,7 @@ function parseMacroInput(value: string): number | undefined {
 
 export function MealCard({
   item,
+  lookups,
   macroOverride,
   noteOverride,
   onSwap,
@@ -98,11 +111,19 @@ export function MealCard({
     typeof macros.fat === "number" ? `${Math.round(macros.fat)}g fat` : null,
   ].filter(Boolean) as string[];
 
+  const recipeId = mealRecipeId(item);
+  const isReused = Boolean(recipeId && lookups.reusedRecipeIds.has(recipeId));
+  const isFavouriteUsed = Boolean(recipeId && lookups.favouriteRecipeIds.has(recipeId));
+  const pastMeal = recipeId ? lookups.pastByRecipeId.get(recipeId) : undefined;
+  const lastUsedLabel = pastMeal ? formatLastUsed(pastMeal.latestPlannedAt) : null;
+
   const metaItems = [
     `${item.cook_time ?? 0} min`,
     ...macroMetaItems,
     `${item.servings ?? 1} servings`,
     item.source ? item.source : null,
+    lastUsedLabel ? `Last used ${lastUsedLabel}` : null,
+    pastMeal && pastMeal.totalCount > 0 ? `Used ${pastMeal.totalCount}×` : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -119,10 +140,22 @@ export function MealCard({
             />
           ) : null}
           <div className="min-w-0">
-            <span className={[
-              "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
-              MEAL_TYPE_STYLES[item.meal_type] ?? "bg-[#F8F8F8] text-[#424242]",
-            ].join(" ")}>{item.meal_type}</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={[
+                "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
+                MEAL_TYPE_STYLES[item.meal_type] ?? "bg-[#F5F3F0] text-[#0A0A0A]",
+              ].join(" ")}>{item.meal_type}</span>
+              {isReused ? (
+                <span className="inline-flex rounded-full border border-[#D4D0CB] bg-[#F5F3F0] px-2 py-0.5 text-[11px] font-semibold text-[#0A0A0A]">
+                  Reused
+                </span>
+              ) : null}
+              {isFavouriteUsed ? (
+                <span className="inline-flex rounded-full border border-[#0A0A0A] bg-[#0A0A0A] px-2 py-0.5 text-[11px] font-semibold text-white">
+                  Favourite
+                </span>
+              ) : null}
+            </div>
             {isEditingTitle ? (
               <div className="mt-1 flex items-center gap-2">
                 <input

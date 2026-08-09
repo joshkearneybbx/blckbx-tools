@@ -1,12 +1,20 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { MacroOverride, MealPlanResult } from "@/lib/meals/api";
+import type { PastMealRecipe } from "@/hooks/meals/usePastMeals";
 import { DaySection } from "./DaySection";
 import { PlanSummaryStats } from "./PlanSummaryStats";
 import { SwapModal } from "./SwapModal";
 
+export interface MealReviewLookups {
+  reusedRecipeIds: Set<string>;
+  favouriteRecipeIds: Set<string>;
+  pastByRecipeId: Map<string, PastMealRecipe>;
+}
+
 interface PlanReviewProps {
   planResult: MealPlanResult;
+  pastMeals?: PastMealRecipe[];
   onRegenerate: () => void;
   onNext: () => void;
   onSwapMeal: (mealPlanItemId: string, payload: { mode: "suggest" | "specific"; reason?: string; replacement_recipe_id?: string }) => Promise<void>;
@@ -19,6 +27,7 @@ interface PlanReviewProps {
 
 export function PlanReview({
   planResult,
+  pastMeals = [],
   onRegenerate,
   onNext,
   onSwapMeal,
@@ -31,6 +40,21 @@ export function PlanReview({
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
 
   const swapOpen = useMemo(() => !!swapTargetId, [swapTargetId]);
+
+  const lookups = useMemo<MealReviewLookups>(() => {
+    const pastByRecipeId = new Map<string, PastMealRecipe>();
+    pastMeals.forEach((meal) => {
+      if (meal.recipeId) {
+        pastByRecipeId.set(meal.recipeId, meal);
+      }
+    });
+
+    return {
+      reusedRecipeIds: new Set(planResult.reused_recipe_ids ?? []),
+      favouriteRecipeIds: new Set(planResult.favourite_recipe_ids_used ?? []),
+      pastByRecipeId,
+    };
+  }, [planResult.reused_recipe_ids, planResult.favourite_recipe_ids_used, pastMeals]);
 
   return (
     <div className="space-y-4">
@@ -46,6 +70,7 @@ export function PlanReview({
         <DaySection
           key={day.day_number}
           day={day}
+          lookups={lookups}
           macroOverrides={planResult.macroOverrides}
           noteOverrides={planResult.noteOverrides}
           onSwapClick={(mealPlanItemId) => setSwapTargetId(mealPlanItemId)}

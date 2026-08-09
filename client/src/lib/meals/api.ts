@@ -60,6 +60,11 @@ export interface MealPlanItem {
   servings?: number;
 }
 
+export function mealRecipeId(item: MealPlanItem): string | undefined {
+  const id = item.recipe_id ?? item.recipe?.id;
+  return id ? String(id) : undefined;
+}
+
 export interface MealPlanDay {
   day_number: number;
   label?: string;
@@ -107,8 +112,9 @@ export interface MealPlanResult {
 export interface PlanReuseConfig {
   include_favourites: boolean;
   avoid_recent: boolean;
-  recent_window_days?: number;
-  specific_recipe_ids?: string[];
+  avoid_recent_days?: number;
+  selected_recipe_ids?: string[];
+  // Not yet consumed by the Save/Generate n8n workflow; still sent for forward compatibility.
   source_plan_id?: string;
 }
 
@@ -145,8 +151,36 @@ export interface SwapMealResult {
 const GENERATE_TIMEOUT_MS = 180_000;
 const SWAP_TIMEOUT_MS = 120_000;
 
+export class MealCraftHttpError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(status: number, message: string, body: unknown = undefined) {
+    super(message);
+    this.name = "MealCraftHttpError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 function withTimeout(ms: number): AbortSignal {
   return AbortSignal.timeout(ms);
+}
+
+function messageFromErrorBody(body: unknown, fallback: string): string {
+  if (body && typeof body === "object") {
+    const record = body as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message.trim();
+    }
+    if (typeof record.error === "string" && record.error.trim()) {
+      return record.error.trim();
+    }
+  }
+  if (typeof body === "string" && body.trim()) {
+    return body.trim();
+  }
+  return fallback;
 }
 
 async function postJson<T>(url: string, body: unknown, timeoutMs: number): Promise<T> {
@@ -165,7 +199,20 @@ async function postJson<T>(url: string, body: unknown, timeoutMs: number): Promi
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
-    throw new Error(errorText || `MealCraft request failed with status ${response.status}.`);
+    let parsedBody: unknown = undefined;
+    if (errorText) {
+      try {
+        parsedBody = JSON.parse(errorText);
+      } catch {
+        parsedBody = errorText;
+      }
+    }
+    const fallback = errorText || `MealCraft request failed with status ${response.status}.`;
+    throw new MealCraftHttpError(
+      response.status,
+      messageFromErrorBody(parsedBody, fallback),
+      parsedBody,
+    );
   }
 
   return response.json() as Promise<T>;

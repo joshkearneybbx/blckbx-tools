@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { toast } from "@/hooks/use-toast";
 import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, PlanReuseConfig, ShoppingList } from "@/lib/meals/api";
-import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, sortMealsByType } from "@/lib/meals/api";
+import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, MealCraftHttpError, sortMealsByType } from "@/lib/meals/api";
 import { StepIndicator } from "@/components/meals/StepIndicator";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
 import { GeneratingLoader } from "@/components/meals/GeneratingLoader";
@@ -28,7 +28,7 @@ const INITIAL_CRITERIA: PlanCriteriaValues = {
   reuse: {
     include_favourites: true,
     avoid_recent: true,
-    recent_window_days: 28,
+    avoid_recent_days: 28,
   },
   advanced: {},
 };
@@ -244,22 +244,30 @@ export default function MealPlanWizard({
         ? planRecord.criteria as any
         : {};
       const persistedReuse = planCriteria.reuse && typeof planCriteria.reuse === "object"
-        ? planCriteria.reuse as Partial<PlanReuseConfig>
+        ? planCriteria.reuse as Partial<PlanReuseConfig> & {
+            // Legacy Stage 5 key names persisted before the n8n contract rename.
+            specific_recipe_ids?: string[];
+            recent_window_days?: number;
+          }
         : {};
-      const persistedRecentWindow = Number(persistedReuse.recent_window_days);
-      const persistedSpecificRecipeIds = Array.isArray(persistedReuse.specific_recipe_ids)
-        ? persistedReuse.specific_recipe_ids.map(String).filter(Boolean)
-        : undefined;
+      const persistedRecentWindow = Number(
+        persistedReuse.avoid_recent_days ?? persistedReuse.recent_window_days,
+      );
+      const persistedSelectedRecipeIds = Array.isArray(persistedReuse.selected_recipe_ids)
+        ? persistedReuse.selected_recipe_ids.map(String).filter(Boolean)
+        : Array.isArray(persistedReuse.specific_recipe_ids)
+          ? persistedReuse.specific_recipe_ids.map(String).filter(Boolean)
+          : undefined;
       const persistedSourcePlanId = typeof persistedReuse.source_plan_id === "string" && persistedReuse.source_plan_id
         ? persistedReuse.source_plan_id
         : undefined;
       const reuse: PlanReuseConfig = {
         include_favourites: persistedReuse.include_favourites !== false,
         avoid_recent: persistedReuse.avoid_recent !== false,
-        recent_window_days: Number.isFinite(persistedRecentWindow) && persistedRecentWindow > 0
+        avoid_recent_days: Number.isFinite(persistedRecentWindow) && persistedRecentWindow > 0
           ? persistedRecentWindow
-          : INITIAL_CRITERIA.reuse.recent_window_days,
-        ...(persistedSpecificRecipeIds?.length ? { specific_recipe_ids: persistedSpecificRecipeIds } : {}),
+          : INITIAL_CRITERIA.reuse.avoid_recent_days,
+        ...(persistedSelectedRecipeIds?.length ? { selected_recipe_ids: persistedSelectedRecipeIds } : {}),
         ...(persistedSourcePlanId ? { source_plan_id: persistedSourcePlanId } : {}),
       };
 
@@ -401,6 +409,15 @@ export default function MealPlanWizard({
         console.warn("Failed to clear swapped meal note in PocketBase:", error);
       }
     } catch (error) {
+      if (error instanceof MealCraftHttpError && error.status === 422) {
+        toast({
+          title: "Swap rejected",
+          description: error.message || "This meal breaks the household's dietary rules and cannot be used.",
+          variant: "destructive",
+        });
+        throw error;
+      }
+
       const message = error instanceof Error ? error.message : "Failed to swap meal";
       toast({ title: "Swap failed", description: message, variant: "destructive" });
       throw error;
@@ -714,6 +731,7 @@ export default function MealPlanWizard({
         {stepToRender === 2 && planResult ? (
           <PlanReview
             planResult={planResult}
+            pastMeals={pastMeals}
             onRegenerate={() => setCurrentStep(1)}
             onNext={() => {
               setCurrentStep(3);

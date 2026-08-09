@@ -78,7 +78,7 @@ export function PlanCriteria({
   });
   const quickPickMeals = sortedPastMeals.slice(0, 3);
   const quickPickIds = new Set(quickPickMeals.map((meal) => meal.recipeId));
-  const selectedRecipeIds = values.reuse.specific_recipe_ids ?? [];
+  const selectedRecipeIds = values.reuse.selected_recipe_ids ?? [];
   const selectedOutsideQuickPick = selectedRecipeIds.filter((recipeId) => !quickPickIds.has(recipeId));
   const searchTerm = specificMealSearch.trim().toLowerCase();
   const filteredPastMeals = sortedPastMeals.filter((meal) => {
@@ -100,11 +100,11 @@ export function PlanCriteria({
   };
 
   const toggleSpecificRecipe = (recipeId: string) => {
-    const selected = values.reuse.specific_recipe_ids ?? [];
+    const selected = values.reuse.selected_recipe_ids ?? [];
     const next = selected.includes(recipeId)
       ? selected.filter((id) => id !== recipeId)
       : [...selected, recipeId];
-    setReuse({ specific_recipe_ids: next.length ? next : undefined });
+    setReuse({ selected_recipe_ids: next.length ? next : undefined });
   };
 
   const startFresh = () => {
@@ -248,10 +248,10 @@ export function PlanCriteria({
               <Input
                 type="number"
                 min={1}
-                value={values.reuse.recent_window_days ?? 28}
+                value={values.reuse.avoid_recent_days ?? 28}
                 onChange={(event) => {
                   const next = Number(event.target.value);
-                  setReuse({ recent_window_days: Number.isFinite(next) && next > 0 ? next : undefined });
+                  setReuse({ avoid_recent_days: Number.isFinite(next) && next > 0 ? next : undefined });
                 }}
                 disabled={!values.reuse.avoid_recent}
                 aria-label="Recent meal window in days"

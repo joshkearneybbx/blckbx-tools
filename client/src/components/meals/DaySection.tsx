@@ -1,8 +1,10 @@
 import { getMealMacros, type MacroOverride, type MealPlanDay } from "@/lib/meals/api";
+import type { MealReviewLookups } from "./PlanReview";
 import { MealCard } from "./MealCard";
 
 interface DaySectionProps {
   day: MealPlanDay;
+  lookups: MealReviewLookups;
   macroOverrides?: Record<string, MacroOverride>;
   noteOverrides?: Record<string, string>;
   onSwapClick: (mealPlanItemId: string) => void;
@@ -14,6 +16,7 @@ interface DaySectionProps {
 
 export function DaySection({
   day,
+  lookups,
   macroOverrides,
   noteOverrides,
   onSwapClick,
@@ -54,6 +57,7 @@ export function DaySection({
           <MealCard
             key={meal.id}
             item={meal}
+            lookups={lookups}
             macroOverride={macroOverrides?.[meal.meal_plan_item_id ?? meal.id]}
             noteOverride={noteOverrides?.[meal.meal_plan_item_id ?? meal.id]}
             onSwap={() => onSwapClick(meal.meal_plan_item_id ?? meal.id)}
