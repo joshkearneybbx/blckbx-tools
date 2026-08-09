@@ -374,7 +374,7 @@ export function MealDetailPane({ meal, favourites, recentPlans, onNewPlan, onCon
 }) {
   const favouriteIds = new Set(favourites.map((favourite) => favourite.recipeId));
   const [imageFailed, setImageFailed] = useState(false);
-  const imageUrl = meal?.image_url ? enhanceImageUrl(meal.image_url) : "";
+  const imageUrl = meal?.image_url ? enhanceImageUrl(meal.image_url, 1600, 1200) : "";
 
   useEffect(() => {
     setImageFailed(false);
@@ -400,7 +400,7 @@ export function MealDetailPane({ meal, favourites, recentPlans, onNewPlan, onCon
             src={imageUrl}
             alt={displayTitle}
             onError={() => setImageFailed(true)}
-            className="max-h-52 w-full object-cover"
+            className="h-auto max-h-64 w-full object-cover"
             loading="lazy"
           />
         </div>

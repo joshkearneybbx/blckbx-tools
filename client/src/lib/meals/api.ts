@@ -309,11 +309,11 @@ function pickImageUrl(...values: unknown[]): string {
   return match ? enhanceImageUrl(match.trim()) : "";
 }
 
-export function enhanceImageUrl(url: string): string {
+export function enhanceImageUrl(url: string, width = 800, height = 600): string {
   if (!url) return url;
   if (url.includes("scene7.com")) {
     const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}wid=800&hei=600`;
+    return `${url}${separator}wid=${width}&hei=${height}`;
   }
   return url;
 }
