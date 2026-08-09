@@ -205,6 +205,7 @@ export default function MealPlanWizard({
   const [isMarkingAsSent, setIsMarkingAsSent] = useState(false);
   const [isPublishingLink, setIsPublishingLink] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const generationIdRef = useRef<string | null>(null);
 
@@ -809,19 +810,82 @@ export default function MealPlanWizard({
         ) : null}
 
         {stepToRender === 2 && planResult?.meal_plan_id ? (
-          <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#D4D0CB] pb-3">
-            <p className="bb-meta">
-              {planResult.status === "active" ? "Plan marked as sent" : "Saved as draft"} · {planResult.title || planResult.meal_plan_id}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleMarkAsSent()}
-              disabled={isMarkingAsSent || planResult.status === "active"}
-              className="shrink-0 border-[#D4D0CB]"
-            >
-              {isMarkingAsSent ? "Updating..." : "Mark as Sent"}
-            </Button>
+          <div className="mb-3 space-y-3 border-b border-[#D4D0CB] pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="bb-meta">
+                {planResult.status === "active" ? "Plan marked as sent" : "Saved as draft"} · {planResult.title || planResult.meal_plan_id}
+              </p>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                {!planResult.document_url ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-[#D4D0CB]"
+                    disabled={isPublishingLink || !planResult.meal_plan_id}
+                    onClick={() => void handlePublishDocument()}
+                  >
+                    {isPublishingLink ? `Publishing… ${publishProgress}%` : "Get Link"}
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleMarkAsSent()}
+                  disabled={isMarkingAsSent || planResult.status === "active"}
+                  className="border-[#D4D0CB]"
+                >
+                  {isMarkingAsSent ? "Updating..." : "Mark as Sent"}
+                </Button>
+              </div>
+            </div>
+
+            {planResult.document_url ? (
+              <div className="space-y-2 border border-[#D4D0CB] bg-[#F5F3F0] px-3 py-3">
+                <p className="font-[var(--bb-font-sans)] text-[10px] font-semibold uppercase tracking-[1px] text-[#0A0A0A]">
+                  Client link
+                </p>
+                <a
+                  href={planResult.document_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block break-all text-xs text-[#0A0A0A] underline underline-offset-2"
+                >
+                  {planResult.document_url}
+                </a>
+                {planResult.document_generated_at ? (
+                  <p className="text-xs text-[#404040]">
+                    Generated {new Date(planResult.document_generated_at).toLocaleString("en-GB")}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-[#D4D0CB]"
+                    disabled={isPublishingLink}
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(planResult.document_url ?? "");
+                      setCopiedLink(true);
+                      window.setTimeout(() => setCopiedLink(false), 1500);
+                    }}
+                  >
+                    {copiedLink ? "Copied" : "Copy link"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-[#D4D0CB]"
+                    disabled={isPublishingLink}
+                    onClick={() => void handlePublishDocument({ supersede: true })}
+                  >
+                    {isPublishingLink ? `Generating… ${publishProgress}%` : "Generate new link"}
+                  </Button>
+                </div>
+                <p className="text-xs text-[#404040]">
+                  Generating a new link creates a fresh URL. The previous link is superseded — share the new one with the client.
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -846,10 +910,7 @@ export default function MealPlanWizard({
             onSaveMacros={handleSaveMacros}
             onSaveNote={handleSaveNote}
             onSaveTitle={handleSaveTitle}
-            onGetLink={() => void handlePublishDocument()}
-            onGenerateNewLink={() => void handlePublishDocument({ supersede: true })}
             isPublishingLink={isPublishingLink}
-            publishProgress={publishProgress}
           />
         ) : null}
 
