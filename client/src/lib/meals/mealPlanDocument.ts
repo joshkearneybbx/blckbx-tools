@@ -223,25 +223,6 @@ function renderRecipeArticles(flat: FlatMeal[], plan: MealPlanResult): string {
     .join("\n\n");
 }
 
-function renderShoppingCategories(plan: MealPlanResult): string {
-  return Object.entries(plan.shopping_list)
-    .map(([category, items]) => {
-      const lis = items
-        .map((item) => `            <li>${escapeHtml(item)}</li>`)
-        .join("\n");
-      // Template CSS has no shop-category/is-static; use col-label + shop-list only.
-      return [
-        `      <div>`,
-        `        <p class="col-label">${escapeHtml(category)}</p>`,
-        `        <ul class="shop-list">`,
-        lis,
-        `        </ul>`,
-        `      </div>`,
-      ].join("\n");
-    })
-    .join("\n");
-}
-
 function buildBlckbxData(input: MealPlanDocumentInput, flat: FlatMeal[]) {
   const { plan, clientName, assistantName } = input;
   const days = plan.num_days && plan.num_days > 0 ? plan.num_days : plan.plan.length;
@@ -432,10 +413,9 @@ ${renderRecipeArticles(flat, plan)}
 
     <section id="shopping">
       <h2 class="block-title">Shopping list <span id="shop-count" class="shop-count"></span></h2>
-      <p class="block-note">Everything you need for the week, grouped by aisle. Use the <span class="inline-plus">+</span> on any recipe ingredient to build a personal tick-list below.</p>
-${renderShoppingCategories(plan)}
+      <p class="block-note">Tap the <span class="inline-plus">+</span> beside any recipe ingredient to add it here. Build a personal list as you plan the shop.</p>
       <div id="shop-panel">
-        <p id="shop-empty" class="shop-empty">Nothing added yet. Use the <span class="inline-plus">+</span> on the recipes above and your list builds here.</p>
+        <p id="shop-empty" class="shop-empty">Your list is empty. Open a recipe above and tap <span class="inline-plus">+</span> on what you need.</p>
         <ul id="shop-list" class="shop-list"></ul>
         <button id="shop-clear" class="shop-clear" type="button" onclick="clearShop()" hidden>Clear list</button>
       </div>
