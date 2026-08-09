@@ -12,6 +12,16 @@ import { PlanReview } from "@/components/meals/PlanReview";
 import { ShoppingList as ShoppingListSection } from "@/components/meals/ShoppingList";
 import { ImportRecipeModal } from "@/components/meals/ImportRecipeModal";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useGeneratePlan } from "@/hooks/meals/useGeneratePlan";
 import { useSwapMeal } from "@/hooks/meals/useSwapMeal";
 import { useMealFeedback } from "@/hooks/meals/useMealFeedback";
@@ -206,6 +216,7 @@ export default function MealPlanWizard({
   const [isPublishingLink, setIsPublishingLink] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [supersedeLinkOpen, setSupersedeLinkOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const generationIdRef = useRef<string | null>(null);
 
@@ -683,19 +694,9 @@ export default function MealPlanWizard({
     }
   };
 
-  const handlePublishDocument = async (options?: { supersede?: boolean }) => {
+  const runPublishDocument = async (supersede: boolean) => {
     if (!planResult?.meal_plan_id || !selectedClient) return;
-
-    if (planResult.document_url && !options?.supersede) {
-      return;
-    }
-
-    if (planResult.document_url && options?.supersede) {
-      const confirmed = window.confirm(
-        "Generate a new link? The previous link will be superseded — share the new URL with the client.",
-      );
-      if (!confirmed) return;
-    }
+    if (planResult.document_url && !supersede) return;
 
     setIsPublishingLink(true);
     setPublishProgress(0);
@@ -738,8 +739,8 @@ export default function MealPlanWizard({
       ));
 
       toast({
-        title: options?.supersede ? "New link ready" : "Link ready",
-        description: options?.supersede
+        title: supersede ? "New link ready" : "Link ready",
+        description: supersede
           ? "A new client link was created. The previous URL is superseded."
           : "Client meal plan link created.",
       });
@@ -767,6 +768,21 @@ export default function MealPlanWizard({
       setIsPublishingLink(false);
       setPublishProgress(0);
     }
+  };
+
+  const handlePublishDocument = (options?: { supersede?: boolean }) => {
+    if (!planResult?.meal_plan_id || !selectedClient) return;
+
+    if (planResult.document_url && !options?.supersede) {
+      return;
+    }
+
+    if (planResult.document_url && options?.supersede) {
+      setSupersedeLinkOpen(true);
+      return;
+    }
+
+    void runPublishDocument(false);
   };
 
   return (
@@ -876,7 +892,7 @@ export default function MealPlanWizard({
                     variant="outline"
                     className="border-[#D4D0CB]"
                     disabled={isPublishingLink}
-                    onClick={() => void handlePublishDocument({ supersede: true })}
+                    onClick={() => handlePublishDocument({ supersede: true })}
                   >
                     {isPublishingLink ? `Generating… ${publishProgress}%` : "Generate new link"}
                   </Button>
@@ -931,6 +947,29 @@ export default function MealPlanWizard({
         open={importModalOpen}
         onClose={() => setImportModalOpen(false)}
       />
+
+      <AlertDialog open={supersedeLinkOpen} onOpenChange={setSupersedeLinkOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate a new link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Generate a new link? The previous link will be superseded — share the new URL with the client.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPublishingLink}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPublishingLink}
+              onClick={() => {
+                setSupersedeLinkOpen(false);
+                void runPublishDocument(true);
+              }}
+            >
+              Generate new link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
