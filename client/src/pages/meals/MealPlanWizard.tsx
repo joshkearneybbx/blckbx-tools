@@ -5,7 +5,6 @@ import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, Meal
 import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, MealCraftHttpError, mealItemOrigin, pocketbaseRecipeId, sortMealsByType } from "@/lib/meals/api";
 import { renderMealPlanDocument } from "@/lib/meals/mealPlanDocument";
 import { isLinksApiError, uploadFile } from "@/features/links/api";
-import { useAuth } from "@/hooks/useAuth";
 import { StepIndicator } from "@/components/meals/StepIndicator";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
 import { GeneratingLoader } from "@/components/meals/GeneratingLoader";
@@ -208,15 +207,10 @@ export default function MealPlanWizard({
   const [publishProgress, setPublishProgress] = useState(0);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const generationIdRef = useRef<string | null>(null);
-  const { user } = useAuth();
 
   const generateMutation = useGeneratePlan();
   const swapMutation = useSwapMeal();
   const feedbackMutation = useMealFeedback();
-
-  const assistantName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim()
-    || user?.email?.split("@")[0]?.trim()
-    || "";
   const isGenerating = generateMutation.isPending;
   const showLoading = isGenerating;
 
@@ -691,15 +685,6 @@ export default function MealPlanWizard({
   const handlePublishDocument = async (options?: { supersede?: boolean }) => {
     if (!planResult?.meal_plan_id || !selectedClient) return;
 
-    if (!assistantName) {
-      toast({
-        title: "Cannot create link",
-        description: "Your account has no name or email to use as the assistant on the document.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (planResult.document_url && !options?.supersede) {
       return;
     }
@@ -718,7 +703,6 @@ export default function MealPlanWizard({
       const html = renderMealPlanDocument({
         plan: planResult,
         clientName: selectedClient.name,
-        assistantName,
       });
 
       const safeClient = selectedClient.name
