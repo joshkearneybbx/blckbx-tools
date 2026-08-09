@@ -62,7 +62,20 @@ export function PlanReview({
 
       {planResult.warnings?.length ? (
         <div className="border border-[#E4E2DD] bg-[#FAF9F7] px-3 py-2 text-xs text-[#404040]">
-          {planResult.warnings.join(" • ")}
+          <ul className="space-y-1.5">
+            {planResult.warnings.map((warning, index) => (
+              <li key={`${warning.type}-${warning.recipe_id ?? "none"}-${index}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="font-[var(--bb-font-sans)] text-[10px] font-semibold uppercase tracking-[1px] text-[#0A0A0A]">
+                  {warning.type === "recent_repeat"
+                    ? "Recently used"
+                    : warning.type === "selection_excluded"
+                      ? "Selection excluded"
+                      : "Favourite excluded"}
+                </span>
+                <span className="text-[#404040]">{warning.message}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

@@ -89,6 +89,17 @@ export interface MacroOverride {
   fat?: number;
 }
 
+export type MealPlanWarningType =
+  | "recent_repeat"
+  | "selection_excluded"
+  | "favourite_excluded";
+
+export interface MealPlanWarning {
+  type: MealPlanWarningType;
+  recipe_id?: string;
+  message: string;
+}
+
 export interface MealPlanResult {
   meal_plan_id: string;
   generation_id?: string;
@@ -102,7 +113,7 @@ export interface MealPlanResult {
   plan: MealPlanDay[];
   daily_summary?: Array<{ day_number: number; calories?: number; protein?: number }>;
   shopping_list: ShoppingList;
-  warnings?: string[];
+  warnings?: MealPlanWarning[];
   shopping_overlap_notes?: string;
   stats: MealPlanStats;
   macroOverrides?: Record<string, MacroOverride>;
@@ -223,6 +234,38 @@ function asArrayString(value: unknown): string[] {
     return value.map((v) => String(v)).filter(Boolean);
   }
   return [];
+}
+
+const MEAL_PLAN_WARNING_TYPES = new Set<MealPlanWarningType>([
+  "recent_repeat",
+  "selection_excluded",
+  "favourite_excluded",
+]);
+
+function normalizeWarnings(value: unknown): MealPlanWarning[] {
+  if (!Array.isArray(value)) return [];
+
+  const warnings: MealPlanWarning[] = [];
+
+  value.forEach((entry) => {
+    if (!entry || typeof entry !== "object") return;
+
+    const record = entry as Record<string, unknown>;
+    const type = record.type;
+    const message = typeof record.message === "string" ? record.message.trim() : "";
+
+    if (typeof type !== "string" || !MEAL_PLAN_WARNING_TYPES.has(type as MealPlanWarningType)) return;
+    if (!message) return;
+
+    const recipeId = typeof record.recipe_id === "string" ? record.recipe_id.trim() : "";
+    warnings.push({
+      type: type as MealPlanWarningType,
+      message,
+      ...(recipeId ? { recipe_id: recipeId } : {}),
+    });
+  });
+
+  return warnings;
 }
 
 function toNumber(value: unknown): number | undefined {
@@ -402,7 +445,7 @@ function normalizePlanResponse(raw: any): MealPlanResult {
     plan,
     daily_summary: dailySummary,
     shopping_list: shoppingList,
-    warnings: asArrayString(raw?.warnings),
+    warnings: normalizeWarnings(raw?.warnings),
     shopping_overlap_notes: raw?.shopping_overlap_notes ? String(raw.shopping_overlap_notes) : undefined,
     stats: computeMealPlanStats(plan),
     macroOverrides: {},
