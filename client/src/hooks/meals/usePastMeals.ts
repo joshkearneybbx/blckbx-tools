@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { pocketbaseRecipeId } from "@/lib/meals/api";
 import { pb } from "@/lib/pocketbase";
 
 export interface PastMealRecipe {
@@ -41,7 +42,7 @@ export function usePastMeals(clientId: string | null, enabled = false) {
       items.forEach((item: any) => {
         const recipe = item.expand?.recipe;
         const mealPlan = item.expand?.meal_plan;
-        const recipeId = String(recipe?.id ?? item.recipe ?? "");
+        const recipeId = pocketbaseRecipeId(item, recipe);
         if (!recipeId) return;
 
         const title = String(recipe?.title ?? "Untitled recipe");

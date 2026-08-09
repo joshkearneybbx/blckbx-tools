@@ -112,8 +112,13 @@ export function MealCard({
   ].filter(Boolean) as string[];
 
   const recipeId = mealRecipeId(item);
-  const isReused = Boolean(recipeId && lookups.reusedRecipeIds.has(recipeId));
-  const isFavouriteUsed = Boolean(recipeId && lookups.favouriteRecipeIds.has(recipeId));
+  // Generate responses use plan-level id sets; loaded plans use item.origin / was_favourite.
+  const isReused = Boolean(
+    item.origin === "reused" || (recipeId && lookups.reusedRecipeIds.has(recipeId)),
+  );
+  const isFavouriteUsed = Boolean(
+    item.was_favourite === true || (recipeId && lookups.favouriteRecipeIds.has(recipeId)),
+  );
   const pastMeal = recipeId ? lookups.pastByRecipeId.get(recipeId) : undefined;
   const lastUsedLabel = pastMeal ? formatLastUsed(pastMeal.latestPlannedAt) : null;
 

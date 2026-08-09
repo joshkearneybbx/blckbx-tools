@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { toast } from "@/hooks/use-toast";
 import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, PlanReuseConfig, ShoppingList } from "@/lib/meals/api";
-import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, MealCraftHttpError, sortMealsByType } from "@/lib/meals/api";
+import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, MealCraftHttpError, mealItemOrigin, pocketbaseRecipeId, sortMealsByType } from "@/lib/meals/api";
 import { StepIndicator } from "@/components/meals/StepIndicator";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
 import { GeneratingLoader } from "@/components/meals/GeneratingLoader";
@@ -103,10 +103,12 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
 
     const recipe = item.expand?.recipe ? mapRecipeRecord(item.expand.recipe) : undefined;
 
+    const origin = mealItemOrigin(item.origin);
     const meal: MealPlanItem = {
       id: String(item.id),
       meal_plan_item_id: String(item.id),
-      recipe_id: String(item.recipe ?? recipe?.id ?? ""),
+      // Always a string for downstream consumers that treat recipe_id as present text.
+      recipe_id: pocketbaseRecipeId(item, recipe) ?? "",
       day_number: dayNumber,
       meal_type: String(item.meal_type ?? "dinner") as MealPlanItem["meal_type"],
       feedback: (item.feedback ?? null) as "liked" | "disliked" | null,
@@ -123,6 +125,8 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
       carbs: recipe?.carbs,
       fat: recipe?.fat,
       servings: recipe?.servings,
+      ...(origin ? { origin } : {}),
+      ...(typeof item.was_favourite === "boolean" ? { was_favourite: item.was_favourite } : {}),
     };
 
     const clientNote = typeof item.client_note === "string" ? item.client_note.trim() : "";

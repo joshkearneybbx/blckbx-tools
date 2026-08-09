@@ -38,6 +38,8 @@ export interface MealCraftRecipe {
   meal_type?: MealType[];
 }
 
+export type MealItemOrigin = "generated" | "reused" | "manual";
+
 export interface MealPlanItem {
   id: string;
   meal_plan_item_id?: string;
@@ -58,11 +60,33 @@ export interface MealPlanItem {
   carbs?: number;
   fat?: number;
   servings?: number;
+  origin?: MealItemOrigin;
+  was_favourite?: boolean;
 }
 
 export function mealRecipeId(item: MealPlanItem): string | undefined {
   const id = item.recipe_id ?? item.recipe?.id;
   return id ? String(id) : undefined;
+}
+
+/**
+ * Recipe identity from a raw PocketBase meal_plan_items record.
+ * Prefer the relation field, then the expanded recipe id.
+ * Order matches mealRecipeId(item.recipe_id ?? item.recipe?.id).
+ */
+export function pocketbaseRecipeId(
+  item: { recipe?: unknown },
+  expandedRecipe?: { id?: unknown } | null,
+): string | undefined {
+  const relationId = item.recipe != null && item.recipe !== "" ? String(item.recipe) : "";
+  if (relationId) return relationId;
+  const expandedId = expandedRecipe?.id != null && expandedRecipe.id !== "" ? String(expandedRecipe.id) : "";
+  return expandedId || undefined;
+}
+
+export function mealItemOrigin(value: unknown): MealItemOrigin | undefined {
+  if (value === "generated" || value === "reused" || value === "manual") return value;
+  return undefined;
 }
 
 export interface MealPlanDay {
@@ -379,9 +403,18 @@ function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
 
   const mealType = String(rawMeal.meal_type ?? rawMeal.type ?? "dinner") as MealType;
 
+  const origin = mealItemOrigin(rawMeal.origin);
+  const wasFavourite = typeof rawMeal.was_favourite === "boolean" ? rawMeal.was_favourite : undefined;
+  const resolvedRecipeId = rawMeal.recipe_id
+    ? String(rawMeal.recipe_id)
+    : recipe?.id
+      ? String(recipe.id)
+      : undefined;
+
   return {
     id: String(rawMeal.id ?? rawMeal.meal_plan_item_id ?? crypto.randomUUID()),
     meal_plan_item_id: rawMeal.meal_plan_item_id ? String(rawMeal.meal_plan_item_id) : undefined,
+    recipe_id: resolvedRecipeId,
     day_number: toNumber(rawMeal.day_number) ?? dayNumber,
     meal_type: mealType,
     feedback: rawMeal.feedback ?? null,
@@ -402,6 +435,8 @@ function normalizeMeal(rawMeal: any, dayNumber: number): MealPlanItem {
     carbs: toNumber(rawMeal.carbs) ?? recipe?.carbs,
     fat: toNumber(rawMeal.fat) ?? recipe?.fat,
     servings: toNumber(rawMeal.servings) ?? recipe?.servings,
+    ...(origin ? { origin } : {}),
+    ...(typeof wasFavourite === "boolean" ? { was_favourite: wasFavourite } : {}),
   };
 }
 
