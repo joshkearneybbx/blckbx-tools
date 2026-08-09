@@ -3,6 +3,9 @@ import { pdf } from "@react-pdf/renderer";
 import { toast } from "@/hooks/use-toast";
 import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, PlanReuseConfig, ShoppingList } from "@/lib/meals/api";
 import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, MealCraftHttpError, mealItemOrigin, pocketbaseRecipeId, sortMealsByType } from "@/lib/meals/api";
+import { renderMealPlanDocument } from "@/lib/meals/mealPlanDocument";
+import { isLinksApiError, uploadFile } from "@/features/links/api";
+import { useAuth } from "@/hooks/useAuth";
 import { StepIndicator } from "@/components/meals/StepIndicator";
 import { PlanCriteria, type PlanCriteriaValues } from "@/components/meals/PlanCriteria";
 import { GeneratingLoader } from "@/components/meals/GeneratingLoader";
@@ -147,6 +150,13 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
       meals: sortMealsByType(meals),
     }));
 
+  const documentUrl = typeof planRecord.document_url === "string" && planRecord.document_url.trim()
+    ? planRecord.document_url.trim()
+    : undefined;
+  const documentGeneratedAt = typeof planRecord.document_generated_at === "string" && planRecord.document_generated_at.trim()
+    ? planRecord.document_generated_at.trim()
+    : undefined;
+
   return {
     meal_plan_id: String(planRecord.id),
     title: String(planRecord.title ?? `Meal Plan - ${formatDate(String(planRecord.created ?? ""))}`),
@@ -158,6 +168,8 @@ function buildPlanResultFromPocketBase(planRecord: any, itemRecords: any[]): Mea
     stats: computeMealPlanStats(plan),
     macroOverrides: {},
     noteOverrides,
+    ...(documentUrl ? { document_url: documentUrl } : {}),
+    ...(documentGeneratedAt ? { document_generated_at: documentGeneratedAt } : {}),
   };
 }
 
@@ -192,12 +204,19 @@ export default function MealPlanWizard({
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
   const [isMarkingAsSent, setIsMarkingAsSent] = useState(false);
+  const [isPublishingLink, setIsPublishingLink] = useState(false);
+  const [publishProgress, setPublishProgress] = useState(0);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const generationIdRef = useRef<string | null>(null);
+  const { user } = useAuth();
 
   const generateMutation = useGeneratePlan();
   const swapMutation = useSwapMeal();
   const feedbackMutation = useMealFeedback();
+
+  const assistantName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim()
+    || user?.email?.split("@")[0]?.trim()
+    || "";
   const isGenerating = generateMutation.isPending;
   const showLoading = isGenerating;
 
@@ -669,6 +688,102 @@ export default function MealPlanWizard({
     }
   };
 
+  const handlePublishDocument = async (options?: { supersede?: boolean }) => {
+    if (!planResult?.meal_plan_id || !selectedClient) return;
+
+    if (!assistantName) {
+      toast({
+        title: "Cannot create link",
+        description: "Your account has no name or email to use as the assistant on the document.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (planResult.document_url && !options?.supersede) {
+      return;
+    }
+
+    if (planResult.document_url && options?.supersede) {
+      const confirmed = window.confirm(
+        "Generate a new link? The previous link will be superseded — share the new URL with the client.",
+      );
+      if (!confirmed) return;
+    }
+
+    setIsPublishingLink(true);
+    setPublishProgress(0);
+
+    try {
+      const html = renderMealPlanDocument({
+        plan: planResult,
+        clientName: selectedClient.name,
+        assistantName,
+      });
+
+      const safeClient = selectedClient.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "client";
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const file = new File([html], `meal-plan-${safeClient}-${dateStamp}.html`, { type: "text/html" });
+
+      const uploaded = await uploadFile({
+        file,
+        clientName: selectedClient.name,
+        title: planResult.title?.trim() || `Meal plan for ${selectedClient.name}`,
+        area: "BOH",
+        onProgress: setPublishProgress,
+      });
+
+      const generatedAt = new Date().toISOString();
+      await pb.collection("meal_plans").update(planResult.meal_plan_id, {
+        document_url: uploaded.url,
+        document_generated_at: generatedAt,
+      });
+
+      setPlanResult((current) => (
+        current
+          ? {
+              ...current,
+              document_url: uploaded.url,
+              document_generated_at: generatedAt,
+            }
+          : current
+      ));
+
+      toast({
+        title: options?.supersede ? "New link ready" : "Link ready",
+        description: options?.supersede
+          ? "A new client link was created. The previous URL is superseded."
+          : "Client meal plan link created.",
+      });
+    } catch (error) {
+      if (isLinksApiError(error)) {
+        toast({
+          title: "Upload failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else if (error instanceof Error) {
+        toast({
+          title: "Cannot create link",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Cannot create link",
+          description: "Something went wrong while preparing the document.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsPublishingLink(false);
+      setPublishProgress(0);
+    }
+  };
+
   return (
     <div className={embedded ? "h-full overflow-y-auto bg-white" : "min-h-screen bg-[#FAF9F7]"}>
       <div className={embedded ? "min-h-full p-4" : "mx-auto w-full max-w-5xl px-4 py-6 md:px-8"}>
@@ -747,6 +862,10 @@ export default function MealPlanWizard({
             onSaveMacros={handleSaveMacros}
             onSaveNote={handleSaveNote}
             onSaveTitle={handleSaveTitle}
+            onGetLink={() => void handlePublishDocument()}
+            onGenerateNewLink={() => void handlePublishDocument({ supersede: true })}
+            isPublishingLink={isPublishingLink}
+            publishProgress={publishProgress}
           />
         ) : null}
 

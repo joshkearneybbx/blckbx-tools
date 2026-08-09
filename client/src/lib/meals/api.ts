@@ -142,6 +142,8 @@ export interface MealPlanResult {
   stats: MealPlanStats;
   macroOverrides?: Record<string, MacroOverride>;
   noteOverrides?: Record<string, string>;
+  document_url?: string;
+  document_generated_at?: string;
 }
 
 export interface PlanReuseConfig {
