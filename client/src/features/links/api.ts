@@ -69,7 +69,7 @@ type UploadFileInput = {
   onProgress?: (percent: number) => void;
 };
 
-function getFreshToken(): string {
+export function getFreshToken(): string {
   const token = pb.authStore.token;
 
   if (!token) {

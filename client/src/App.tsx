@@ -33,6 +33,7 @@ import ContentHubTrendDetailPage from "@/features/content-hub/pages/ContentHubTr
 import ContentHubTrendsPage from "@/features/content-hub/pages/ContentHubTrendsPage";
 import TravelHubPage from "@/features/travel-hub/TravelHubPage";
 import LinksPage from "@/features/links/LinksPage";
+import ImagesPage from "@/features/images/ImagesPage";
 import ShortlistsDashboard from "@/features/shortlists/pages/ShortlistsDashboard";
 import ShortlistEditor from "@/features/shortlists/pages/ShortlistEditor";
 import ShortlistView from "@/features/shortlists/pages/ShortlistView";
@@ -340,6 +341,20 @@ function Router() {
           {() => (
             <ToolGuard slug="links">
               <Redirect to="/links" replace />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/images">
+          {() => (
+            <ToolGuard slug="images">
+              <ImagesPage />
+            </ToolGuard>
+          )}
+        </Route>
+        <Route path="/images/:rest*">
+          {() => (
+            <ToolGuard slug="images">
+              <Redirect to="/images" replace />
             </ToolGuard>
           )}
         </Route>

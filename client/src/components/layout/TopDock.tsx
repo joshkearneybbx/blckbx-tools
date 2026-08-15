@@ -11,6 +11,7 @@ import {
   MapPin,
   ListChecks,
   Link2,
+  Image as ImageIcon,
   BookOpen,
   ShoppingBag,
   UtensilsCrossed,
@@ -98,6 +99,14 @@ const TOOL_ITEMS: DockItemConfig[] = [
     toolSlug: "links",
     active: (location) => location.startsWith("/links"),
     badge: true,
+  },
+  {
+    key: "images",
+    label: "Images",
+    route: "/images",
+    Icon: ImageIcon,
+    toolSlug: "images",
+    active: (location) => location.startsWith("/images"),
   },
   {
     key: "task-guide",
