@@ -30,20 +30,7 @@ import { pb } from "@/lib/pocketbase";
 import { fetchRecipeImages } from "@/lib/meals/pdfImages";
 import type { PastMealRecipe } from "@/hooks/meals/usePastMeals";
 import type { WorkspaceFavourite, WorkspacePlanSummary } from "@/hooks/meals/useHouseholdWorkspace";
-
-const INITIAL_CRITERIA: PlanCriteriaValues = {
-  free_prompt: "",
-  num_days: 3,
-  meals_per_day: 2,
-  meal_types: ["lunch", "dinner"],
-  focus_tags: [],
-  reuse: {
-    include_favourites: true,
-    avoid_recent: true,
-    avoid_recent_days: 28,
-  },
-  advanced: {},
-};
+import { INITIAL_CRITERIA, criteriaFromLatestPlan, type LatestPlanDefaults } from "@/lib/meals/criteriaDefaults";
 
 function mergeDailySummary(result: MealPlanResult): MealPlanResult {
   if (!result.daily_summary?.length) return result;
@@ -189,6 +176,7 @@ interface MealPlanWizardProps {
   pastMealsLoading: boolean;
   pastMealsError: boolean;
   recentPlans: WorkspacePlanSummary[];
+  latestPlanDefaults?: LatestPlanDefaults | null;
   initialPlanId?: string | null;
   embedded?: boolean;
   onExit: () => void;
@@ -201,6 +189,7 @@ export default function MealPlanWizard({
   pastMealsLoading,
   pastMealsError,
   recentPlans,
+  latestPlanDefaults = null,
   initialPlanId = null,
   embedded = false,
   onExit,
@@ -208,7 +197,9 @@ export default function MealPlanWizard({
   const [currentStep, setCurrentStep] = useState(1);
   const [maxCompletedStep, setMaxCompletedStep] = useState(1);
   const [selectedClient, setSelectedClient] = useState<MealCraftClient | null>(initialClient);
-  const [criteria, setCriteria] = useState<PlanCriteriaValues>(INITIAL_CRITERIA);
+  const [criteria, setCriteria] = useState<PlanCriteriaValues>(
+    initialPlanId == null ? criteriaFromLatestPlan(latestPlanDefaults) : INITIAL_CRITERIA,
+  );
   const [planResult, setPlanResult] = useState<MealPlanResult | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);

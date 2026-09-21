@@ -90,6 +90,7 @@ export default function HouseholdWorkspacePage({ clientId }: HouseholdWorkspaceP
                 pastMealsLoading={pastMealsQuery.isLoading}
                 pastMealsError={pastMealsQuery.isError}
                 recentPlans={data.recentPlans}
+                latestPlanDefaults={data.latestPlanDefaults}
                 initialPlanId={planToLoad}
                 embedded
                 onExit={() => {

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RecordModel } from "pocketbase";
 import { pb } from "@/lib/pocketbase";
 import type { MealCraftClient } from "@/lib/meals/api";
+import type { LatestPlanDefaults } from "@/lib/meals/criteriaDefaults";
 import type { MealPlanStatus } from "./useHouseholdDashboard";
 
 export interface WorkspacePlanSummary {
@@ -33,6 +34,7 @@ export interface HouseholdWorkspaceData {
   favouriteCount: number;
   favourites: WorkspaceFavourite[];
   recentPlans: WorkspacePlanSummary[];
+  latestPlanDefaults: LatestPlanDefaults | null;
 }
 
 export interface HouseholdPatch {
@@ -129,7 +131,7 @@ export function useHouseholdWorkspace(clientId: string | null) {
         getAllPages("meal_plans", {
           filter: `client = "${clientId}"`,
           sort: "-created",
-          fields: "id,title,created,status,generated_at,sent_at,num_days,meals_per_day",
+          fields: "id,title,created,status,generated_at,sent_at,num_days,meals_per_day,criteria",
         }),
         getAllPages("meal_favourites", {
           filter: `client = "${clientId}" && active = true`,
@@ -160,6 +162,13 @@ export function useHouseholdWorkspace(clientId: string | null) {
         favouriteCount: favouriteRecords.length,
         favourites: favouriteRecords.map(mapFavourite),
         recentPlans: plans.slice(0, 5).map(mapPlan),
+        latestPlanDefaults: plans[0]
+          ? {
+              num_days: Number(plans[0].num_days),
+              meals_per_day: Number(plans[0].meals_per_day),
+              criteria: plans[0].criteria,
+            }
+          : null,
       } satisfies HouseholdWorkspaceData;
     },
   });
