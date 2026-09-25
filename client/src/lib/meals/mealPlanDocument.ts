@@ -15,6 +15,9 @@ import fontsCss from "./assets/mealPlanFonts.css?raw";
 import layoutCss from "./assets/mealPlanLayout.css?raw";
 import scriptJs from "./assets/mealPlanScript.js?raw";
 
+/** Must match the declaration in assets/mealPlanScript.js exactly. */
+const SHOP_QTY_PLACEHOLDER = 'var SHOP_QTY = { /* "Item name": "buy qty for the week" */ };';
+
 export interface MealPlanDocumentInput {
   plan: MealPlanResult;
   clientName: string;
@@ -121,6 +124,113 @@ type FlatMeal = {
   meal: MealPlanItem;
 };
 
+type ShopItem = { name: string; qty: string };
+
+function parseShopItem(raw: string): ShopItem {
+  const s = raw.trim();
+  if (!s) return { name: "", qty: "" };
+
+  const dash = s.match(/^(.*?)\s+[\u2014\u2013-]\s+(.+)$/);
+  if (dash?.[1]?.trim() && dash[2]?.trim()) {
+    return { name: dash[1].trim(), qty: dash[2].trim() };
+  }
+
+  const colon = s.match(/^([^:]+):\s+(.+)$/);
+  if (colon?.[1]?.trim() && colon[2]?.trim() && /\d/.test(colon[2])) {
+    return { name: colon[1].trim(), qty: colon[2].trim() };
+  }
+
+  const paren = s.match(/^(.*?)\s+\(([^)]*\d[^)]*)\)\s*$/);
+  if (paren?.[1]?.trim() && paren[2]?.trim()) {
+    return { name: paren[1].trim(), qty: paren[2].trim() };
+  }
+
+  const leadUnit = s.match(/^(\d[\d.,/]*(?:\s*x\s*\d[\d.,/]*)?(?:\s*[a-zA-Z%]+))\s+(.+)$/);
+  if (leadUnit?.[1] && leadUnit[2]?.trim()) {
+    return { name: leadUnit[2].trim(), qty: leadUnit[1].replace(/\s+/g, " ").trim() };
+  }
+
+  const leadWords = s.match(/^(\d[\d.,/]*\s+[a-zA-Z]+)\s+(.+)$/);
+  if (leadWords?.[1] && leadWords[2]?.trim()) {
+    return { name: leadWords[2].trim(), qty: leadWords[1].trim() };
+  }
+
+  return { name: s, qty: "" };
+}
+
+function collectShopItems(plan: MealPlanResult): ShopItem[] {
+  const items: ShopItem[] = [];
+  const seen = new Set<string>();
+  for (const list of Object.values(plan.shopping_list)) {
+    for (const raw of list) {
+      const parsed = parseShopItem(raw);
+      if (!parsed.name) continue;
+      const key = parsed.name.toLowerCase();
+      if (seen.has(key)) {
+        const existing = items.find((item) => item.name.toLowerCase() === key);
+        if (existing && !existing.qty && parsed.qty) existing.qty = parsed.qty;
+        continue;
+      }
+      seen.add(key);
+      items.push(parsed);
+    }
+  }
+  return items;
+}
+
+function buildShopQtyMap(items: ShopItem[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const item of items) {
+    map[item.name] = item.qty;
+  }
+  return map;
+}
+
+function shopNameForIngredient(ingredient: string, shopNames: string[]): string {
+  const lower = ingredient.toLowerCase();
+  let best: string | null = null;
+  for (const name of shopNames) {
+    if (name.length < 3) continue;
+    if (lower.includes(name.toLowerCase()) && (!best || name.length > best.length)) {
+      best = name;
+    }
+  }
+  return best ?? ingredient;
+}
+
+function injectShopQty(script: string, shopQty: Record<string, string>): string {
+  if (!script.includes(SHOP_QTY_PLACEHOLDER)) {
+    throw new Error("Meal plan document script is missing the SHOP_QTY placeholder.");
+  }
+  return script.replace(SHOP_QTY_PLACEHOLDER, `var SHOP_QTY = ${JSON.stringify(shopQty)};`);
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  return haystack.split(needle).length - 1;
+}
+
+function assertPublishedMealPlanHtml(html: string, shopQty: Record<string, string>): void {
+  const addShopCount = countOccurrences(html, "function addShop");
+  if (addShopCount !== 1) {
+    throw new Error(
+      `Meal plan document must contain exactly one shopping-list script (found ${addShopCount} addShop).`,
+    );
+  }
+  if (!html.includes("/state") || !html.includes("getDocUuid") || !html.includes("hydrateShop")) {
+    throw new Error(
+      "Meal plan document script is missing Links /state persistence (expected getDocUuid, hydrateShop, and /state).",
+    );
+  }
+  const serialized = `var SHOP_QTY = ${JSON.stringify(shopQty)};`;
+  if (!html.includes(serialized) || html.includes(SHOP_QTY_PLACEHOLDER)) {
+    throw new Error("Meal plan document SHOP_QTY was not inlined from the plan's buy quantities.");
+  }
+  if (Object.keys(shopQty).length === 0) {
+    throw new Error("Meal plan document SHOP_QTY is empty but the plan has shopping-list items.");
+  }
+}
+
 function flattenMeals(plan: MealPlanResult): FlatMeal[] {
   const flat: FlatMeal[] = [];
   let index = 1;
@@ -152,7 +262,7 @@ function renderMenuCards(flat: FlatMeal[]): string {
     .join("\n\n");
 }
 
-function renderRecipeArticles(flat: FlatMeal[], plan: MealPlanResult): string {
+function renderRecipeArticles(flat: FlatMeal[], plan: MealPlanResult, shopNames: string[]): string {
   return flat
     .map(({ recipeDomId, dayNumber, meal }) => {
       const title = escapeHtml(mealTitle(meal));
@@ -175,7 +285,8 @@ function renderRecipeArticles(flat: FlatMeal[], plan: MealPlanResult): string {
             `              <ul class="ingredients">`,
             ...ingredients.map((ingredient) => {
               const text = escapeHtml(ingredient);
-              return `                <li data-shop="${text}">${text}<button class="add-btn" type="button" aria-label="Add to shopping list" onclick="addShop(this)"></button></li>`;
+              const shop = escapeHtml(shopNameForIngredient(ingredient, shopNames));
+              return `                <li data-shop="${shop}">${text}<button class="add-btn" type="button" aria-label="Add to shopping list" onclick="addShop(this)"></button></li>`;
             }),
             `              </ul>`,
             `            </div>`,
@@ -224,19 +335,16 @@ function renderRecipeArticles(flat: FlatMeal[], plan: MealPlanResult): string {
     .join("\n\n");
 }
 
-function buildBlckbxData(input: MealPlanDocumentInput, flat: FlatMeal[]) {
+function buildBlckbxData(
+  input: MealPlanDocumentInput,
+  flat: FlatMeal[],
+  shoppingQuantities: Record<string, string>,
+) {
   const { plan, clientName } = input;
   const days = plan.num_days && plan.num_days > 0 ? plan.num_days : plan.plan.length;
   const mpd = mealsPerDay(plan);
   const kcal = averageKcalPerDay(plan);
   const stats = plan.stats;
-
-  const shoppingQuantities: Record<string, string> = {};
-  Object.entries(plan.shopping_list).forEach(([category, items]) => {
-    items.forEach((item) => {
-      shoppingQuantities[item] = category;
-    });
-  });
 
   return {
     blckbxDataVersion: 1 as const,
@@ -320,10 +428,17 @@ export function renderMealPlanDocument(input: MealPlanDocumentInput): string {
     !scriptJs.includes("function toggleRecipe")
     || !scriptJs.includes("function addShop")
     || !scriptJs.includes("function hydrateShop")
+    || !scriptJs.includes("getDocUuid")
+    || !scriptJs.includes("/state")
     || !scriptJs.includes("getElementById('shop-list')")
   ) {
-    throw new Error("Meal plan document script failed to load (missing toggleRecipe/addShop/hydrateShop/shop-list).");
+    throw new Error("Meal plan document script failed to load (missing toggleRecipe/addShop/hydrateShop/getDocUuid/state/shop-list).");
   }
+
+  const shopItems = collectShopItems(plan);
+  const shopQty = buildShopQtyMap(shopItems);
+  const shopNames = shopItems.map((item) => item.name);
+  const scriptWithQty = injectShopQty(scriptJs, shopQty);
 
   const flat = flattenMeals(plan);
   const days = plan.num_days && plan.num_days > 0 ? plan.num_days : plan.plan.length;
@@ -334,7 +449,7 @@ export function renderMealPlanDocument(input: MealPlanDocumentInput): string {
   const avgCook =
     stats.recipesCount > 0 ? `${Math.round(stats.totalCookTimeMinutes / stats.recipesCount)} min` : "—";
 
-  const blckbxData = buildBlckbxData({ plan, clientName }, flat);
+  const blckbxData = buildBlckbxData({ plan, clientName }, flat, shopQty);
   // Prevent </script> breakout inside the JSON blob.
   const blckbxJson = JSON.stringify(blckbxData).replace(/</g, "\\u003c");
 
@@ -407,7 +522,7 @@ ${renderMenuCards(flat)}
       <h2 class="block-title">Recipes</h2>
       <p class="block-note">Full method and ingredients for each dish. <strong>Tap a recipe to expand.</strong></p>
       <div class="recipe-list">
-${renderRecipeArticles(flat, plan)}
+${renderRecipeArticles(flat, plan, shopNames)}
       </div>
     </section>
 
@@ -445,7 +560,7 @@ ${renderRecipeArticles(flat, plan)}
 
 <script type="application/json" id="blckbx-data">${blckbxJson}</script>
 <script>
-${scriptJs}
+${scriptWithQty}
 </script>
 </body>
 </html>
@@ -454,6 +569,8 @@ ${scriptJs}
   if (document.includes("{{")) {
     throw new Error("Meal plan document still contains unresolved template tokens.");
   }
+
+  assertPublishedMealPlanHtml(document, shopQty);
 
   return document;
 }

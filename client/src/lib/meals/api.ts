@@ -262,6 +262,24 @@ function asArrayString(value: unknown): string[] {
   return [];
 }
 
+/** Turn a shopping-list entry into a display string, preserving buy qty. */
+export function shopEntryToString(item: unknown): string {
+  if (typeof item === "string") return item.trim();
+  if (item && typeof item === "object") {
+    const record = item as Record<string, unknown>;
+    const name = String(record.name ?? record.item ?? record.title ?? "").trim();
+    const qty = String(record.qty ?? record.quantity ?? record.amount ?? record.buy ?? "").trim();
+    if (name && qty) return `${name} — ${qty}`;
+    return name || qty;
+  }
+  return "";
+}
+
+function asShopItemStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(shopEntryToString).filter(Boolean);
+}
+
 const MEAL_PLAN_WARNING_TYPES = new Set<MealPlanWarningType>([
   "recent_repeat",
   "selection_excluded",
@@ -490,13 +508,13 @@ function normalizePlanResponse(raw: any): MealPlanResult {
   };
 }
 
-function normalizeShoppingList(rawShoppingList: unknown): ShoppingList {
+export function normalizeShoppingList(rawShoppingList: unknown): ShoppingList {
   if (!rawShoppingList || typeof rawShoppingList !== "object") {
     return {};
   }
 
   return Object.entries(rawShoppingList as Record<string, unknown>).reduce<ShoppingList>((acc, [key, value]) => {
-    acc[key] = asArrayString(value);
+    acc[key] = asShopItemStrings(value);
     return acc;
   }, {});
 }

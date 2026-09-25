@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { toast } from "@/hooks/use-toast";
-import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, PlanReuseConfig, ShoppingList } from "@/lib/meals/api";
-import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, MealCraftHttpError, mealItemOrigin, pocketbaseRecipeId, sortMealsByType } from "@/lib/meals/api";
+import type { MacroOverride, MealCraftClient, MealCraftRecipe, MealPlanDay, MealPlanItem, MealPlanResult, PlanReuseConfig } from "@/lib/meals/api";
+import { computeMealPlanStats, enhanceImageUrl, getMealPlanItemKey, MealCraftHttpError, mealItemOrigin, normalizeShoppingList, pocketbaseRecipeId, sortMealsByType } from "@/lib/meals/api";
 import { renderMealPlanDocument } from "@/lib/meals/mealPlanDocument";
 import { isLinksApiError, uploadFile } from "@/features/links/api";
 import { StepIndicator } from "@/components/meals/StepIndicator";
@@ -62,15 +62,6 @@ function formatDate(value: string): string {
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item)).filter(Boolean);
-}
-
-function normalizeShoppingList(value: unknown): ShoppingList {
-  if (!value || typeof value !== "object") return {};
-
-  return Object.entries(value as Record<string, unknown>).reduce<ShoppingList>((acc, [key, rawItems]) => {
-    acc[key] = asStringArray(rawItems);
-    return acc;
-  }, {});
 }
 
 function mapRecipeRecord(record: any): MealCraftRecipe {
